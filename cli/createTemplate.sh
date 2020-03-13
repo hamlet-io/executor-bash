@@ -143,13 +143,13 @@ function options() {
             fi
 
             # Legacy fragments
-            for fragment in ${GENERATION_DIR}/templates/${composite}/${composite}_*.ftl; do
+            for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/${composite}_*.ftl; do
                 $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
                 addToArray "${composite}_array" "${fragment}"
             done
 
             # Legacy end fragments
-            for fragment in ${GENERATION_DIR}/templates/${composite}/*end.ftl; do
+            for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/*end.ftl; do
                 $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
                 addToArray "${composite}_array" "${fragment}"
             done
@@ -294,7 +294,7 @@ function process_template_pass() {
   local region_prefix="${region:+${region}-}"
 
   # Set up the level specific template information
-  local template_dir="${GENERATION_DIR}/templates"
+  local template_dir="${GENERATION_ENGINE_DIR}/client"
   local template="create${level^}Template.ftl"
   [[ ! -f "${template_dir}/${template}" ]] && template="create${level^}.ftl"
   local template_composites=()
@@ -506,8 +506,8 @@ function process_template_pass() {
       ${GENERATION_BASE_DIR}/execution/freemarker.sh \
         -d "${template_dir}" \
         ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
-        -d "${GENERATION_BASE_DIR}/engine" \
-        -d "${GENERATION_BASE_DIR}/providers" \
+        -d "${GENERATION_ENGINE_DIR}/engine" \
+        -d "${GENERATION_ENGINE_DIR}/providers" \
         ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
 		    -t "${template}" \
         -o "${template_result_file}" \
