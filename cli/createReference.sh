@@ -68,7 +68,7 @@ function process_template() {
   local type_prefix="${type}-"
 
   # Set up the level specific template information
-  local template_dir="${GENERATION_DIR}/templates"
+  local template_dir="${GENERATION_ENGINE_DIR}/client"
   local template="create${type^}Reference.ftl"
   [[ ! -f "${template_dir}/${template}" ]] && template="create${type^}.ftl"
   local template_composites=()

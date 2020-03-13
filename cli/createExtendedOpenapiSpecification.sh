@@ -94,7 +94,7 @@ POST_PROCESSING_FILTER="${tmp_dir}/pp.jq"
 cp ${GENERATION_DIR}/postProcessOpenapi.jq "${POST_PROCESSING_FILTER}"
 
 # Set up the type specific template information
-TEMPLATE_DIR="${GENERATION_DIR}/templates"
+TEMPLATE_DIR="${GENERATION_ENGINE_DIR}/client"
 TEMPLATE="createOpenapiExtensions.ftl"
 OPENAPI_EXTENSIONS_FILE="${tmp_dir}/openapi_extensions.json"
 OPENAPI_EXTENSIONS_PRE_POST_FILE="${tmp_dir}/openapi_pre_post.json"
@@ -114,12 +114,12 @@ for ACCOUNT in "${ACCOUNTS[@]}"; do
         ARGS+=("-v" "openapi=${OPENAPI_FILE}")
         ARGS+=("-v" "integrations=${INTEGRATIONS_FILE}")
 
-        ${GENERATION_DIR}/freemarker.sh -t ${TEMPLATE} -d ${TEMPLATE_DIR} -o "${OPENAPI_EXTENSIONS_FILE}" "${ARGS[@]}"
+        ${GENERATION_BASE_DIR}/execution/freemarker.sh -t ${TEMPLATE} -d ${TEMPLATE_DIR} -o "${OPENAPI_EXTENSIONS_FILE}" "${ARGS[@]}"
         RESULT=$?
         [[ "${RESULT}" -ne 0 ]] && exit
 
         # Merge the two
-        ${GENERATION_DIR}/manageJSON.sh -o "${OPENAPI_EXTENSIONS_PRE_POST_FILE}" "${OPENAPI_FILE}" "${OPENAPI_EXTENSIONS_FILE}"
+        ${GENERATION_BASE_DIR}/execution/manageJSON.sh -o "${OPENAPI_EXTENSIONS_PRE_POST_FILE}" "${OPENAPI_FILE}" "${OPENAPI_EXTENSIONS_FILE}"
         RESULT=$?
         [[ "${RESULT}" -ne 0 ]] && exit
 
