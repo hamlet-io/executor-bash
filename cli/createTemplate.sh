@@ -286,6 +286,7 @@ function process_template_pass() {
   local deployment_mode="${1}"; shift
   local cf_dir="${1}"; shift
   local run_id="${1,,}"; shift
+  local deployment_unit_state_subdirectories="${1,,}"; shift
 
   # Filename parts
   local level_prefix="${level}-"
@@ -518,7 +519,12 @@ function process_template_pass() {
     info "Ignoring empty ${file_description} file ...\n"
 
     # Remove any previous version
-    [[ -f "${output_file}" ]] && rm "${output_file}"
+    # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
+    # cleanup is done once all passes have been processed in this case
+    if [[ (-f "${output_file}") && ("${deployment_unit_state_subdirectories}" == "false") ]]; then
+      info "... removing existing ${file_description} file ${output_file} ...\n"
+      rm "${output_file}"
+    fi
 
     # Indicate template should be ignored
     return 254
@@ -667,6 +673,7 @@ function process_template() {
   # Defaults
   local passes=("template")
   local template_alternatives=("primary")
+  local cleanup_level="${level}"
 
   case "${level}" in
 
@@ -682,8 +689,19 @@ function process_template() {
       local cf_dir_default="${PRODUCT_STATE_DIR}/cf/shared"
       ;;
 
-    solution|segment|application)
+    application)
       local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+      cleanup_level="app"
+      ;;
+
+    solution)
+      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+      cleanup_level="soln"
+      ;;
+
+    segment)
+      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+      cleanup_level="seg"
       ;;
 
     *)
@@ -698,6 +716,10 @@ function process_template() {
   #
   # This will start to cause the new structure to be created by default for new units,
   # and will accommodate the cmdb update when it is performed.
+  #
+  # The cleanup logic for >=2.0.1 cmdb is also more robust, as it will remove files
+  # that are no longer generated.
+  local deployment_unit_state_subdirectories="false"
   case "${level}" in
     unitlist|blueprint|buildblueprint)
       # No subdirectories for deployment units
@@ -707,6 +729,7 @@ function process_template() {
 
       if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
         local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
+        deployment_unit_state_subdirectories="true"
       fi
       ;;
   esac
@@ -734,7 +757,7 @@ function process_template() {
   local results_dir="${tmp_dir}/results"
   mkdir -p "${results_dir}"
 
-  # First see if an generation plan can be generated
+  # First see if a generation contract can be generated
   process_template_pass \
       "${GENERATION_PROVIDERS}" \
       "${GENERATION_FRAMEWORK}" \
@@ -754,24 +777,43 @@ function process_template() {
       "${configuration_reference}" \
       "${deployment_mode}" \
       "${cf_dir}" \
-      "${run_id}"
+      "${run_id}" \
+      "${deployment_unit_state_subdirectories}"
   local result=$?
 
-  if [[ ( ${result} == 0 ) || ( ${result} == 255 ) ]]; then
-    local generation_contract="${results_dir}/${results_list[0]}"
-    info "Generating documents from generation contract ${generation_contract}"
-    willLog "debug" && cat ${generation_contract}
-
-    local task_list_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-    getTasksFromContract "${generation_contract}" "${task_list_file}" ";"
-
-    local process_template_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-    cat "${task_list_file}" | grep "^process_template_pass" > "${process_template_tasks_file}"
-    readarray -t process_template_tasks_list < "${process_template_tasks_file}"
-  else
-    # Need execution plan to define template framework and format
-    fatalCantProceed "No execution plan." && return 1
+  # Include contract in difference checking
+  if [[ ${result} == 0 ]]; then
+      # At least one difference seen
+      differences_detected="true"
   fi
+
+  case ${result} in
+    254)
+      # Nothing generated
+      # Need contract to define generation processing required
+      # Treat as complete
+      warn "No generation contract generated - treating as successful"
+      return 0
+      ;;
+
+    0 | 255)
+      # Use the contract to control further processing
+      local generation_contract="${results_dir}/${results_list[0]}"
+      info "Generating documents from generation contract ${generation_contract}"
+      willLog "debug" && cat ${generation_contract}
+
+      local task_list_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
+      getTasksFromContract "${generation_contract}" "${task_list_file}" ";"
+
+      local process_template_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
+      cat "${task_list_file}" | grep "^process_template_pass" > "${process_template_tasks_file}"
+      readarray -t process_template_tasks_list < "${process_template_tasks_file}"
+      ;;
+
+    *)
+      # Fatal error of some description
+      return ${result}
+  esac
 
   # Perform each pass/alternative combination
   for step in "${process_template_tasks_list[@]}"; do
@@ -792,7 +834,8 @@ function process_template() {
       "${configuration_reference}" \
       "${deployment_mode}" \
       "${cf_dir}" \
-      "${run_id}"
+      "${run_id}" \
+      "${deployment_unit_state_subdirectories}"
 
     local result=$?
     case ${result} in
@@ -814,9 +857,30 @@ function process_template() {
 
   # Copy the set of result file if necessary
   if [[ "${differences_detected}" == "true" ]]; then
+
+    # Cleanup output directory
+    if [[ "${deployment_unit_state_subdirectories}" == "true" ]]; then
+      info "Checking output directory for unused files ..."
+
+      # Remove existing files for the current level being careful to preserve stacks
+      readarray -t existing_files < <(find "${cf_dir}" -mindepth 1 -maxdepth 1 -type f \
+      \( -name "${cleanup_level}-*" -and -not -name "${cleanup_level}-*-stack.json" \) )
+
+      for e in "${existing_files[@]}"; do
+        local existing_filename="$(fileName "${e}")"
+        debug "Checking file ${existing_filename} ..."
+        # If generated, then ignore
+        $(inArray "results_list" "${existing_filename}") && continue
+
+        # Wasn't generated so remove
+        info "... removing ${existing_filename} ..."
+        rm  -f "${cf_dir}/${existing_filename}"
+      done
+    fi
+
     info "Differences detected ..."
     for f in "${results_list[@]}"; do
-      info "Updating "${f}" ..."
+      info "... updating ${f} ..."
       cp "${results_dir}/${f}" "${cf_dir}/${f}"
     done
   else
