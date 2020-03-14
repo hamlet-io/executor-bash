@@ -68,7 +68,7 @@ for composite in "${TEMPLATE_COMPOSITES[@]}"; do
         declare -ga "${composite}_array"
 
         # Legacy start fragments
-        for fragment in "${GENERATION_DIR}"/templates/${composite}/start*.ftl; do
+        for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start*.ftl; do
             $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
             addToArray "${composite}_array" "${fragment}"
         done
