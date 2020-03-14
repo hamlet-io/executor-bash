@@ -1,6 +1,5 @@
 # Set the default behavior, in case people don't have core.autocrlf set.
 * text=auto
 
-# *nix scripts should stay with LF 
-*.sh text eol=lf
-
+# Set the default behavior - its Linux so use LF for everything
+* text eol=lf
