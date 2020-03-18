@@ -23,7 +23,7 @@ Usage: $(basename $0)  -f -l -u
                         -c CODE_COMMIT_LIST
                         -t CODE_TAG_LIST
                         -r CODE_REPO_LIST
-                        -o REGISTRY_SCOPE
+                        -o REGISTRY_SCOPE_LIST
                         -p CODE_PROVIDER_LIST
                         -i IMAGE_FORMATS_LIST
                         -a ACCEPTANCE_TAG
@@ -36,7 +36,7 @@ where
     -h                              shows this text
 (o) -i IMAGE_FORMATS_LIST           is the list of image formats for each deployment unit
 (o) -l (REFERENCE_OPERATION=${REFERENCE_OPERATION_LIST}) to detail DEPLOYMENT_UNIT_LIST build info
-(o) -o REGISTRY_SCOPE               is the registry scope
+(o) -o REGISTRY_SCOPE_LIST          is the registry scope for each deployment unit
 (o) -p CODE_PROVIDER_LIST           is the repo provider for each deployment unit
 (o) -r CODE_REPO_LIST               is the repo for each deployment unit
 (m) -s DEPLOYMENT_UNIT_LIST         is the list of deployment units to process
@@ -73,6 +73,7 @@ function updateDetail() {
     local UD_COMMIT="${2,,:-?}"
     local UD_TAG="${3:-?}"
     local UD_FORMATS="${4,,:-?}"
+    local UD_SCOPE="${5,,:-?}"
 
     if [[ ("${UD_COMMIT}" != "?") || ("${UD_TAG}" != "?") ]]; then
         DETAIL_MESSAGE="${DETAIL_MESSAGE}, ${UD_DEPLOYMENT_UNIT}="
@@ -89,6 +90,9 @@ function updateDetail() {
             # Format is just the commit
             DETAIL_MESSAGE="${DETAIL_MESSAGE}${UD_COMMIT:0:7}"
         fi
+        if [[ "${UD_SCOPE}" != "?" ]]; then
+            DETAIL_MESSAGE="${DETAIL_MESSAGE}:${UD_SCOPE}"
+        fi
     fi
 }
 
@@ -102,17 +106,17 @@ function getBuildReferenceParts() {
 
     if [[ "${GBRP_REFERENCE}" =~ ^\{ ]]; then
         # Newer JSON based format
-        for ATTRIBUTE in commit tag format; do
-            ATTRIBUTE_VALUE=$(jq -r ".${ATTRIBUTE} | select(.!=null)" <<< "${GBRP_REFERENCE}")
+        for ATTRIBUTE in commit tag format scope; do
+            ATTRIBUTE_VALUE=$(jq -r ".${ATTRIBUTE^} | select(.!=null)" <<< "${GBRP_REFERENCE}")
             if [[ -z "${ATTRIBUTE_VALUE}" ]]; then
-                ATTRIBUTE_VALUE=$(jq -r ".${ATTRIBUTE^} | select(.!=null)" <<< "${GBRP_REFERENCE}")
+                ATTRIBUTE_VALUE=$(jq -r ".${ATTRIBUTE} | select(.!=null)" <<< "${GBRP_REFERENCE}")
             fi
             declare -g "BUILD_REFERENCE_${ATTRIBUTE^^}"="${ATTRIBUTE_VALUE:-?}"
         done
         for ATTRIBUTE in formats; do
-            readarray -t FORMAT_VALUES < <(jq -r ".${ATTRIBUTE} | select(.!=null) | .[]" <<< "${GBRP_REFERENCE}")
+            readarray -t FORMAT_VALUES < <(jq -r ".${ATTRIBUTE^} | select(.!=null) | .[]" <<< "${GBRP_REFERENCE}")
             arrayIsEmpty FORMAT_VALUES &&
-                readarray -t FORMAT_VALUES < <(jq -r ".${ATTRIBUTE^} | select(.!=null) | .[]" <<< "${GBRP_REFERENCE}")
+                readarray -t FORMAT_VALUES < <(jq -r ".${ATTRIBUTE} | select(.!=null) | .[]" <<< "${GBRP_REFERENCE}")
             ATTRIBUTE_VALUE="$(listFromArray FORMAT_VALUES "${IMAGE_FORMAT_SEPARATORS:0:1}")"
             declare -g "BUILD_REFERENCE_${ATTRIBUTE^^}"="${ATTRIBUTE_VALUE:-?}"
         done
@@ -195,7 +199,7 @@ while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
             REFERENCE_OPERATION="${REFERENCE_OPERATION_LIST}"
             ;;
         o)
-            REGISTRY_SCOPE="${OPTARG}"
+            REGISTRY_SCOPE_LIST="${OPTARG}"
             ;;
         p)
             CODE_PROVIDER_LIST="${OPTARG}"
@@ -217,10 +221,10 @@ while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
             VERIFICATION_TAG="${OPTARG}"
             ;;
         \?)
-            fatalOption; exit
+            fatalOption; RESULT=1 && exit
             ;;
         :)
-            fatalOptionArgument; exit
+            fatalOptionArgument; RESULT=1 && exit
             ;;
      esac
 done
@@ -234,33 +238,33 @@ case ${REFERENCE_OPERATION} in
         # Add the acceptance tag on provided deployment unit list
         # Normally this would be called after list full
         [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory && exit
+            (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory && RESULT=1 && exit
         ;;
 
     ${REFERENCE_OPERATION_LIST})
         # Format the build details based on provided deployment unit list
-        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ]] && fatalMandatory && exit
+        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ]] && fatalMandatory && RESULT=1 && exit
         ;;
 
     ${REFERENCE_OPERATION_LISTFULL})
         # Populate DEPLOYMENT_UNIT_LIST based on current appsettings
-        [[ -z "${SEGMENT_BUILDS_DIR}" ]] && fatalMandatory && exit
+        [[ -z "${SEGMENT_BUILDS_DIR}" ]] && fatalMandatory && RESULT=1 && exit
         ;;
 
     ${REFERENCE_OPERATION_UPDATE})
         # Update builds based on provided deployment unit list
         [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${SEGMENT_BUILDS_DIR}") ]] && fatalMandatory && exit
+            (-z "${SEGMENT_BUILDS_DIR}") ]] && fatalMandatory && RESULT=1 && exit
         ;;
 
     ${REFERENCE_OPERATION_VERIFY})
         # Verify builds based on provided deployment unit list
         [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${VERIFICATION_TAG}") ]] && fatalMandatory && exit
+            (-z "${VERIFICATION_TAG}") ]] && fatalMandatory && RESULT=1 && exit
         ;;
 
     *)
-        fatal "Invalid REFERENCE_OPERATION \"${REFERENCE_OPERATION}\"" && exit
+        fatal "Invalid REFERENCE_OPERATION \"${REFERENCE_OPERATION}\"" && RESULT=1 && exit
         ;;
 esac
 
@@ -272,6 +276,7 @@ CODE_TAG_ARRAY=(${CODE_TAG_LIST})
 CODE_REPO_ARRAY=(${CODE_REPO_LIST})
 CODE_PROVIDER_ARRAY=(${CODE_PROVIDER_LIST})
 IMAGE_FORMATS_ARRAY=(${IMAGE_FORMATS_LIST})
+REGISTRY_SCOPE_ARRAY=(${REGISTRY_SCOPE_LIST})
 
 if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
     # Most operations require access to the segment build settings
@@ -297,6 +302,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
     CODE_REPO="${CODE_REPO_ARRAY[${INDEX}]:-?}"
     CODE_PROVIDER="${CODE_PROVIDER_ARRAY[${INDEX}]:-?}"
     IMAGE_FORMATS="${IMAGE_FORMATS_ARRAY[${INDEX}]:-?}"
+    REGISTRY_SCOPE="${REGISTRY_SCOPE_ARRAY[${INDEX}]:-?}"
     IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
 
     # Look for the deployment unit and build reference files
@@ -357,7 +363,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                             [[ "${RESULT}" -ne 0 ]] && exit
                             ;;
                         *)
-                            fatal "Unknown image format \"${IMAGE_FORMAT}\"" && exit
+                            fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
                             ;;
                     esac
                 done
@@ -366,7 +372,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
 
         ${REFERENCE_OPERATION_LIST})
             # Add build info to DETAIL_MESSAGE
-            updateDetail "${CURRENT_DEPLOYMENT_UNIT}" "${CODE_COMMIT}" "${CODE_TAG}" "${IMAGE_FORMATS}"
+            updateDetail "${CURRENT_DEPLOYMENT_UNIT}" "${CODE_COMMIT}" "${CODE_TAG}" "${IMAGE_FORMATS}" "${REGISTRY_SCOPE}"
             ;;
 
         ${REFERENCE_OPERATION_LISTFULL})
@@ -377,9 +383,10 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     CODE_COMMIT_ARRAY["${INDEX}"]="${BUILD_REFERENCE_COMMIT}"
                     CODE_TAG_ARRAY["${INDEX}"]="${BUILD_REFERENCE_TAG}"
                     IMAGE_FORMATS_ARRAY["${INDEX}"]="${BUILD_REFERENCE_FORMATS}"
-                fi
+                    REGISTRY_SCOPE_ARRAY["${INDEX}"]="${BUILD_REFERENCE_SCOPE}"
             fi
-            ;;
+                 fi
+           ;;
 
         ${REFERENCE_OPERATION_UPDATE})
             # Ensure something to do for the current deployment unit
@@ -390,6 +397,13 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
                 IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+            fi
+
+            # Preserve the scope if none provided
+            if [[ ("${REGISTRY_SCOPE}" == "?") &&
+                    (-f ${BUILD_FILE}) ]]; then
+                getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
             fi
 
             # Construct the build reference
@@ -406,7 +420,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                 if [[ "${CODE_TAG}" != "?" ]]; then
                     if [[ ("${CODE_REPO}" == "?") ||
                             ("${CODE_PROVIDER}" == "?") ]]; then
-                        fatal "Ignoring tag for the \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit - no code repo and/or provider defined" && exit
+                        fatal "Ignoring tag for the \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit - no code repo and/or provider defined" && RESULT=1 && exit
                     fi
                     # Determine the details of the provider hosting the code repo
                     defineGitProviderAttributes "${CODE_PROVIDER}" "CODE"
@@ -416,7 +430,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     CODE_COMMIT=$(git ls-remote -t https://${!CODE_CREDENTIALS_VAR}@${CODE_DNS}/${CODE_ORG}/${CODE_REPO} \
                                     "${CODE_TAG}^{}" | cut -f 1)
                     [[ -z "${CODE_COMMIT}" ]] &&
-                        fatal "Tag ${CODE_TAG} not found in the ${CODE_REPO} repo. Was an annotated tag used?" && exit
+                        fatal "Tag ${CODE_TAG} not found in the ${CODE_REPO} repo. Was an annotated tag used?" && RESULT=1 && exit
 
                     # Fetch other info about the tag
                     # We are using a github api here to avoid having to pull in the whole repo -
@@ -424,7 +438,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     CODE_TAG_MESSAGE=$(curl -s https://${!CODE_CREDENTIALS_VAR}@${CODE_API_DNS}/repos/${CODE_ORG}/${CODE_REPO}/git/tags/${TAG_COMMIT} | jq .message | tr -d '"')
                     [[ (-z "${CODE_TAG_MESSAGE}") ||
                         ("${CODE_TAG_MESSAGE}" == "Not Found") ]] &&
-                        fatal "Message for tag ${CODE_TAG} not found in the ${CODE_REPO} repo" && exit
+                        fatal "Message for tag ${CODE_TAG} not found in the ${CODE_REPO} repo" && RESULT=1 && exit
                     # else
                     # TODO: Confirm commit is in remote repo - for now we'll assume its there if an image exists
                 else
@@ -445,11 +459,18 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                 IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
             fi
 
+            # If no scope explicitly defined, use the scope in the build reference if defined
+            if [[ ("${REGISTRY_SCOPE}" == "?") &&
+                    (-f ${BUILD_FILE}) ]]; then
+                getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+            fi
+
             # If we don't know the image type, then there is a problem
             # Most likely it is the first time this unit has been mentioned and no format was
             # included as part of the prepare operation.
             [[ "${IMAGE_FORMATS}" == "?" ]] &&
-                        fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit. Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time." && exit
+                        fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit. Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time." && RESULT=1 && exit
 
             for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
                 IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
@@ -532,7 +553,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                         RESULT=$?
                         ;;
                     *)
-                        fatal "Unknown image format \"${IMAGE_FORMAT}\"" && exit
+                        fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
                         ;;
                 esac
                 if [[ "${RESULT}" -ne 0 ]]; then
@@ -631,13 +652,13 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 RESULT=$?
                                 ;;
                             *)
-                                fatal "Unknown image format \"${IMAGE_FORMAT}\"" && exit
+                                fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
                                 ;;
                         esac
                         [[ "${RESULT}" -ne 0 ]] &&
-                            fatal "Unable to pull ${IMAGE_FORMAT,,} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} from provider ${FROM_IMAGE_PROVIDER}. Was the build successful?" && exit
+                            fatal "Unable to pull ${IMAGE_FORMAT,,} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} from provider ${FROM_IMAGE_PROVIDER}. Was the build successful?" && RESULT=1 && exit
                     else
-                        fatal "${IMAGE_FORMAT^} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} not found. Was the build successful?" && exit
+                        fatal "${IMAGE_FORMAT^} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} not found. Was the build successful?" && RESULT=1 && exit
                     fi
                 fi
             done
@@ -660,6 +681,7 @@ case ${REFERENCE_OPERATION} in
         save_context_property CODE_COMMIT_LIST "${CODE_COMMIT_ARRAY[*]}"
         save_context_property CODE_TAG_LIST "${CODE_TAG_ARRAY[*]}"
         save_context_property IMAGE_FORMATS_LIST "${IMAGE_FORMATS_ARRAY[*]}"
+        save_context_property REGISTRY_SCOPE_LIST "${REGISTRY_SCOPE_ARRAY[*]}"
         save_context_property DETAIL_MESSAGE "${DETAIL_MESSAGE}"
         ;;
 
