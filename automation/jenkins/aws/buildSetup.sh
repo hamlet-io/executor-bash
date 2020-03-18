@@ -49,13 +49,11 @@ if [[ -z "${DEPLOYMENT_UNIT_LIST}" ]]; then
                         declare "${ATTRIBUTE^^}"="${ATTRIBUTE_VALUE}"
                     done
                     export DEPLOYMENT_UNIT_LIST="${UNITS:-${SLICES}}"
-                    export REGISTRY_SCOPE="${SCOPE,,}"
                     break
                     ;;
 
                 ref)
                     export DEPLOYMENT_UNIT_LIST=$(cat "${DU_FILE}")
-                    export REGISTRY_SCOPE=""
                     break
                     ;;
             esac
@@ -63,7 +61,6 @@ if [[ -z "${DEPLOYMENT_UNIT_LIST}" ]]; then
     done
 
     save_context_property DEPLOYMENT_UNIT_LIST
-    save_context_property REGISTRY_SCOPE
 fi
 
 # Already set image format overrides that in the repo
@@ -77,6 +74,11 @@ DEPLOYMENT_UNIT_ARRAY=(${DEPLOYMENT_UNIT_LIST})
 DEPLOYMENT_UNIT="${DEPLOYMENT_UNIT_ARRAY[0]}"
 CODE_COMMIT_ARRAY=(${CODE_COMMIT_LIST})
 CODE_COMMIT="${CODE_COMMIT_ARRAY[0]}"
+
+# Already set registry scope overrides that in the repo
+REGISTRY_SCOPE="${REGISTRY_SCOPE:-${SCOPE}}"
+export REGISTRY_SCOPE_LIST="${REGISTRY_SCOPE}"
+save_context_property REGISTRY_SCOPE_LIST
 
 # Record key parameters for downstream jobs
 save_chain_property DEPLOYMENT_UNITS "${DEPLOYMENT_UNIT_LIST}"

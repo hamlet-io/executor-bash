@@ -490,6 +490,7 @@ function main() {
   CODE_REPO_ARRAY=()
   CODE_PROVIDER_ARRAY=()
   IMAGE_FORMATS_ARRAY=()
+  REGISTRY_SCOPE_ARRAY=()
   arrayFromList "UNITS" "${DEPLOYMENT_UNITS:-${DEPLOYMENT_UNIT:-${SLICES:-${SLICE}}}}" "${DEPLOYMENT_UNIT_SEPARATORS}"
   for CURRENT_DEPLOYMENT_UNIT in "${UNITS[@]}"; do
       [[ -z "${CURRENT_DEPLOYMENT_UNIT}" ]] && continue
@@ -497,6 +498,7 @@ function main() {
       DEPLOYMENT_UNIT_PART="${BUILD_REFERENCE_PARTS[0]}"
       TAG_PART="${BUILD_REFERENCE_PARTS[1]:-?}"
       FORMATS_PART="${BUILD_REFERENCE_PARTS[2]:-?}"
+      SCOPE_PART="${BUILD_REFERENCE_PARTS[3]:-?}"
       COMMIT_PART="?"
       if [[ ("${#DEPLOYMENT_UNIT_ARRAY[@]}" -eq 0) ||
               ("${APPLY_TO_ALL_DEPLOYMENT_UNITS}" == "true") ]]; then
@@ -511,6 +513,11 @@ function main() {
               IFS="${IMAGE_FORMAT_SEPARATORS}, " read -ra FORMATS <<< "${IMAGE_FORMATS:-${IMAGE_FORMAT}}"
               FORMATS_PART=$(IFS="${IMAGE_FORMAT_SEPARATORS}"; echo "${FORMATS[*]}")
           fi
+          if [[ -n "${REGISTRY_SCOPE}" ]]; then
+              # Permit separate variable for registry scope value - easier if
+              # all units are segment specific
+              SCOPE_PART="${REGISTRY_SCOPE}"
+          fi
       fi
 
       if [[ "${#TAG_PART}" -eq 40 ]]; then
@@ -523,6 +530,7 @@ function main() {
       CODE_COMMIT_ARRAY+=("${COMMIT_PART,,}")
       CODE_TAG_ARRAY+=("${TAG_PART}")
       IMAGE_FORMATS_ARRAY+=("${FORMATS_PART}")
+      REGISTRY_SCOPE_ARRAY+=("${SCOPE_PART}")
 
       # Determine code repo for the deployment unit - there may be none
       CODE_DEPLOYMENT_UNIT=$(tr "-" "_" <<< "${DEPLOYMENT_UNIT_PART^^}")
@@ -566,6 +574,7 @@ function main() {
   save_context_property CODE_REPO_LIST       "${CODE_REPO_ARRAY[*]}"
   save_context_property CODE_PROVIDER_LIST   "${CODE_PROVIDER_ARRAY[*]}"
   save_context_property IMAGE_FORMATS_LIST   "${IMAGE_FORMATS_ARRAY[*]}"
+  save_context_property REGISTRY_SCOPE_LIST   "${REGISTRY_SCOPE_ARRAY[*]}"
   [[ -n "${UPDATED_UNITS}" ]] && save_context_property CLEANED_DEPLOYMENT_UNITS "${UPDATED_UNITS}"
 
   ### Release management ###
