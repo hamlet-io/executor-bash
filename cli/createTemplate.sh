@@ -858,17 +858,25 @@ function process_template() {
   # Copy the set of result file if necessary
   if [[ "${differences_detected}" == "true" ]]; then
 
+    info "Differences detected ..."
+
+    for f in "${results_list[@]}"; do
+      info "... updating ${f} ..."
+      cp "${results_dir}/${f}" "${cf_dir}/${f}"
+    done
+
     # Cleanup output directory
     if [[ "${deployment_unit_state_subdirectories}" == "true" ]]; then
-      info "Checking output directory for unused files ..."
 
       # Remove existing files for the current level being careful to preserve stacks
       readarray -t existing_files < <(find "${cf_dir}" -mindepth 1 -maxdepth 1 -type f \
-      \( -name "${cleanup_level}-*" -and -not -name "${cleanup_level}-*-stack.json" \) )
+      \(  -name "${cleanup_level}-*" \
+          -and -not -name "${cleanup_level}-*-stack.json" \
+          -and -not -name "${cleanup_level}-*-lastchange.json" \) )
 
       for e in "${existing_files[@]}"; do
         local existing_filename="$(fileName "${e}")"
-        debug "Checking file ${existing_filename} ..."
+        debug "... checking file ${existing_filename} ..."
         # If generated, then ignore
         $(inArray "results_list" "${existing_filename}") && continue
 
@@ -878,11 +886,6 @@ function process_template() {
       done
     fi
 
-    info "Differences detected ..."
-    for f in "${results_list[@]}"; do
-      info "... updating ${f} ..."
-      cp "${results_dir}/${f}" "${cf_dir}/${f}"
-    done
   else
     info "No differences detected."
   fi
