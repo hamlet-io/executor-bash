@@ -338,7 +338,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 -r "${ACCEPTANCE_TAG}" \
                                 -c "${REGISTRY_SCOPE}"
                             RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && exit
+                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
                         lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot)
                             ${AUTOMATION_DIR}/manage${IMAGE_FORMAT_LOWER^}.sh -k \
@@ -348,19 +348,19 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 -r "${ACCEPTANCE_TAG}" \
                                 -c "${REGISTRY_SCOPE}"
                             RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && exit
+                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
                         openapi|swagger)
-                            ${AUTOMATION_DIR}/manageOpenapi.sh -k
+                            ${AUTOMATION_DIR}/manageOpenapi.sh -k \
                                 -a "${IMAGE_PROVIDER}" \
-                                -y "${IMAGE_FORMAT_LOWER}"
+                                -y "${IMAGE_FORMAT_LOWER}" \
                                 -f "${IMAGE_FORMAT_LOWER}.zip" \
                                 -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
                                 -r "${ACCEPTANCE_TAG}" \
                                 -c "${REGISTRY_SCOPE}"
                             RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && exit
+                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
                         *)
                             fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit

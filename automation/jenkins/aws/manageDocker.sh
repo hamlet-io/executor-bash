@@ -255,7 +255,7 @@ case "${REGISTRY_SCOPE}" in
         if [[ -n "${SEGMENT}" ]]; then
             REGISTRY_SUBTYPE="-${SEGMENT}"
         else
-          fatal "Segment scoped registry required but SEGMENT not defined" && exit
+          fatal "Segment scoped registry required but SEGMENT not defined" && RESULT=1 && exit
         fi
         ;;
     *)
@@ -286,7 +286,7 @@ defineDockerProviderAttributes "${DOCKER_PROVIDER}" "DOCKER_PROVIDER"
 
 # Ensure the local repository has been determined
 [[ -z "${DOCKER_REPO}" ]] &&
-    fatal "Job requires the local repository name, or the product/deployment unit/commit" && exit
+    fatal "Job requires the local repository name, or the product/deployment unit/commit" && RESULT=1 && exit
 
 # Apply remote registry defaults
 REMOTE_DOCKER_PROVIDER="${REMOTE_DOCKER_PROVIDER:-${PRODUCT_REMOTE_DOCKER_PROVIDER}}"
@@ -310,7 +310,7 @@ FULL_DOCKER_IMAGE="${DOCKER_PROVIDER_DNS}/${DOCKER_IMAGE}"
 # Confirm access to the local registry
 dockerLogin ${DOCKER_PROVIDER_DNS} ${DOCKER_PROVIDER} ${!DOCKER_PROVIDER_USER_VAR} ${!DOCKER_PROVIDER_PASSWORD_VAR}
 RESULT=$?
-[[ "$RESULT" -ne 0 ]] && fatal "Can't log in to ${DOCKER_PROVIDER_DNS}" && exit
+[[ "$RESULT" -ne 0 ]] && fatal "Can't log in to ${DOCKER_PROVIDER_DNS}" && RESULT=1 && exit
 
 # Perform the required action
 case ${DOCKER_OPERATION} in
@@ -333,7 +333,7 @@ case ${DOCKER_OPERATION} in
                 docker build -t "${FULL_DOCKER_IMAGE}" -f "${DOCKERFILE}" "${DOCKER_CONTEXT_DIR}" --build-arg SSH_KEY="$(cat ${DOCKER_GITHUB_SSH_KEY_FILE})"
                 RESULT=$?
             else
-                fatal "Unable to locate github ssh key file for the docker image" && exit
+                fatal "Unable to locate github ssh key file for the docker image" && RESULT=1 && exit
             fi
         else
             # Perform the build
@@ -341,17 +341,17 @@ case ${DOCKER_OPERATION} in
             RESULT=$?
         fi
 
-        [[ $RESULT -ne 0 ]] && fatal "Cannot build image ${DOCKER_IMAGE}" && exit
+        [[ $RESULT -ne 0 ]] && fatal "Cannot build image ${DOCKER_IMAGE}" && RESULT=1 && exit
 
         createRepository ${DOCKER_PROVIDER_DNS} ${DOCKER_REPO}
         RESULT=$?
         [[ $RESULT -ne 0 ]] &&
-            fatal "Unable to create repository ${DOCKER_REPO} in the local registry" && exit
+            fatal "Unable to create repository ${DOCKER_REPO} in the local registry" && RESULT=1 && exit
 
         docker push ${FULL_DOCKER_IMAGE}
         RESULT=$?
         [[ $RESULT -ne 0 ]] &&
-            fatal "Unable to push ${DOCKER_IMAGE} to the local registry" && exit
+            fatal "Unable to push ${DOCKER_IMAGE} to the local registry" && RESULT=1 && exit
         ;;
 
     ${DOCKER_OPERATION_VERIFY})
@@ -417,7 +417,7 @@ case ${DOCKER_OPERATION} in
                 dockerLogin ${REMOTE_DOCKER_PROVIDER_DNS} ${REMOTE_DOCKER_PROVIDER} ${!REMOTE_DOCKER_PROVIDER_USER_VAR} ${!REMOTE_DOCKER_PROVIDER_PASSWORD_VAR}
                 RESULT=$?
                 [[ "$RESULT" -ne 0 ]] &&
-                    fatal "Can't log in to ${REMOTE_DOCKER_PROVIDER_DNS}" && exit
+                    fatal "Can't log in to ${REMOTE_DOCKER_PROVIDER_DNS}" && RESULT=1 && exit
                 ;;
 
             *)
@@ -454,7 +454,7 @@ case ${DOCKER_OPERATION} in
         ;;
 
     *)
-        fatal "Unknown operation \"${DOCKER_OPERATION}\"" && exit
+        fatal "Unknown operation \"${DOCKER_OPERATION}\"" && RESULT=1 && exit
         ;;
 esac
 

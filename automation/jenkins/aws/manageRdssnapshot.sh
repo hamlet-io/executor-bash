@@ -214,7 +214,7 @@ case "${REGISTRY_SCOPE}" in
         if [[ -n "${SEGMENT}" ]]; then
             REGISTRY_SUBTYPE="-${SEGMENT}"
         else
-          fatal "Segment scoped registry required but SEGMENT not defined" && exit
+          fatal "Segment scoped registry required but SEGMENT not defined" && RESULT=1 && exit
         fi
         ;;
     *)
@@ -277,7 +277,7 @@ SNAPSHOT_PROVIDER_AWS_ACCOUNT_ID_VAR="${SNAPSHOT_PROVIDER^^}_AWS_ACCOUNT_ID"
 aws --region "${SNAPSHOT_PROVIDER_REGION}" rds describe-db-snapshots >/dev/null 2>&1
 RESULT=$?
 [[ "$RESULT" -ne 0 ]] &&
-    fatal "Can't access ${SNAPSHOT_TYPE} registry at ${SNAPSHOT_PROVIDER}" && exit
+    fatal "Can't access ${SNAPSHOT_TYPE} registry at ${SNAPSHOT_PROVIDER}" && RESULT=1 && exit
 
 # Perform the required action
 case ${SNAPSHOT_OPERATION} in
@@ -384,7 +384,7 @@ case ${SNAPSHOT_OPERATION} in
         ;;
 
     *)
-        fatal "Unknown operation \"${SNAPSHOT_OPERATION}\"" && exit
+        fatal "Unknown operation \"${SNAPSHOT_OPERATION}\"" && RESULT=1 && exit
         ;;
 esac
 
