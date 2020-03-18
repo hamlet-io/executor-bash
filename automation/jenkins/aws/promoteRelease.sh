@@ -4,11 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
-RELEASE_MODE_PROMOTION="promotion"
-
 # Ensure mandatory arguments have been provided
 [[ (-z "${RELEASE_MODE}") ||
-    (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory
+    (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory && RESULT=1 && exit
 
 # Verify the build information
 if [[ "${RELEASE_MODE}" == "${RELEASE_MODE_PROMOTION}" ]]; then

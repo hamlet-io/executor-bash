@@ -156,10 +156,10 @@ while getopts ":a:b:c:d:e:f:g:hki:l:pr:st:u:vxy:z:" opt; do
             REMOTE_REGISTRY_PROVIDER="${OPTARG}"
             ;;
         \?)
-            fatalOption
+            fatalOption && RESULT=1 && exit
             ;;
         :)
-            fatalOptionArgument
+            fatalOptionArgument && RESULT=1 && exit
             ;;
      esac
 done
@@ -237,7 +237,7 @@ function copyToRegistry() {
         aws --region "${REGISTRY_PROVIDER_REGION}" s3 ls "${FILE_TO_COPY}"  >/dev/null 2>&1
         RESULT=$?
         [[ "$RESULT" -ne 0 ]] &&
-            fatal "Can't access ${FILE_TO_COPY}" && exit
+            fatal "Can't access ${FILE_TO_COPY}" && RESULT=1 && exit
 
         aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --recursive "${FILE_TO_COPY}" "${FULL_REGISTRY_IMAGE_PATH}/"
 
@@ -247,27 +247,27 @@ function copyToRegistry() {
         mkdir -p "${FILES_TEMP_DIR}"
         cp "${FILE_TO_COPY}" "${FILES_TEMP_DIR}/${SAVE_AS}"
         RESULT=$?
-        [[ $RESULT -ne 0 ]] && fatal "Unable to copy ${FILE_TO_COPY}" && exit
+        [[ $RESULT -ne 0 ]] && fatal "Unable to copy ${FILE_TO_COPY}" && RESULT=1 && exit
 
         if [[ ("${REGISTRY_EXPAND}" == "true") &&
             ("${FILE_TO_COPY##*.}" == "zip") ]]; then
                 unzip "${FILE_TO_COPY}" -d "${FILES_TEMP_DIR}"
                 RESULT=$?
                 [[ $RESULT -ne 0 ]] &&
-                    fatal "Unable to unzip ${FILE_TO_COPY}" && exit
+                    fatal "Unable to unzip ${FILE_TO_COPY}" && RESULT=1 && exit
         fi
 
         aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --recursive "${FILES_TEMP_DIR}/" "${FULL_REGISTRY_IMAGE_PATH}/"
         RESULT=$?
         [[ $RESULT -ne 0 ]] &&
-            fatal "Unable to save ${BASE_REGISTRY_FILENAME} in the local registry" && exit
+            fatal "Unable to save ${BASE_REGISTRY_FILENAME} in the local registry" && RESULT=1 && exit
 
     fi
 
     aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${TAG_FILE}" "${FULL_TAGGED_REGISTRY_IMAGE}"
     RESULT=$?
     [[ $RESULT -ne 0 ]] &&
-        fatal "Unable to tag ${BASE_REGISTRY_FILENAME} as latest" && exit
+        fatal "Unable to tag ${BASE_REGISTRY_FILENAME} as latest" && RESULT=1 && exit
 }
 
 # Remove the source S3 content. This is used to keep the S3 Stage clean for new uploads
@@ -307,7 +307,7 @@ case "${REGISTRY_SCOPE}" in
         if [[ -n "${SEGMENT}" ]]; then
             REGISTRY_SUBTYPE="/${SEGMENT}"
         else
-          fatal "Segment scoped registry required but SEGMENT not defined" && exit
+            fatal "Segment scoped registry required but SEGMENT not defined" && RESULT=1 && exit
         fi
         ;;
     *)
@@ -335,7 +335,7 @@ defineRegistryProviderAttributes "${REGISTRY_PROVIDER}" "${REGISTRY_TYPE}" "REGI
 
 # Ensure the local repository has been determined
 [[ -z "${REGISTRY_REPO}" ]] &&
-    fatal "Job requires the local repository name, or the product/deployment unit/commit" && exit
+    fatal "Job requires the local repository name, or the product/deployment unit/commit" && RESULT=1 && exit
 
 # Apply remote registry defaults
 REMOTE_REGISTRY_PROVIDER_VAR="PRODUCT_REMOTE_${REGISTRY_TYPE^^}_PROVIDER"
@@ -366,7 +366,7 @@ setCredentials "${REGISTRY_PROVIDER}"
 aws --region "${REGISTRY_PROVIDER_REGION}" s3 ls "s3://${REGISTRY_PROVIDER_DNS}/${REGISTRY_TYPE}" >/dev/null 2>&1
 RESULT=$?
 [[ "$RESULT" -ne 0 ]] &&
-    fatal "Can't access ${REGISTRY_TYPE} registry at ${REGISTRY_PROVIDER_DNS}" && exit
+    fatal "Can't access ${REGISTRY_TYPE} registry at ${REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
 
 # Perform the required action
 case ${REGISTRY_OPERATION} in
@@ -407,13 +407,13 @@ case ${REGISTRY_OPERATION} in
         aws --region "${REGISTRY_PROVIDER_REGION}" s3 ls "${FULL_REGISTRY_IMAGE}" >/dev/null 2>&1
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            fatal "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && exit
+            fatal "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
         else
             # Copy to S3
             aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${TAG_FILE}" "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}"
             RESULT=$?
             [[ "${RESULT}" -ne 0 ]] &&
-                fatal "Couldn't tag image ${FULL_REGISTRY_IMAGE} with tag ${REMOTE_REGISTRY_TAG}" && exit
+                fatal "Couldn't tag image ${FULL_REGISTRY_IMAGE} with tag ${REMOTE_REGISTRY_TAG}" && RESULT=1 && exit
         fi
         ;;
 
@@ -434,13 +434,13 @@ case ${REGISTRY_OPERATION} in
         aws --region "${REMOTE_REGISTRY_PROVIDER_REGION}" s3 ls "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}" >/dev/null 2>&1
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            fatal "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && exit
+            fatal "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
         else
             # Copy image
             aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${FULL_REMOTE_REGISTRY_IMAGE}" "${IMAGE_FILE}"
             RESULT=$?
             [[ "$RESULT" -ne 0 ]] &&
-                fatal "Can't copy remote image ${FULL_REMOTE_REGISTRY_IMAGE}" && exit
+                fatal "Can't copy remote image ${FULL_REMOTE_REGISTRY_IMAGE}" && RESULT=1 && exit
         fi
 
         # Now copy to local rgistry
@@ -457,7 +457,7 @@ case ${REGISTRY_OPERATION} in
         ;;
 
     *)
-        fatal "Unknown operation \"${REGISTRY_OPERATION}\"" && exit
+        fatal "Unknown operation \"${REGISTRY_OPERATION}\"" && RESULT=1 && exit
         ;;
 esac
 

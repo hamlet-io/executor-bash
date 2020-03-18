@@ -607,7 +607,7 @@ function main() {
                   defineRegistryProviderSettings "${REGISTRY_TYPE}" "FROM_PRODUCT" "" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${FROM_ACCOUNT}"
               done
           else
-              fatal "PROMOTION environment/account not defined" && exit
+              fatal "PROMOTION environment/account not defined" && RESULT=1 && exit
           fi
           ;;
 
@@ -632,7 +632,7 @@ function main() {
                   defineRegistryProviderSettings "${REGISTRY_TYPE}" "FROM_PRODUCT" "" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${FROM_ACCOUNT}"
               done
           else
-              fatal "HOTFIX environment/account not defined" && exit
+              fatal "HOTFIX environment/account not defined" && RESULT=1 && exit
           fi
           ;;
   esac
@@ -674,7 +674,11 @@ function main() {
           if [[ "${AUTOMATION_RELEASE_IDENTIFIER}" == "branch:*" ]]; then
             define_context_property "ACCEPTANCE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER#"branch:"}"
           else
-            define_context_property "ACCEPTANCE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER}-${FROM_ENVIRONMENT}"
+            if [[ "${SEGMENT}" == "default" ]]; then
+                define_context_property "ACCEPTANCE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER}-${FROM_ENVIRONMENT}"
+            else
+                define_context_property "ACCEPTANCE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER}-${FROM_ENVIRONMENT}-${SEGMENT}"
+            fi
           fi
 
           define_context_property "RELEASE_MODE_TAG" "p${ACCEPTANCE_TAG}-${DEPLOYMENT_LOCATION}"
