@@ -4,8 +4,12 @@
 #
 # This script is designed to be sourced into other scripts
 
-. "${AUTOMATION_BASE_DIR}/utility.sh"
-. "${AUTOMATION_BASE_DIR}/contextTree.sh"
+# TODO(mfl): Remove symlinks in /automation once all explicit usage
+#            of these in jenkins jobs has been modified to use
+#            /execution instead.
+
+. "${GENERATION_BASE_DIR}/execution/utility.sh"
+. "${GENERATION_BASE_DIR}/execution/contextTree.sh"
 
 # -- Repositories --
 
@@ -51,7 +55,7 @@ function save_context_property() {
   local name="$1"; shift
   local value="$1"; shift
   local file="${1:-${AUTOMATION_DATA_DIR}/context.properties}"; shift
-  
+
   if [[ -n "${value}" ]]; then
     local property_value="${value}"
   else
@@ -82,7 +86,7 @@ function save_chain_property() {
   local value="$1"; shift
 
   save_context_property "${name}" "${value}" "${AUTOMATION_DATA_DIR}/chain.properties"
-  
+
 }
 
 function define_context_property() {
@@ -98,7 +102,7 @@ function define_context_property() {
       value="${value^^}"
       ;;
   esac
-  
+
   declare -g ${name}="${value}"
   save_context_property "${name}" "${value}"
 }
@@ -112,7 +116,7 @@ function save_gen3_dirs_in_context() {
     PRODUCT_DIR PRODUCT_INFRASTRUCTURE_DIR PRODUCT_SETTINGS_DIR PRODUCT_SOLUTIONS_DIR PRODUCT_OPERATIONS_DIR \
     SEGMENT_SETTINGS_DIR SEGMENT_BUILDS_DIR SEGMENT_SOLUTIONS_DIR)
 
-  for directory in "${directories[@]}"; do 
+  for directory in "${directories[@]}"; do
     save_context_property "${directory}" "$(getGen3Env "${directory}" "${prefix}")"
   done
 
