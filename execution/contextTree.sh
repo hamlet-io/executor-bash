@@ -285,65 +285,6 @@ function assemble_settings() {
   return ${return_status}
 }
 
-function assemble_composite_definitions() {
-
-  local tmp_file="$( getTempFile "definitions_XXXXXX" "${tmp_dir}" )"
-
-  # Gather the relevant definitions
-  local restore_nullglob=$(shopt -p nullglob)
-  local restore_globstar=$(shopt -p globstar)
-  shopt -s nullglob
-  shopt -s globstar
-
-  local definitions_array=()
-  [[ (-n "${ACCOUNT}") ]] &&
-      addToArray "definitions_array" "${ACCOUNT_STATE_DIR}"/cf/shared/**/defn*-definition.json
-  [[ (-n "${PRODUCT}") && (-n "${REGION}") ]] &&
-      addToArray "definitions_array" "${PRODUCT_STATE_DIR}"/cf/shared/**/defn*-"${REGION}"*-definition.json
-  [[ (-n "${ENVIRONMENT}") && (-n "${SEGMENT}") && (-n "${REGION}") ]] &&
-      addToArray "definitions_array" "${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"/**/*${ACCOUNT}*-definition.json
-
-  ${restore_globstar}
-  ${restore_nullglob}
-
-  debug "DEFINITIONS=${definitions_array[*]}"
-  jqMerge "${definitions_array[@]}" > "${tmp_file}"
-
-  # Escape any freemarker markup
-  export COMPOSITE_DEFINITIONS="${CACHE_DIR}/composite_definitions.json"
-  sed 's/${/$\\{/g' < "${tmp_file}" > "${COMPOSITE_DEFINITIONS}"
-}
-
-function assemble_composite_stack_outputs() {
-
-  pushTempDir "${FUNCNAME[0]}_XXXXXX"
-  local tmp_dir="$(getTopTempDir)"
-
-  # Create the composite stack outputs
-  local restore_nullglob=$(shopt -p nullglob)
-  local restore_globstar=$(shopt -p globstar)
-  shopt -s nullglob
-  shopt -s globstar
-
-  local stack_array=()
-  [[ (-n "${ACCOUNT}") ]] &&
-      addToArray "stack_array" "${ACCOUNT_STATE_DIR}"/*/shared/**/acc*-stack.json
-  [[ (-n "${ENVIRONMENT}") && (-n "${SEGMENT}") && (-n "${REGION}") ]] &&
-      addToArray "stack_array" "${PRODUCT_STATE_DIR}"/*/"${ENVIRONMENT}/${SEGMENT}"/**/*${ACCOUNT}*-stack.json
-
-  ${restore_globstar}
-  ${restore_nullglob}
-
-  debug "STACK_OUTPUTS=${stack_array[*]}"
-
-  export COMPOSITE_STACK_OUTPUTS="${CACHE_DIR}/composite_stack_outputs.json"
-
-  getFilesAsJSON "${COMPOSITE_STACK_OUTPUTS}" "${stack_array[@]}"; return_status=$?
-
-  popTempDir
-  return ${return_status}
-}
-
 function getBluePrintParameter() {
   local patterns=("$@")
 
