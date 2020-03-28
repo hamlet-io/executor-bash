@@ -79,7 +79,7 @@ function init() {
         [[ ${RESULT} -ne 0 ]] &&
             fatal "Can't add remote ${REPO_REMOTE} to ${REPO_LOG_NAME} repo" && return 1
     fi
-    
+
     git log -n 1 >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
         # Create basic files
@@ -135,29 +135,44 @@ function push() {
             trace "Adding tag \"${REPO_TAG}\" to the ${REPO_LOG_NAME} repo..."
             git tag -a "${REPO_TAG}" -m "${REPO_MESSAGE}"
             RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't tag the ${REPO_LOG_NAME} repo" && return 1
-    
+
             REPO_PUSH_REQUIRED="true"
         fi
     fi
 
     # Update upstream repo
+    GENERATION_REPO_PUSH_RETRIES="${GENERATION_REPO_PUSH_RETRIES:-6}"
+    REPO_PUSHED=false
     if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
-        trace "Rebasing ${REPO_LOG_NAME} in case of changes..."
-        git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
-        RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-            fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
-
-        trace "Pushing the ${REPO_LOG_NAME} repo upstream..."
-        git push --tags ${REPO_REMOTE} ${REPO_BRANCH}
-        # If push failed HEAD might be detached. Create a temp branch and merge it to the target to fix it.
-        RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-            git branch temp-${REPO_BRANCH} && \
-            git checkout ${REPO_BRANCH} && \
-            git merge temp-${REPO_BRANCH} && \
-            git branch -D temp-${REPO_BRANCH} && \
-            git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && \
+        for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
+            trace "Rebasing ${REPO_LOG_NAME} in case of changes..."
+            git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
             RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-                fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
+                fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
+
+            trace "Pushing the ${REPO_LOG_NAME} repo upstream..."
+            if git push --tags ${REPO_REMOTE} ${REPO_BRANCH}; then
+                # Push succeeded
+                REPO_PUSHED=true
+                break
+            else
+                # Take a breather
+                info "Waiting to retry rebasing ${REPO_LOG_NAME} repo ..."
+                sleep 5
+            fi
+        done
+
+        if [[ "${REPO_PUSHED}" == "false" ]]; then
+            # If push failed HEAD might be detached. Create a temp branch and merge it to the target to fix it.
+            RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
+                git branch temp-${REPO_BRANCH} && \
+                git checkout ${REPO_BRANCH} && \
+                git merge temp-${REPO_BRANCH} && \
+                git branch -D temp-${REPO_BRANCH} && \
+                git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && \
+                RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
+                    fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
+        fi
     fi
 }
 
@@ -198,7 +213,7 @@ function set_context() {
           :) fatalOptionArgument; return 1 ;;
        esac
   done
-  
+
   # Apply defaults
   REPO_OPERATION="${REPO_OPERATION:-$REPO_OPERATION_DEFAULT}"
   REPO_REMOTE="${REPO_REMOTE:-$REPO_REMOTE_DEFAULT}"
@@ -214,10 +229,10 @@ function set_context() {
       fi
     fi
   fi
-  
+
   # Ensure mandatory arguments have been provided
   [[ (-z "${REPO_DIR}") || (-z "${REPO_LOG_NAME}") ]] && fatalMandatory && return 1
-  
+
   # Ensure we are inside the repo directory
   if [[ ! -d "${REPO_DIR}" ]]; then
     mkdir -p "${REPO_DIR}"
@@ -239,7 +254,7 @@ function main() {
     ${REPO_OPERATION_CLONE}) clone || return $? ;;
     ${REPO_OPERATION_PUSH})  push || return $? ;;
   esac
-  
+
   # All good
   RESULT=0
   return 0
