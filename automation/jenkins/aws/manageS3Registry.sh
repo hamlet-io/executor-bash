@@ -239,7 +239,7 @@ function copyToRegistry() {
         [[ "$RESULT" -ne 0 ]] &&
             fatal "Can't access ${FILE_TO_COPY}" && RESULT=1 && exit
 
-        aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --recursive "${FILE_TO_COPY}" "${FULL_REGISTRY_IMAGE_PATH}/"
+        aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --no-progress --recursive "${FILE_TO_COPY}" "${FULL_REGISTRY_IMAGE_PATH}/"
 
     else
 
@@ -257,14 +257,14 @@ function copyToRegistry() {
                     fatal "Unable to unzip ${FILE_TO_COPY}" && RESULT=1 && exit
         fi
 
-        aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --recursive "${FILES_TEMP_DIR}/" "${FULL_REGISTRY_IMAGE_PATH}/"
+        aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --no-progress --recursive "${FILES_TEMP_DIR}/" "${FULL_REGISTRY_IMAGE_PATH}/"
         RESULT=$?
         [[ $RESULT -ne 0 ]] &&
             fatal "Unable to save ${BASE_REGISTRY_FILENAME} in the local registry" && RESULT=1 && exit
 
     fi
 
-    aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${TAG_FILE}" "${FULL_TAGGED_REGISTRY_IMAGE}"
+    aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --no-progress "${TAG_FILE}" "${FULL_TAGGED_REGISTRY_IMAGE}"
     RESULT=$?
     [[ $RESULT -ne 0 ]] &&
         fatal "Unable to tag ${BASE_REGISTRY_FILENAME} as latest" && RESULT=1 && exit
@@ -410,7 +410,7 @@ case ${REGISTRY_OPERATION} in
             fatal "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
         else
             # Copy to S3
-            aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${TAG_FILE}" "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}"
+            aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --no-progress "${TAG_FILE}" "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}"
             RESULT=$?
             [[ "${RESULT}" -ne 0 ]] &&
                 fatal "Couldn't tag image ${FULL_REGISTRY_IMAGE} with tag ${REMOTE_REGISTRY_TAG}" && RESULT=1 && exit
@@ -437,7 +437,7 @@ case ${REGISTRY_OPERATION} in
             fatal "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
         else
             # Copy image
-            aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${FULL_REMOTE_REGISTRY_IMAGE}" "${IMAGE_FILE}"
+            aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp --no-progress "${FULL_REMOTE_REGISTRY_IMAGE}" "${IMAGE_FILE}"
             RESULT=$?
             [[ "$RESULT" -ne 0 ]] &&
                 fatal "Can't copy remote image ${FULL_REMOTE_REGISTRY_IMAGE}" && RESULT=1 && exit
