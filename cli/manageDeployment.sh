@@ -123,9 +123,9 @@ function wait_for_deployment_execution() {
     case ${DEPLOYMENT_OPERATION} in
       update | create)
         if [[ "${DEPLOYMENT_SCOPE}" == "resourceGroup" ]]; then
-          DEPLOYMENT=$(az group deployment show --resource-group "${RESOURCE_GROUP}" --name "${DEPLOYMENT_NAME}")
+          DEPLOYMENT=$(az deployment group show --resource-group "${RESOURCE_GROUP}" --name "${DEPLOYMENT_NAME}")
         else
-          DEPLOYMENT=$(az deployment show --name "${DEPLOYMENT_NAME}")
+          DEPLOYMENT=$(az deployment sub show --name "${DEPLOYMENT_NAME}")
         fi
       ;;
       delete)
@@ -224,7 +224,7 @@ function process_deployment() {
           fi
 
           info "Validating template..."
-          az group deployment validate ${group_deployment_args[@]/#/--} > /dev/null || return $?
+          az deployment group validate ${group_deployment_args[@]/#/--} > /dev/null || return $?
           info "Template is valid."
 
           # add remaining deployment options
@@ -236,7 +236,7 @@ function process_deployment() {
 
           # Execute the deployment to the resource group
           info "Starting deployment of ${DEPLOYMENT_NAME} to the Resource Group ${RESOURCE_GROUP}."
-          az group deployment create ${group_deployment_args[@]/#/--} > /dev/null || return $?
+          az deployment group create ${group_deployment_args[@]/#/--} > /dev/null || return $?
 
         elif [[ "${DEPLOYMENT_SCOPE}" == "subscription" ]]; then
 
@@ -254,7 +254,7 @@ function process_deployment() {
 
           # validate subscription level deployment
           info "Validating template..."
-          az deployment validate ${subscription_deployment_args[@]/#/--} > /dev/null || return $?
+          az deployment sub validate ${subscription_deployment_args[@]/#/--} > /dev/null || return $?
           info "Template is valid."
 
           subscription_deployment_args=(
@@ -265,7 +265,7 @@ function process_deployment() {
 
           # Execute the deployment to the subscription
           info "Starting deployment of ${DEPLOYMENT_NAME} to the subscription."
-          az deployment create ${subscription_deployment_args[@]/#/--} > /dev/null || return $?
+          az deployment sub create ${subscription_deployment_args[@]/#/--} > /dev/null || return $?
 
         fi
 
@@ -277,7 +277,7 @@ function process_deployment() {
 
           # Delete the resource group
           info "Deleting the ${RESOURCE_GROUP} resource group"
-          az group delete --resource-group "${RESOURCE_GROUP}" --no-wait --yes
+          az deployment group delete --resource-group "${RESOURCE_GROUP}" --no-wait --yes
 
           wait_for_deployment_execution
 
