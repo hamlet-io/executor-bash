@@ -21,7 +21,7 @@ function usage() {
 
 Manage images in an S3 backed registry
 
-Usage: $(basename $0) -s -v -p -k -x
+Usage: $(basename $0) -s -v -p -k -x -w
                         -y REGISTRY_TYPE
                         -c REGISTRY_SCOPE
                         -a REGISTRY_PROVIDER
@@ -60,6 +60,7 @@ where
 (o) -u REGISTRY_DEPLOYMENT_UNIT         is the deployment unit to use when defaulting REGISTRY_REPO
 (o) -v                                  verify image is present in local registry
                                         (REGISTRY_OPERATION=${REGISTRY_OPERATION_VERIFY})
+(o) -w                                  warn and skip if invalid build reference
 (o) -x                                  expand on save if REGISTRY_FILENAME is a zip file
                                         (REGISTRY_EXPAND=true)
 (m) -y REGISTRY_TYPE                    is the registry image type
@@ -93,7 +94,7 @@ EOF
 }
 
 # Parse options
-while getopts ":a:b:c:d:e:f:g:hki:l:pr:st:u:vxy:z:" opt; do
+while getopts ":a:b:c:d:e:f:g:hki:l:pr:st:u:vwxy:z:" opt; do
     case $opt in
         a)
             REGISTRY_PROVIDER="${OPTARG}"
@@ -145,6 +146,9 @@ while getopts ":a:b:c:d:e:f:g:hki:l:pr:st:u:vxy:z:" opt; do
             ;;
         v)
             REGISTRY_OPERATION="${REGISTRY_OPERATION_VERIFY}"
+            ;;
+        w)
+            WARN_ON_INVALID_BUILD_REFERENCES=true
             ;;
         x)
             REGISTRY_EXPAND="true"
@@ -407,7 +411,11 @@ case ${REGISTRY_OPERATION} in
         aws --region "${REGISTRY_PROVIDER_REGION}" s3 ls "${FULL_REGISTRY_IMAGE}" >/dev/null 2>&1
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            fatal "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
+            if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                warn "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && RESULT=0 && exit
+            else
+                fatal "Can't find ${REGISTRY_IMAGE} in ${REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
+            fi
         else
             # Copy to S3
             aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${TAG_FILE}" "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}"
@@ -434,7 +442,11 @@ case ${REGISTRY_OPERATION} in
         aws --region "${REMOTE_REGISTRY_PROVIDER_REGION}" s3 ls "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}" >/dev/null 2>&1
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            fatal "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
+            if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                warn "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && RESULT=0 && exit
+            else
+                fatal "Can't find ${REMOTE_REGISTRY_IMAGE} in ${REMOTE_REGISTRY_PROVIDER_DNS}" && RESULT=1 && exit
+            fi
         else
             # Copy image
             aws --region "${REGISTRY_PROVIDER_REGION}" s3 cp "${FULL_REMOTE_REGISTRY_IMAGE}" "${IMAGE_FILE}"

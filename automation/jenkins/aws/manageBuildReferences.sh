@@ -17,7 +17,7 @@ function usage() {
 
 Manage build references for one or more deployment units
 
-Usage: $(basename $0)  -f -l -u
+Usage: $(basename $0)  -f -l -u -w
                         -s DEPLOYMENT_UNIT_LIST
                         -g SEGMENT_BUILDS_DIR
                         -c CODE_COMMIT_LIST
@@ -43,6 +43,7 @@ where
 (o) -t CODE_TAG_LIST                is the tag for each deployment unit
 (o) -u (REFERENCE_OPERATION=${REFERENCE_OPERATION_UPDATE}) to update build references
 (o) -v VERIFICATION_TAG (REFERENCE_OPERATION=${REFERENCE_OPERATION_VERIFY}) to verify build references
+(o) -w                              warn and skip if invalid build reference
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -174,7 +175,7 @@ function defineGitProviderAttributes() {
 }
 
 # Parse options
-while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
+while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:wz:" opt; do
     case $opt in
         a)
             REFERENCE_OPERATION="${REFERENCE_OPERATION_ACCEPT}"
@@ -219,6 +220,9 @@ while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
         v)
             REFERENCE_OPERATION="${REFERENCE_OPERATION_VERIFY}"
             VERIFICATION_TAG="${OPTARG}"
+            ;;
+        w)
+            WARN_ON_INVALID_BUILD_REFERENCES=true
             ;;
         \?)
             fatalOption; RESULT=1 && exit
@@ -292,6 +296,12 @@ if [[ ("${REFERENCE_OPERATION}" == "${REFERENCE_OPERATION_LISTFULL}") ]]; then
     done
 fi
 
+if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+    WARN_OPTION="-w"
+else
+    WARN_OPTON=""
+fi
+
 # Process each deployment unit
 for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
 
@@ -336,7 +346,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 -s "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
                                 -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
+                                -c "${REGISTRY_SCOPE}" \
+                                "${WARN_OPTION}"
                             RESULT=$?
                             [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
@@ -346,7 +357,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
                                 -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
+                                -c "${REGISTRY_SCOPE}" \
+                                "${WARN_OPTION}"
                             RESULT=$?
                             [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
@@ -358,7 +370,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
                                 -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
+                                -c "${REGISTRY_SCOPE}" \
+                                "${WARN_OPTION}"
                             RESULT=$?
                             [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
@@ -568,7 +581,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
                                     -b "REGISTRY_CONTENT" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             rdssnapshot)
@@ -578,7 +592,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
                                     -g "${CODE_COMMIT}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             docker)
@@ -588,7 +603,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             lambda)
@@ -598,7 +614,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             pipeline)
@@ -608,7 +625,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             scripts)
@@ -618,7 +636,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             openapi|swagger)
@@ -630,7 +649,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             spa)
@@ -640,15 +660,17 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             contentnode)
                                 ${AUTOMATION_DIR}/manageContentNode.sh -v \
-                                -a "${IMAGE_PROVIDER}" \
-                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -g "${CODE_COMMIT}" \
-                                -c "${REGISTRY_SCOPE}"
+                                    -a "${IMAGE_PROVIDER}" \
+                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                    -g "${CODE_COMMIT}" \
+                                    -c "${REGISTRY_SCOPE}" \
+                                    "${WARN_OPTION}"
                                 RESULT=$?
                                 ;;
                             *)

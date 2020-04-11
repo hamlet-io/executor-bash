@@ -20,7 +20,7 @@ function usage() {
 
 Manage images in an S3 backed registry
 
-Usage: $(basename $0) -s -v -p -k -x
+Usage: $(basename $0) -s -v -p -k -w -x
                         -y SNAPSHOT_TYPE
                         -q SNAPSHOT_SOURCE
                         -a SNAPSHOT_PROVIDER
@@ -53,6 +53,7 @@ where
                                         (SNAPSHOT_OPERATION=${REGISRTY_OPERATION_SAVE})
 (o) -t SNAPSHOT_TAG                     is the local tag
 (o) -u SNAPSHOT_DEPLOYMENT_UNIT         is the deployment unit to use when defaulting SNAPSHOT_REPO
+(o) -w                                  warn and skip if invalid build reference
 (o) -v                                  verify image is present in local registry
                                         (SNAPSHOT_OPERATION=${SNAPSHOT_OPERATION_VERIFY})
 (m) -y SNAPSHOT_TYPE                    is the registry image type
@@ -80,7 +81,7 @@ EOF
 }
 
 # Parse options
-while getopts ":a:c:d:g:hki:l:pqr:st:u:vxy:z:" opt; do
+while getopts ":a:c:d:g:hki:l:pqr:st:u:vwxy:z:" opt; do
     case $opt in
         a)
             SNAPSHOT_PROVIDER="${OPTARG}"
@@ -126,6 +127,9 @@ while getopts ":a:c:d:g:hki:l:pqr:st:u:vxy:z:" opt; do
             ;;
         v)
             SNAPSHOT_OPERATION="${SNAPSHOT_OPERATION_VERIFY}"
+            ;;
+        w)
+            WARN_ON_INVALID_BUILD_REFERENCES=true
             ;;
         y)
             SNAPSHOT_TYPE="${OPTARG,,}"
@@ -322,7 +326,11 @@ case ${SNAPSHOT_OPERATION} in
         # Check for the local image
         SNAPSHOT_ARN="$(aws --region "${SNAPSHOT_PROVIDER_REGION}" rds describe-db-snapshots --db-snapshot-identifier "${SNAPSHOT_IMAGE}" --query "DBSnapshots[0].DBSnapshotArn" --output text)"
         if [[ -z "${SNAPSHOT_ARN}" || "${SNAPSHOT_ARN}" == 'null' ]]; then
-            fatal "Can't find ${SNAPSHOT_IMAGE} in ${SNAPSHOT_PROVIDER}"
+            if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                warn "Can't find ${SNAPSHOT_IMAGE} in ${SNAPSHOT_PROVIDER}" && RESULT=0
+            else
+                fatal "Can't find ${SNAPSHOT_IMAGE} in ${SNAPSHOT_PROVIDER}" && RESULT=1
+            fi
             exit
         else
             aws --region "${SNAPSHOT_PROVIDER_REGION}" rds add-tags-to-resource --resource-name "${SNAPSHOT_ARN}" --tags Key=RegistryTag,Value="${REMOTE_SNAPSHOT_TAG}"
@@ -342,8 +350,14 @@ case ${SNAPSHOT_OPERATION} in
         SNAPSHOT_SNAPSHOT_ARN="$(aws --region "${SNAPSHOT_PROVIDER_REGION}" rds describe-db-snapshots --db-snapshot-identifier "${SNAPSHOT_IMAGE}" --query "DBSnapshots[0].DBSnapshotArn" --output text )"
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            fatal "Can't find ${SNAPSHOT_IMAGE} in ${REMOTE_SNAPSHOT_PROVIDER}"
-            exit 255
+            if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                warn "Can't find ${SNAPSHOT_IMAGE} in ${REMOTE_SNAPSHOT_PROVIDER}"
+                RESULT=0
+                exit
+            else
+                fatal "Can't find ${SNAPSHOT_IMAGE} in ${REMOTE_SNAPSHOT_PROVIDER}"
+                exit 255
+            fi
         else
 
             # Now see if its available in the local registry

@@ -20,7 +20,7 @@ function usage() {
 
 Manage docker images
 
-Usage: $(basename $0) -b -v -p -k
+Usage: $(basename $0) -b -v -p -k -w
                         -a DOCKER_PROVIDER
                         -c REGISTRY_SCOPE
                         -l DOCKER_REPO
@@ -50,6 +50,7 @@ where
 (o) -t DOCKER_TAG               is the local tag
 (o) -u DOCKER_IMAGE_SOURCE      is the registry to pull from
 (o) -v                          verify image is present in local registry
+(o) -w                          warn and skip if invalid build reference
 (o) -z REMOTE_DOCKER_PROVIDER   is the docker provider to pull from
 
 (m) mandatory, (o) optional, (d) deprecated
@@ -77,7 +78,7 @@ EOF
 }
 
 # Parse options
-while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vz:" opt; do
+while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vwz:" opt; do
     case $opt in
         a)
             DOCKER_PROVIDER="${OPTARG}"
@@ -123,6 +124,9 @@ while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vz:" opt; do
             ;;
         v)
             DOCKER_OPERATION="${DOCKER_OPERATION_VERIFY}"
+            ;;
+        w)
+            WARN_ON_INVALID_BUILD_REFERENCES=true
             ;;
         z)
             REMOTE_DOCKER_PROVIDER="${OPTARG}"
@@ -382,7 +386,11 @@ case ${DOCKER_OPERATION} in
         docker pull ${FULL_DOCKER_IMAGE}
         RESULT=$?
         if [[ "$RESULT" -ne 0 ]]; then
-            error "Can't pull ${DOCKER_IMAGE} from ${DOCKER_PROVIDER_DNS}"
+            if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                warn "Can't pull ${DOCKER_IMAGE} from ${DOCKER_PROVIDER_DNS}" && RESULT=0
+            else
+                error "Can't pull ${DOCKER_IMAGE} from ${DOCKER_PROVIDER_DNS}"
+            fi
         else
             # Tag the image ready to push to the registry
             docker tag ${FULL_DOCKER_IMAGE} ${FULL_REMOTE_DOCKER_IMAGE}
@@ -436,7 +444,11 @@ case ${DOCKER_OPERATION} in
             docker tag ${FULL_REMOTE_DOCKER_IMAGE} ${FULL_DOCKER_IMAGE}
             RESULT=$?
             if [[ "$RESULT" -ne 0 ]]; then
-                error "Couldn't tag image ${FULL_REMOTE_DOCKER_IMAGE} with ${FULL_DOCKER_IMAGE}"
+                if [[ "${WARN_ON_INVALID_BUILD_REFERENCES}" == "true" ]]; then
+                    warn "Couldn't tag image ${FULL_REMOTE_DOCKER_IMAGE} with ${FULL_DOCKER_IMAGE}" && RESULT=0
+                else
+                    error "Couldn't tag image ${FULL_REMOTE_DOCKER_IMAGE} with ${FULL_DOCKER_IMAGE}"
+                fi
             else
                 # Push to registry
                 createRepository ${DOCKER_PROVIDER_DNS} ${DOCKER_REPO}
