@@ -3,7 +3,15 @@
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
-. "${GENERATION_PLUGIN_DIRS}/azure/utility.sh"
+
+# Load any plugin provider utility.sh
+IFS=';' read -ra PLUGINDIRS <<< ${GENERATION_PLUGIN_DIRS}
+for dir in "${PLUGINDIRS[@]}"; do
+  plugin_provider=${dir##*/}
+    if [[ -e "${dir}/${plugin_provider}/utility.sh" ]]; then
+      . "${dir}/${plugin_provider}/utility.sh"
+    fi
+done
 
 # Defaults
 DEPLOYMENT_INITIATE_DEFAULT="true"
@@ -316,20 +324,23 @@ function main() {
   [[ -s "${PROLOGUE}" ]] && \
     { info "Processing prologue script ..." && . "${PROLOGUE}" || return $?; }
 
-  process_deployment_status=0
-  # Process the deployment
-  info "processing the deployment"
-  process_deployment || process_deployment_status=$?
+  # Run the ARM Template deployment, if present
+  if [[ -f "${TEMPLATE}" ]]; then
+    info "processing the deployment ..."
+    process_deployment_status=0
 
-  # Check for completion
-  case ${process_deployment_status} in
-    0)
-      info "${DEPLOYMENT_OPERATION} completed for ${RESOURCE_GROUP:-DEPLOYMENT_NAME}."
-    ;;
-    *)
-      fatal "There was an issue during deployment."
-      return ${process_deployment_status}
-  esac
+    process_deployment || process_deployment_status=$?
+
+    # Check for completion
+    case ${process_deployment_status} in
+      0)
+        info "${DEPLOYMENT_OPERATION} completed for ${RESOURCE_GROUP:-DEPLOYMENT_NAME}."
+      ;;
+      *)
+        fatal "There was an issue during deployment."
+        return ${process_deployment_status}
+    esac
+  fi
 
   # Run the epilogue script if present
   # Refresh the stack outputs in case something from the just created stack is needed
