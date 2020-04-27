@@ -4,6 +4,49 @@ trap '[[ (-z "${AUTOMATION_DEBUG}") && (-d "${NVM_DIR}") ]] && nvm deactivate; r
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 
+function runTask() {
+    local REQUIRED_TASK=$1; shift
+
+    # The build file existence checks below rely on nullglob
+    # to return nothing if no match
+    shopt -s nullglob
+    BUILD_FILES=(?runtfile.js ?ulpfile.js package.json)
+
+    for BUILD_FILE in "${BUILD_FILES[@]}"; do
+
+        BUILD_TASKS=()
+        case ${BUILD_FILE} in
+            ?runtfile.js)
+                BUILD_TASKS=( $(grunt -h --no-color | sed -n '/^Available tasks/,/^$/ {s/^  *\([^ ]\+\)  [^ ]\+.*$/\1/p}') )
+                BUILD_UTILITY="grunt"
+                ;;
+
+            ?ulpfile.js)
+                BUILD_TASKS=( $(gulp --tasks-simple) )
+                BUILD_UTILITY="gulp"
+                ;;
+
+            package.json)
+                BUILD_TASKS=( $(jq -r '.scripts | select(.!=null) | keys[]' < package.json) )
+                BUILD_UTILITY="${NODE_PACKAGE_MANAGER} run"
+                ;;
+        esac
+
+        for BUILD_TASK in "${BUILD_TASKS[@]}"; do
+            if [[ "${BUILD_TASK}" == "${REQUIRED_TASK}" ]]; then
+                ${BUILD_UTILITY} ${REQUIRED_TASK} ||
+                    { exit_status=$?; fatal "${BUILD_UTILITY} \"${TASK}\" task failed";  return ${exit_status}; }
+
+                # Task complete so stop looking for build file supporting it
+                return 0
+            fi
+        done
+    done
+
+    # Task not found
+    return 255
+}
+
 function main() {
     # Make sure we are in the build source directory
     cd ${AUTOMATION_BUILD_SRC_DIR}
@@ -60,45 +103,44 @@ function main() {
     shopt -s nullglob
     BUILD_FILES=(?runtfile.js ?ulpfile.js package.json)
 
-    # Perform build tasks in the order specified
-    for REQUIRED_TASK in "${REQUIRED_TASKS[@]}" "${FORMATS[@]}"; do
-        TASK_FOUND=
-        for BUILD_FILE in "${BUILD_FILES[@]}"; do
-            BUILD_TASKS=()
-            case ${BUILD_FILE} in
-                ?runtfile.js)
-                    BUILD_TASKS=( $(grunt -h --no-color | sed -n '/^Available tasks/,/^$/ {s/^  *\([^ ]\+\)  [^ ]\+.*$/\1/p}') )
-                    BUILD_UTILITY="grunt"
-                    ;;
+    # Perform the required build tasks in the order specified
+    for REQUIRED_TASK in "${REQUIRED_TASKS[@]}"; do
+        runTask "${REQUIRED_TASK}"; exit_status=$?
+        case $exit_status in
+            255)
+                if [[ "${IGNORE_MISSING_TASKS}" == "true" ]]; then
+                    # Nothing more to do for this task
+                    continue
+                fi
 
-                ?ulpfile.js)
-                    BUILD_TASKS=( $(gulp --tasks-simple) )
-                    BUILD_UTILITY="gulp"
-                    ;;
+                # Missing required task
+                fatal "Required task ${REQUIRED_TASK} not found in build files"
+                return 1
+                ;;
+            0)
+                # Task found and executed successfully
+                continue
+                ;;
+            *)
+                # Some other error
+                return ${exit_status}
+                ;;
+        esac
+     done
 
-                package.json)
-                    BUILD_TASKS=( $(jq -r '.scripts | select(.!=null) | keys[]' < package.json) )
-                    BUILD_UTILITY="${NODE_PACKAGE_MANAGER} run"
-                    ;;
-            esac
-
-            if [[ "${BUILD_TASKS[*]/${REQUIRED_TASK}/XXfoundXX}" != "${BUILD_TASKS[*]}" ]]; then
-                TASK_FOUND=true
-                ${BUILD_UTILITY} ${REQUIRED_TASK} ||
-                    { exit_status=$?; fatal "${BUILD_UTILITY} \"${TASK}\" task failed";  return ${exit_status}; }
-
-                # Task complete so stop looking for build file supporting it
-                break
-            fi
-        done
-        if [[ ("${TASK_FOUND}" == "true") || ("${IGNORE_MISSING_TASKS}" == "true") ]]; then
-            # Nothing more to do for this task
-          continue
-        fi
-        if [[ "${REQUIRED_TASKS[*]/${REQUIRED_TASK}/XXfoundXX}" != "${REQUIRED_TASKS[*]}" ]]; then
-            # If was a required task so fail
-            fatal "Required task ${REQUIRED_TASK} not found in build files"; return 1
-        fi
+    # Perform optional format tasks
+    for REQUIRED_TASK in "${FORMATS[@]}"; do
+        runTask "${REQUIRED_TASK}"; exit_status=$?
+        case $exit_status in
+            255|0)
+               # Task not found or executed successfully
+                continue
+                ;;
+            *)
+                # Some other error
+                return ${exit_status}
+                ;;
+        esac
     done
 
     # Clean up dev dependencies
