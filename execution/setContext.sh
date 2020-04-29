@@ -52,29 +52,6 @@ fi
 export CACHE_DIR="${GENERATION_DATA_DIR}/cache"
 mkdir -p "${CACHE_DIR}"
 
-# Generate the list of files constituting the composites based on the contents
-# of the account
-# The blueprint is handled specially as its logic is different to the others
-TEMPLATE_COMPOSITES=("account" "fragment")
-
-for composite in "${TEMPLATE_COMPOSITES[@]}"; do
-    # Define the composite
-    declare -gx COMPOSITE_${composite^^}="${CACHE_DIR}/composite_${composite}.ftl"
-
-    if [[ (("${GENERATION_USE_CACHE}" != "true")  &&
-            ("${GENERATION_USE_FRAGMENTS_CACHE}" != "true")) ||
-          (! -f "${CACHE_DIR}/composite_account.ftl") ]]; then
-        # define the array holding the list of composite fragment filenames
-        declare -ga "${composite}_array"
-
-        # Legacy start fragments
-        for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start*.ftl; do
-            $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
-            addToArray "${composite}_array" "${fragment}"
-        done
-    fi
-done
-
 # Check if the current directory gives any clue to the context
 # Accommodate both pre cmdb v2.0.0 where segment/environment in the config tree
 # and post v2.0.0 where they are in the infrastructure tree
