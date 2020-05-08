@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
-trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT SIGTERM
+
+function cleanup {
+    # Make sure we always remove keychains that we create
+    if [[ -f "${FASTLANE_KEYCHAIN_PATH}" ]]; then
+        security delete-keychain "${FASTLANE_KEYCHAIN_PATH}"
+    fi
+
+    # normal context cleanup
+    . ${GENERATION_BASE_DIR}/execution/cleanupContext.sh
+
+}
+
+trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_EXPO_VERSION="2.21.2"
-DEFAULT_TURTLE_VERSION="0.8.7"
+DEFAULT_EXPO_VERSION="3.20.1"
+DEFAULT_TURTLE_VERSION="0.14.11"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
 DEFAULT_RUN_SETUP="false"
@@ -16,6 +28,8 @@ DEFAULT_DISABLE_OTA="false"
 
 DEFAULT_QR_BUILD_FORMATS="ios,android"
 DEFAULT_BINARY_BUILD_PROCESS="turtle"
+
+DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 
 export FASTLANE_SKIP_UPDATE_CHECK="true"
 export FASTLANE_HIDE_CHANGELOG="true"
@@ -80,6 +94,7 @@ where
 (o) -s RUN_SETUP              run setup installation to prepare
 (o) -t BINARY_EXPIRATION      how long presigned urls are active for once created ( seconds )
 (o) -f FORCE_BINARY_BUILD     force the build of binary images
+(o) -n NODE_PACKAGE_MANAGER   Set the node package manager for app installation
 (o) -m SUBMIT_BINARY          submit the binary for testing
 (o) -o DISABLE_OTA            don't publish the OTA to the CDN
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
@@ -96,6 +111,7 @@ SUBMIT_BINARY = ${DEFAULT_SUBMIT_BINARY}
 DISABLE_OTA  = ${DEPLOY_OTA}
 QR_BUILD_FORMATS = ${DEFAULT_QR_BUILD_FORMATS}
 BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
+NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 
 NOTES:
 RELEASE_CHANNEL default is environment
@@ -120,6 +136,9 @@ function options() {
                 ;;
             m)
                 SUBMIT_BINARY="true"
+                ;;
+            n)
+                NODE_PACKAGE_MANAGER="${OPTARG}"
                 ;;
             o)
                 DISABLE_OTA="true"
@@ -155,6 +174,7 @@ function options() {
     QR_BUILD_FORMATS="${QR_BUILD_FORMATS:-$DEFAULT_QR_BUILD_FORMATS}"
     BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
     DISABLE_OTA="${DISABLE_OTA:-${DEFAULT_DISABLE_OTA}}"
+    NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
 }
 
 
@@ -195,7 +215,7 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # Operations data - Credentials, config etc.
   OPSDATA_BUCKET="$( jq -r '.BuildConfig.OPSDATA_BUCKET' < "${CONFIG_FILE}" )"
@@ -228,16 +248,26 @@ function main() {
 
   # Prepare the code build environment
   info "Getting source code from from s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip"
-  aws --region "${AWS_REGION}" s3 cp "s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip" "${tmpdir}/scripts.zip" || return $?
+  aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip" "${tmpdir}/scripts.zip" || return $?
 
   unzip -q "${tmpdir}/scripts.zip" -d "${SRC_PATH}" || return $?
 
   cd "${SRC_PATH}"
-  yarn install --production=false
+
+  # Support the usual node package manager preferences
+  case "${build_format}" in
+    "yarn")
+        yarn install --production=false
+        ;;
+
+    "npm")
+        npm ci
+        ;;
+  esac
 
   # decrypt secrets from credentials store
   info "Getting credentials from s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}"
-  aws --region "${AWS_REGION}" s3 sync "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
+  aws --region "${AWS_REGION}" s3 sync --no-progress "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
   find "${OPS_PATH}" -name \*.kms -exec decrypt_kms_file "${AWS_REGION}" "{}" \;
 
   # get the version of the expo SDK which is required
@@ -254,7 +284,7 @@ function main() {
   if [[ -n "${EXPO_CURRENT_SDK_BUILD}" ]]; then
     for sdk_file in "${EXPO_CURRENT_SDK_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
-            aws --region "${AWS_REGION}" s3 cp "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
+            aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
         fi
     done
 
@@ -323,10 +353,10 @@ function main() {
     fi
 
     info "Copying OTA to CDN"
-    aws --region "${AWS_REGION}" s3 sync --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" || return $?
+    aws --region "${AWS_REGION}" s3 sync --no-progress --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" || return $?
 
     # Merge all existing SDK packages into a master distribution
-    aws --region "${AWS_REGION}" s3 cp --recursive --exclude "${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
+    aws --region "${AWS_REGION}" s3 cp --no-progress --recursive --exclude "${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
     EXPO_EXPORT_MERGE_ARGUMENTS=""
     for dir in ${SRC_PATH}/app/dist/packages/*/ ; do
         EXPO_EXPORT_MERGE_ARGUMENTS="${EXPO_EXPORT_MERGE_ARGUMENTS} --merge-src-dir "${dir}""
@@ -356,7 +386,7 @@ function main() {
 
     fi
 
-    aws --region "${AWS_REGION}" s3 sync "${SRC_PATH}/app/dist/master/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}" || return $?
+    aws --region "${AWS_REGION}" s3 sync --no-progress "${SRC_PATH}/app/dist/master/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}" || return $?
   fi
 
    DETAILED_HTML_QR_MESSAGE="<h4>Expo Client App QR Codes</h4> <p>Use these codes to load the app through the Expo Client</p>"
@@ -483,7 +513,7 @@ function main() {
 
 
         if [[ -f "${EXPO_BINARY_FILE_PATH}" ]]; then
-            aws --region "${AWS_REGION}" s3 sync --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
+            aws --region "${AWS_REGION}" s3 sync --no-progress --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
             EXPO_BINARY_PRESIGNED_URL="$(aws --region "${AWS_REGION}" s3 presign --expires-in "${BINARY_EXPIRATION}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/${EXPO_BINARY_FILE_NAME}" )"
             DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<p><strong>${build_format}</strong> <a href="${EXPO_BINARY_PRESIGNED_URL}">${build_format} - ${EXPO_APP_VERSION} - ${BUILD_NUMBER}</a>"
 
@@ -527,7 +557,7 @@ function main() {
   DETAILED_HTML="<html><body> <h4>Expo Mobile App Publish</h4> <p> A new Expo mobile app publish has completed </p> <ul> <li><strong>Public URL</strong> ${PUBLIC_URL}</li> <li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_QR_MESSAGE} ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
   echo "${DETAILED_HTML}" > "${REPORTS_PATH}/build-report.html"
 
-  aws --region "${AWS_REGION}" s3 sync "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
+  aws --region "${AWS_REGION}" s3 sync  --no-progress "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
 
   if [[ "${BUILD_BINARY}" == "true" ]]; then
     if [[ "${SUBMIT_BINARY}" == "true" ]]; then
