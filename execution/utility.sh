@@ -1894,9 +1894,9 @@ function set_rds_master_password() {
 
   info "Resetting master password for RDS instance ${db_identifier}"
   if [[ "${db_type}" == "cluster" ]]; then
-    aws --region "${region}" rds modify-db-cluster --db-cluster-identifier "${db_identifier}" --master-user-password "${password}" 1> /dev/null
+    aws --region "${region}" rds modify-db-cluster --db-cluster-identifier "${db_identifier}" --master-user-password "${password}" --apply-immediately 1> /dev/null
   else
-    aws --region "${region}" rds modify-db-instance --db-instance-identifier ${db_identifier} --master-user-password "${password}" 1> /dev/null
+    aws --region "${region}" rds modify-db-instance --db-instance-identifier ${db_identifier} --master-user-password "${password}" --apply-immediately 1> /dev/null
   fi
 }
 
