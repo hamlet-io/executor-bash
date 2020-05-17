@@ -11,13 +11,13 @@ function usage() {
 
 Generate a document using the Freemarker template engine
 
-Usage: $(basename $0) -t TEMPLATE -d TEMPLATEDIR -o OUTPUT (-v VARIABLE=VALUE)* (-g CMDB=PATH)* -b CMDB (-c CMDB)*
+Usage: $(basename $0) -t TEMPLATE (-d TEMPLATEDIR)+ -o OUTPUT (-v VARIABLE=VALUE)* (-g CMDB=PATH)* -b CMDB (-c CMDB)*
 
 where
 
 (o) -b CMDB           base cmdb
 (o) -c CMDB           cmdb to be included
-(m) -d TEMPLATEDIR    is the directory containing the template
+(m) -d TEMPLATEDIR    is a directory containing templates
 (o) -g CMDB=PATH      defines a cmdb and the corresponding path
 (o) -g PATH           finds all cmdbs under PATH based on a .cmdb marker file
     -h                shows this text
@@ -116,7 +116,7 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.11.jar" \
+java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.11.1.jar" \
     -i $TEMPLATE "${TEMPLATEDIRS[@]}" \
     -o $OUTPUT \
     "${VARIABLES[@]}" \
