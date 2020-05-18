@@ -255,7 +255,7 @@ function main() {
   cd "${SRC_PATH}"
 
   # Support the usual node package manager preferences
-  case "${build_format}" in
+  case "${NODE_PACKAGE_MANAGER}" in
     "yarn")
         yarn install --production=false
         ;;
