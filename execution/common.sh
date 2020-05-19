@@ -7,6 +7,15 @@
 . ${GENERATION_BASE_DIR}/execution/utility.sh
 . ${GENERATION_BASE_DIR}/execution/contextTree.sh
 
+# Load any plugin provider utility.sh
+IFS=';' read -ra PLUGINDIRS <<< ${GENERATION_PLUGIN_DIRS}
+for dir in "${PLUGINDIRS[@]}"; do
+  plugin_provider=${dir##*/}
+    if [[ -e "${dir}/${plugin_provider}/utility.sh" ]]; then
+      . "${dir}/${plugin_provider}/utility.sh"
+    fi
+done
+
 function getLogLevel() {
   checkLogLevel "${GENERATION_LOG_LEVEL}"
 }
