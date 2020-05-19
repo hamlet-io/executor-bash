@@ -4,14 +4,6 @@
 trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
-# Load any plugin provider utility.sh
-IFS=';' read -ra PLUGINDIRS <<< ${GENERATION_PLUGIN_DIRS}
-for dir in "${PLUGINDIRS[@]}"; do
-  plugin_provider=${dir##*/}
-    if [[ -e "${dir}/${plugin_provider}/utility.sh" ]]; then
-      . "${dir}/${plugin_provider}/utility.sh"
-    fi
-done
 
 # Defaults
 DEPLOYMENT_INITIATE_DEFAULT="true"
