@@ -44,9 +44,6 @@ EOF
     exit
 }
 
-ENV_STRUCTURE="\"environment\":["
-ENV_NAME=
-
 # Parse options
 while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
     case $opt in
@@ -57,10 +54,6 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             DELAY="${OPTARG}"
             ;;
         e)
-            # Separate environment variable definitions
-            if [[ -n "${ENV_NAME}" ]]; then
-              ENV_STRUCTURE="${ENV_STRUCTURE},"
-            fi
             ENV_NAME="${OPTARG}"
             ;;
         h)
@@ -70,7 +63,11 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             COMPONENT="${OPTARG}"
             ;;
         j)
-            COMPONET_INSTANCE="${OPTARG}"
+            if [[ "${OPTARG}" == "default" ]]; then
+                COMPONET_INSTANCE=""
+            else
+                COMPONET_INSTANCE="${OPTARG}"
+            fi
             ;;
         k)
             COMPONENT_VERSION="${OPTARG}"
@@ -79,14 +76,17 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             TIER="${OPTARG}"
             ;;
         v)
-            # TODO: add escaping of quotes in OPTARG
-            ENV_STRUCTURE="${ENV_STRUCTURE}{\"name\":\"${ENV_NAME}\", \"value\":\"${OPTARG}\"}"
+            ENV_VALUE="${OPTARG}"
             ;;
         w)
             TASK="${OPTARG}"
             ;;
         x)
-            INSTANCE="${OPTARG}"
+            if [[ "${OPTARG}" == "default" ]]; then
+                INSTANCE=""
+            else
+                INSTANCE="${OPTARG}"
+            fi
             ;;
         y)
             VERSION="${OPTARG}"
@@ -101,7 +101,6 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
 done
 
 DELAY="${DELAY:-${DELAY_DEFAULT}}"
-ENV_STRUCTURE="${ENV_STRUCTURE}]"
 
 # Ensure mandatory arguments have been provided
 if [[ -z "${TASK}" || -z "${TIER}" || -z "${COMPONENT}" ]]; then
@@ -123,21 +122,27 @@ ${GENERATION_DIR}/createBlueprint.sh >/dev/null || exit $?
 ENV_BLUEPRINT="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}/blueprint.json"
 
 # Search through the blueprint to find the cluster and the task
-COMPONENT_BLUEPRINT="$(getJSONValue "${ENV_BLUEPRINT}" \
-                                    " .Tenants[]        | objects | select(.Name==\"${TENANT}\") \
-                                    | .Products[]       | objects | select(.Name==\"${PRODUCT}\") \
-                                    | .Environments[]   | objects | select(.Name==\"${ENVIRONMENT}\") \
-                                    | .Segments[]       | objects | select(.Name==\"${SEGMENT}\") \
+CLUSTER_BLUEPRINT="$(getJSONValue "${ENV_BLUEPRINT}" \
+                                    " .Tenants[0]       | objects \
+                                    | .Products[0]      | objects \
+                                    | .Environments[0]  | objects \
+                                    | .Segments[0]      | objects \
                                     | .Tiers[]          | objects | select(.Name==\"${TIER}\") \
                                     | .Components[]     | objects | select(.Name==\"${COMPONENT}\") \
                                     | .Occurrences[]    | objects | \
                                             select( \
                                                 .Core.Type==\"ecs\" \
-                                                and .Core.Component.RawName==\"${COMPONENT}\" \
                                                 and .Core.Instance.Name==\"${COMPONENT_INSTANCE}\" \
                                                 and .Core.Version.Name==\"${COMPONENT_VERSION}\" \
-                                            ) \
-                                    | .Occurrences[] | objects | \
+                                            )")"
+
+if [[ -z "${CLUSTER_BLUEPRINT}" ]]; then
+    error "Could not find ECS Component - Tier: ${TIER} - Component: ${COMPONENT} - Component_Instance: ${COMPONENT_INSTANCE} - Component_Version: ${COMPONENT_VERSION}"
+    exit 255
+fi
+
+COMPONENT_BLUEPRINT="$(echo "${CLUSTER_BLUEPRINT}" | jq \
+                                    ".Occurrences[] | objects | \
                                             select( \
                                                 .Core.Type==\"task\" \
                                                 and .Core.Component.RawName==\"${TASK}\" \
@@ -145,7 +150,16 @@ COMPONENT_BLUEPRINT="$(getJSONValue "${ENV_BLUEPRINT}" \
                                                 and .Core.Version.Name==\"${VERSION}\" \
                                             )")"
 
+if [[ -z "${COMPONENT_BLUEPRINT}" ]]; then
+    error "Could not find ECS Task - Task: ${TASK} - Instance: ${INSTANCE} - Version: ${VERSION}"
+    exit 255
+fi
+
 CLUSTER_ARN="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.State.Attributes.ECSHOST' )"
+
+ENGINE="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.Engine' )"
+NETWORK_MODE="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.NetworkMode' )"
+
 DEFAULT_CONTAINER="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.Containers | keys | .[0]' )"
 TASK_DEFINITION_ID="-$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.State.ResourceGroups.default.Resources.task.Id' )-"
 
@@ -183,8 +197,37 @@ if [[ -z "${TASK_DEFINITION_ARN}" ]]; then
     exit
 fi
 
-# Find the container
-TASK_ARN="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 --overrides "{\"containerOverrides\":[{\"name\":\"${CONTAINER}\",${ENV_STRUCTURE}}]}" --query 'tasks[0].taskArn' --output text || exit $? )"
+# Configuration Overrides
+CLI_CONFIGURATION="{}"
+
+# Task hosting engine
+case $ENGINE in
+    fargate)
+        CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq '. * { launchType: "FARGATE" }' )"
+        ;;
+esac
+
+# Task Networking
+case $NETWORK_MODE in
+    awsvpc)
+        SECURITY_GROUP="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.State.Attributes.SECURITY_GROUP' )"
+        SUBNET="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.State.Attributes.SUBNET' )"
+        NETWORK_CONFIGURATION="$( echo "{}" | jq --arg sec_group "${SECURITY_GROUP}" --arg subnet "${SUBNET}" '. | { networkConfiguration : { awsvpcConfiguration : { subnets : [ $subnet ], securityGroups: [ $sec_group ]}}}' )"
+
+        CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq --argjson network "${NETWORK_CONFIGURATION}" '. * $network' )"
+        ;;
+esac
+
+# Environment Var Configuration
+if [[ -n "${ENV_NAME}" && -n "${ENV_VALUE}" ]]; then
+    ENVVAR_CONFIGURATION="$( echo "{}" | jq --arg container "${CONTAINER}" --arg env_name "${ENV_NAME}" --arg env_value "${ENV_VALUE}" '. | { overrides : { containerOverrides : [ { name : $container, environment : [ { name : $env_name, value: $env_value }]}]}}' )"
+
+    CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq --argjson envvar "${ENVVAR_CONFIGURATION}" '. * $envvar' )"
+fi
+
+CLI_CONFIGURATION="$(echo "${CLI_CONFIGURATION}" | jq -c '.' )"
+
+TASK_ARN="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 --query 'tasks[0].taskArn' ${TASK_ARGS} --cli-input-json "${CLI_CONFIGURATION}" --output text || exit $? )"
 
 info "Watching task..."
 while true; do
