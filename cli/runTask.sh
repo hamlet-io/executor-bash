@@ -6,6 +6,8 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' E
 
 # Defaults
 DELAY_DEFAULT=30
+ENV_NAMES=()
+ENV_VALUES=()
 
 function usage() {
     cat <<EOF
@@ -54,7 +56,7 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             DELAY="${OPTARG}"
             ;;
         e)
-            ENV_NAME="${OPTARG}"
+            addToArray "ENV_NAMES" "${OPTARG}"
             ;;
         h)
             usage
@@ -76,7 +78,7 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             TIER="${OPTARG}"
             ;;
         v)
-            ENV_VALUE="${OPTARG}"
+            addToArray "ENV_VALUES" "${OPTARG}"
             ;;
         w)
             TASK="${OPTARG}"
@@ -219,10 +221,17 @@ case $NETWORK_MODE in
 esac
 
 # Environment Var Configuration
-if [[ -n "${ENV_NAME}" && -n "${ENV_VALUE}" ]]; then
-    ENVVAR_CONFIGURATION="$( echo "{}" | jq --arg container "${CONTAINER}" --arg env_name "${ENV_NAME}" --arg env_value "${ENV_VALUE}" '. | { overrides : { containerOverrides : [ { name : $container, environment : [ { name : $env_name, value: $env_value }]}]}}' )"
+if [[ -n "${ENV_NAMES}" && -n "${ENV_VALUES}" ]]; then
 
-    CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq --argjson envvar "${ENVVAR_CONFIGURATION}" '. * $envvar' )"
+    ENV_CONFIG="[]"
+
+    for i in "${!ENV_NAMES[@]}"; do
+        ENV_NAME="${ENV_NAMES[$i]}"
+        ENV_VALUE="${ENV_VALUES[$i]}"
+        ENV_CONFIG="$(echo "${ENV_CONFIG}" | jq  --arg env_name "${ENV_NAME}" --arg env_value "${ENV_VALUE}" '. += [ { name : $env_name, value: $env_value } ]' )"
+    done
+
+    CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq --arg container "${CONTAINER}" --argjson envvars "${ENV_CONFIG}" '. * { overrides : { containerOverrides : [ { name : $container, environment : $envvars }]}}' )"
 fi
 
 CLI_CONFIGURATION="$(echo "${CLI_CONFIGURATION}" | jq -c '.' )"
