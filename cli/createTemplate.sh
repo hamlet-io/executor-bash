@@ -129,9 +129,6 @@ function options() {
         TEMPLATE_COMPOSITES=("account" "fragment")
         for composite in "${TEMPLATE_COMPOSITES[@]}"; do
 
-          # Define the composite
-          declare -gx COMPOSITE_${composite^^}="${CACHE_DIR}/composite_${composite}.ftl"
-
           # define the array holding the list of composite fragment filenames
           declare -ga "${composite}_array"
 
@@ -208,7 +205,7 @@ function options() {
 
   fi
 
-  # Specific intput control for mock input
+  # Specific input control for mock input
   if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
 
     if [[ -z "${OUTPUT_DIR}" ]]; then
@@ -460,8 +457,8 @@ function process_template_pass() {
   # Removal of drive letter (/?/) is specifically for MINGW
   # It shouldn't affect other platforms as it won't be matched
   for composite in "${template_composites[@]}"; do
-    composite_var="COMPOSITE_${composite^^}"
-    args+=("-r" "${composite,,}List=${!composite_var#/?/}")
+    composite_var="${CACHE_DIR}/composite_${composite,,}.ftl"
+    args+=("-r" "${composite,,}List=${composite_var#/?/}")
   done
 
   args+=("-g" "${GENERATION_DATA_DIR}")
