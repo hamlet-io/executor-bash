@@ -11,7 +11,7 @@ function usage() {
 
 Manage crypto for files
 
-Usage: $(basename $0) -f CRYPTO_FILE -e -d -u -a KEYALIAS -k KEYID
+Usage: $(basename $0) -f CRYPTO_FILE -e -d -l -r -u -a KEYALIAS -k KEYID
 
 where
 
@@ -21,6 +21,8 @@ where
 (o) -f CRYPTO_FILE  is the path to the file managed
     -h              shows this text
 (o) -k KEYID        for the master key to be used
+(o) -l              if cmk should be listed
+(o) -r              if file should be re-encrypted
 (o) -u              if file should be updated
 
 (m) mandatory, (o) optional, (d) deprecated
@@ -36,7 +38,7 @@ EOF
 }
 
 # Parse options
-while getopts ":a:def:hk:u" opt; do
+while getopts ":a:def:hk:lru" opt; do
     case $opt in
         a)
             export ALIAS="${OPTARG}"
@@ -56,14 +58,20 @@ while getopts ":a:def:hk:u" opt; do
         k)
             export KEYID="${OPTARG}"
             ;;
+        l)
+            export CRYPTO_OPERATION="listcmk"
+            ;;
+        r)
+            export CRYPTO_OPERATION="reencrypt"
+            ;;
         u)
             export CRYPTO_UPDATE="true"
             ;;
         \?)
-            fatalOption
+            fatalOption && exit 1
             ;;
         :)
-            fatalOptionArgument
+            fatalOptionArgument && exit 1
             ;;
     esac
 done
@@ -75,6 +83,12 @@ case $CRYPTO_OPERATION in
         ;;
     decrypt)
         ${GENERATION_DIR}/manageCrypto.sh -b -d -v
+        ;;
+    listcmk)
+        ${GENERATION_DIR}/manageCrypto.sh -b -l
+        ;;
+    reencrypt)
+        ${GENERATION_DIR}/manageCrypto.sh -b -r
         ;;
     *)
         ${GENERATION_DIR}/manageCrypto.sh -n
