@@ -1617,6 +1617,20 @@ function update_ssm_document() {
   return $?
 }
 
+# -- Transit Gateway --
+
+function get_transitgateway_vpn_attachment() {
+  local region="$1"; shift
+  local cfnStackName="$1"; shift
+  local vpnConnectionId="$1"; shift
+
+  vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
+  transitGatewayAttachment="$( aws --region "${region}" ec2 describe-transit-gateway-attachments --filters "Name=resource-id,Values=${vpnConnection}" --query 'TransitGatewayAttachments[*].TransitGatewayAttachmentId' --output text || return $? )"
+
+  echo "${transitGatewayAttachment}"
+  return 0
+}
+
 # -- OAI --
 
 function update_oai_credentials() {
