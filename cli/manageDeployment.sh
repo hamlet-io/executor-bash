@@ -308,6 +308,7 @@ function main() {
 
   pushTempDir "manage_deployment_XXXXXX"
   export tmp_dir="$(getTopTempDir)"
+  export tmpdir="${tmp_dir}"
 
   pushd ${CF_DIR} > /dev/null 2>&1
 
