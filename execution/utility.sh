@@ -1631,6 +1631,26 @@ function get_transitgateway_vpn_attachment() {
   return 0
 }
 
+# -- VPN Gateway --
+
+function update_vpn_options() {
+  local region="${1}"; shift
+  local cfnStackName="$1"; shift
+  local vpnConnectionId="${1}"; shift
+  local configfile="${1}"; shift
+
+  vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
+  vpnIPList=( $( aws --region "${region}" ec2 describe-vpn-connections --output text --filters Name=vpn-connection-id,Values="${vpnConnection}" --query 'VpnConnections[0].VgwTelemetry[*].OutsideIpAddress' || return $? ) )
+
+  aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
+
+  for vpn_ip in "${vpnIPList[@]}"; do
+    info "Updating VPN: ${vpnConnection} - IP: ${vpn_ip}"
+    aws --region "${region}" ec2 modify-vpn-tunnel-options --vpn-connection-id "${vpnConnection}" --vpn-tunnel-outside-ip-address "${vpn_ip}" --cli-input-json "file://${configfile}" || return $?
+    aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
+  done
+}
+
 # -- OAI --
 
 function update_oai_credentials() {
