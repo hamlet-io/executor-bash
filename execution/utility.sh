@@ -1396,8 +1396,17 @@ function syncFilesToBucket() {
       fi
     done
 
+    local target_url="s3://${bucket}/${prefix}${prefix:+/}"
+
     # Now synch with s3
-    aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "s3://${bucket}/${prefix}${prefix:+/}"; return_status=$?
+    aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "${target_url}"; return_status=$?
+    if [[ "${return_status}" -eq 0 ]]; then
+      readarray -t precompressed_files < <(find "${tmp_dir}" -type f -name "*-precompressed*" )
+      if [[ ! $(arrayIsEmpty "precompressed_files") ]]; then
+        # Handle precompressed files
+        aws --region ${region} s3 cp --recursive --exclude "*" --include "*-precompressed*" --content-encoding gzip "${tmp_dir}/" "${target_url}"; return_status=$?
+      fi
+    fi
 
     popTempDir
     return ${return_status}
