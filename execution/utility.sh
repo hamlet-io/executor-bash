@@ -1401,11 +1401,20 @@ function syncFilesToBucket() {
     # Now synch with s3
     aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "${target_url}"; return_status=$?
     if [[ "${return_status}" -eq 0 ]]; then
-      readarray -t precompressed_files < <(find "${tmp_dir}" -type f -name "*-precompressed*" )
-      if [[ ! $(arrayIsEmpty "precompressed_files") ]]; then
-        # Handle precompressed files
-        aws --region ${region} s3 cp --recursive --exclude "*" --include "*-precompressed*" --content-encoding gzip "${tmp_dir}/" "${target_url}"; return_status=$?
-      fi
+      readarray -t encoded_files < <(find "${tmp_dir}" -type f -name "encoded--*--*" )
+      for f in "${encoded_files[@]}"; do
+        local filename=$(fileName "${f}")
+
+        # Ensure the encoding has been provided
+        [[ "$filename" =~ ^encoded--(.+)--(.+)$ ]] || continue
+        local encoding="${BASH_REMATCH[1]}"
+
+        # Work out the relative path
+        local relative_path="${f#${tmp_dir}/}"
+
+        # Copy the file
+        aws --region ${region} s3 cp --content-encoding "${encoding}" "${f}" "${target_url}${relative_path}"; return_status=$?
+      done
     fi
 
     popTempDir
