@@ -2,18 +2,60 @@
 
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 
+trim() {
+    local var="$1"
+    # remove leading whitespace characters
+    var="${var#"${var%%[![:space:]]*}"}"
+    # remove trailing whitespace characters
+    var="${var%"${var##*[![:space:]]}"}"
+    echo $var
+}
+
+function cleanup_bundler {
+
+    # Make sure the metro bundler isn't left running
+    # It will work the first time but as the workspace is
+    # deleted each time, it will then be running in a deleted directory
+    # and fail every time
+    BUNDLER_PID=$(trim $(lsof -i :8081 -t))
+    if [[ -n "${BUNDLER_PID}" ]]; then
+        BUNDLER_PARENT=$(trim $(ps -o ppid= ${BUNDLER_PID}))
+        echo "Bundler found, pid=${BUNDLER_PID}, ppid=${BUNDLER_PARENT} ..."
+        if [[ -n "${BUNDLER_PID}" && (${BUNDLER_PID} != 1) ]]; then
+            echo "Killing bundler, pid=${BUNDLER_PID} ..."
+            kill -9 "${BUNDLER_PID}" || return $?
+        fi
+        if [[ -n "${BUNDLER_PARENT}"  && (${BUNDLER_PARENT} != 1) ]]; then
+            echo "Killing bundler parent, pid=${BUNDLER_PARENT} ..."
+            kill -9 "${BUNDLER_PARENT}" || return $?
+        fi
+    fi
+    return 0
+}
+
 function cleanup {
     # Make sure we always remove keychains that we create
     if [[ -f "${FASTLANE_KEYCHAIN_PATH}" ]]; then
+      	echo "Deleting keychain ${FASTLANE_KEYCHAIN_PATH} ..."
         security delete-keychain "${FASTLANE_KEYCHAIN_PATH}"
     fi
+
+    if [[ -n "${OPS_PATH}" ]]; then
+    	for f in ${OPS_PATH}/*.keychain; do
+        	echo "Deleting keychain ${f} ..."
+	        security delete-keychain "${f}"
+        done
+    fi
+
+    # Make sure the bundler is shut down
+    cleanup_bundler
 
     # normal context cleanup
     . ${GENERATION_BASE_DIR}/execution/cleanupContext.sh
 
 }
-
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
+
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
@@ -190,7 +232,11 @@ function main() {
    export PATH="$HOME/.fastlane/bin:$PATH"
 
   # Ensure mandatory arguments have been provided
-  [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory
+  [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory && return 1
+
+  # Make sure the previous bundler has been stopped
+  cleanup_bundler ||
+  { fatal "Can't shut down previous instance of the bundler"; return 1; }
 
   # Create build blueprint
   info "Generating build blueprint..."
@@ -235,6 +281,10 @@ function main() {
 
   BUILD_FORMAT_LIST="$( jq -r '.BuildConfig.APP_BUILD_FORMATS' < "${CONFIG_FILE}" )"
   arrayFromList BUILD_FORMATS "${BUILD_FORMAT_LIST}"
+
+  APP_REFERENCE="$( jq -r '.BuildConfig.APP_REFERENCE |  select (.!=null)' <"${CONFIG_FILE}" )"
+  [[ -z "${APP_REFERENCE}" ]] && APP_REFERENCE="0.0.1"
+  APP_REFERENCE="${APP_REFERENCE#v}"
 
   BUILD_REFERENCE="$( jq -r '.BuildConfig.BUILD_REFERENCE' <"${CONFIG_FILE}" )"
   BUILD_NUMBER="$(date +"%Y%m%d.1%H%M%S")"
@@ -285,6 +335,7 @@ function main() {
     for sdk_file in "${EXPO_CURRENT_SDK_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
             aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
+            break
         fi
     done
 
@@ -294,6 +345,7 @@ function main() {
     fi
   fi
 
+  # If not built before, or the app version has changed, or forced to, build the binary
   if [[ -z "${EXPO_CURRENT_SDK_BUILD}" || "${FORCE_BINARY_BUILD}" == "true" || "${EXPO_CURRENT_APP_VERSION}" != "${EXPO_APP_VERSION}" ]]; then
     BUILD_BINARY="true"
   fi
@@ -309,9 +361,8 @@ function main() {
     --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" \
     --arg BUILD_REFERENCE "${BUILD_REFERENCE}" \
     --arg BUILD_NUMBER "${BUILD_NUMBER}" \
-    '.expo.releaseChannel=$RELEASE_CHANNEL | .expo.extra.build_reference=$BUILD_REFERENCE | .expo.ios.buildNumber=$BUILD_NUMBER | .expo.extra=.expo.extra + $envConfig[]["AppConfig"]' <  "./app.json" > "${tmpdir}/environment-app.json"
+    '.expo.releaseChannel=$RELEASE_CHANNEL | .expo.extra.BUILD_REFERENCE=$BUILD_REFERENCE | .expo.ios.buildNumber=$BUILD_NUMBER | .expo.extra=.expo.extra + $envConfig[]["AppConfig"]' <  "./app.json" > "${tmpdir}/environment-app.json"
   mv "${tmpdir}/environment-app.json" "./app.json"
-
   ## Optional app.json overrides
   IOS_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.IOS_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
@@ -319,7 +370,7 @@ function main() {
     mv "${tmpdir}/ios-bundle-app.json" "./app.json"
   fi
 
-  ANDROID_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROIRD_BUNDLE_ID' < "${CONFIG_FILE}" )"
+  ANDROID_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROID_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${ANDROID_BUNDLE_ID}" != "null" && -n "${ANDROID_BUNDLE_ID}" ]]; then
     jq --arg ANDROID_BUNDLE_ID "${ANDROID_BUNDLE_ID}" '.expo.android.package=$ANDROID_BUNDLE_ID' <  "./app.json" > "${tmpdir}/android-bundle-app.json"
     mv "${tmpdir}/android-bundle-app.json" "./app.json"
@@ -427,7 +478,9 @@ function main() {
             IOS_DIST_P12_PASSWORD="$( jq -r '.BuildConfig.IOS_DIST_P12_PASSWORD' < "${CONFIG_FILE}" )"
             export EXPO_IOS_DIST_P12_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${IOS_DIST_P12_PASSWORD#"base64:"}")"
 
-            export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/ios_profile.mobileprovision"
+            export IOS_DIST_PROVISIONING_PROFILE_BASE="ios_profile"
+            export IOS_DIST_PROVISIONING_PROFILE_EXTENSION=".mobileprovision"
+            export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
 
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
@@ -458,6 +511,7 @@ function main() {
 
             "fastlane")
                 echo "Using fastlane to build the binary image"
+                export FASTLANE_DISABLE_COLORS=1
 
                 FASTLANE_KEYCHAIN_PATH="${OPS_PATH}/${BUILD_NUMBER}.keychain"
                 FASTLANE_KEYCHAIN_NAME="${BUILD_NUMBER}"
@@ -466,32 +520,64 @@ function main() {
                 FASTLANE_IOS_PODFILE="ios/Podfile"
 
                 # Update App details
-                fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Info.plist" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
+                # Pre SDK37, Expokit maintained an Info.plist in Supporting
+                INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Supporting/Info.plist"
+                [[ ! -e "ios/${INFO_PLIST_PATH}" ]] && INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Info.plist"
+                fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
+                fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${APP_REFERENCE}" || return $?
                 if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
                     cd "${SRC_PATH}/ios"
-                    fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${EXPO_PROJECT_SLUG}/Supporting/Info.plist" || return $?
+                    fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
                     cd "${SRC_PATH}"
                 fi
 
-                # Update Expo Details and seed with latest expo expot bundles
-                BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
-                if [[ "${DISABLE_OTA}" == "false" ]]; then
-                    cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
+                if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
+                    # Bare workflow support (SDK 37+)
+
+                    # Updates enabled?
+                    if [[ "${DISABLE_OTA}" == "false" ]]; then
+                        fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesEnabled value:"true" || return $?
+                    else
+                        fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesEnabled value:"false" || return $?
+                    fi
+
+                    # Updates URL
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${PUBLIC_URL}" || return $?
+
+                    # SDK Version
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
+
+                    # Release channel
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesReleaseChannel value:"${RELEASE_CHANNEL}" || return $?
+
+                    # Check for updates
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesCheckOnLaunch value:"ALWAYS" || return $?
+
+                    # Wait up to 10s for updates to download
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesLaunchWaitMs value:"10000" || return $?
+
+                else
+                    # Legacy Expokit support
+                    # Update Expo Details and seed with latest expo expot bundles
+                    BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
+                    if [[ "${DISABLE_OTA}" == "false" ]]; then
+                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
+                    fi
+
+                    # Get the bundle file name from the manifest
+                    BUNDLE_URL="$( jq -r '.bundleUrl' < "${BINARY_BUNDLE_FILE}")"
+                    BUNDLE_FILE_NAME="$( basename "${BUNDLE_URL}")"
+
+                    if [[ "${DISABLE_OTA}" == "false" ]]; then
+                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
+                    fi
+
+                    jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <  "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" > "${tmpdir}/EXShell.json"
+                    mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
+
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:manifestUrl value:"${EXPO_MANIFEST_URL}" || return $?
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:releaseChannel value:"${RELEASE_CHANNEL}" || return $?
                 fi
-
-                # Get the bundle file name from the manifest
-                BUNDLE_URL="$( jq -r '.bundleUrl' < "${BINARY_BUNDLE_FILE}")"
-                BUNDLE_FILE_NAME="$( basename "${BUNDLE_URL}")"
-
-                if [[ "${DISABLE_OTA}" == "false" ]]; then
-                    cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
-                fi
-
-                jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <  "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" > "${tmpdir}/EXShell.json"
-                mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
-
-                fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:manifestUrl value:"${EXPO_MANIFEST_URL}" || return $?
-                fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:releaseChannel value:"${RELEASE_CHANNEL}" || return $?
 
                 # Keychain setup - Creates a temporary keychain
                 fastlane run create_keychain path:"${FASTLANE_KEYCHAIN_PATH}" password:"${FASTLANE_KEYCHAIN_NAME}" add_to_search_list:"true" unlock:"true" timeout:3600 || return $?
@@ -500,9 +586,35 @@ function main() {
                 fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${EXPO_IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
                 CODESIGN_IDENTITY="$( security find-certificate -c "iPhone Distribution" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
 
+                # load the app provisioning profile
                 fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
-                fastlane run automatic_code_signing use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"iPhone Distribution" || return $?
                 fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"iPhone Distribution" || return $?
+
+                # load extension profiles
+                # extension target name is assumed to be the string appended to "ios_profile" in the profile name
+                # ios_profile_xxx.mobileprovision -> target is xxx
+                for PROFILE in "${OPS_PATH}"/"${IOS_DIST_PROVISIONING_PROFILE_BASE}"*${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}; do
+                    TARGET="${PROFILE%${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}}"
+                    TARGET="${TARGET#${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}}"
+                    # Ignore the app provisioning profile
+                    [[ -z "${TARGET}" ]] && continue
+                    # Update the extension target
+                    TARGET="${TARGET#_}"
+                    echo "Updating target ${TARGET} ..."
+                    fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
+                    fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"iPhone Distribution" || return $?
+                    # Update the plist file as well if present
+                    TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
+                    if [[ -f "${TARGET_PLIST_PATH}" ]]; then
+                        fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
+                        fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleShortVersionString value:"${APP_REFERENCE}" || return $?
+                        if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
+                            fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleIdentifier value:"${IOS_DIST_BUNDLE_ID}.${TARGET}" || return $?
+                        fi
+                    fi
+                done
+
+                fastlane run automatic_code_signing use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"iPhone Distribution" || return $?
 
                 # Build App
                 fastlane run cocoapods podfile:"${FASTLANE_IOS_PODFILE}" || return $?

@@ -1396,8 +1396,26 @@ function syncFilesToBucket() {
       fi
     done
 
+    local target_url="s3://${bucket}/${prefix}${prefix:+/}"
+
     # Now synch with s3
-    aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "s3://${bucket}/${prefix}${prefix:+/}"; return_status=$?
+    aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "${target_url}"; return_status=$?
+    if [[ "${return_status}" -eq 0 ]]; then
+      readarray -t encoded_files < <(find "${tmp_dir}" -type f -name "encoded--*--*" )
+      for f in "${encoded_files[@]}"; do
+        local filename=$(fileName "${f}")
+
+        # Ensure the encoding has been provided
+        [[ "$filename" =~ ^encoded--(.+)--(.+)$ ]] || continue
+        local encoding="${BASH_REMATCH[1]}"
+
+        # Work out the relative path
+        local relative_path="${f#${tmp_dir}/}"
+
+        # Copy the file
+        aws --region ${region} s3 cp --content-encoding "${encoding}" "${f}" "${target_url}${relative_path}"; return_status=$?
+      done
+    fi
 
     popTempDir
     return ${return_status}
@@ -1629,6 +1647,26 @@ function get_transitgateway_vpn_attachment() {
 
   echo "${transitGatewayAttachment}"
   return 0
+}
+
+# -- VPN Gateway --
+
+function update_vpn_options() {
+  local region="${1}"; shift
+  local cfnStackName="$1"; shift
+  local vpnConnectionId="${1}"; shift
+  local configfile="${1}"; shift
+
+  vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
+  vpnIPList=( $( aws --region "${region}" ec2 describe-vpn-connections --output text --filters Name=vpn-connection-id,Values="${vpnConnection}" --query 'VpnConnections[0].VgwTelemetry[*].OutsideIpAddress' || return $? ) )
+
+  aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
+
+  for vpn_ip in "${vpnIPList[@]}"; do
+    info "Updating VPN: ${vpnConnection} - IP: ${vpn_ip}"
+    aws --region "${region}" ec2 modify-vpn-tunnel-options --vpn-connection-id "${vpnConnection}" --vpn-tunnel-outside-ip-address "${vpn_ip}" --cli-input-json "file://${configfile}" || return $?
+    aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
+  done
 }
 
 # -- OAI --
