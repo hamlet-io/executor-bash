@@ -1242,6 +1242,31 @@ function update_ec2_autoscalegroup() {
   aws --region "${region}" autoscaling update-auto-scaling-group --auto-scaling-group-name "${groupName}" --cli-input-json "file://${configfile}" || return $?
 }
 
+function manage_ec2_volume_encryption() {
+  local region="$1"; shift
+  local encryptionEnabled="$1"; shift
+  local kmsKeyArn="$1"; shift
+
+  current_state="$(aws --region "${region}" ec2 get-ebs-encryption-by-default --output text --query 'EbsEncryptionByDefault' | tr '[:upper:]' '[:lower:]' )"
+  encryptionEnabled="$( echo ${encryptionEnabled} | tr '[:upper:]' '[:lower:]')"
+
+  if [[ "${current_state}" != "${encryptionEnabled}" ]]; then
+    aws --region "${region}" ec2 modify-ebs-default-kms-key-id --kms-key-id "${kmsKeyArn}"
+
+    if [[ "${encryptionEnabled}" == "true" ]]; then
+        info "Enabling KMS Volume Encryption"
+        aws --region "${region}" ec2 enable-ebs-encryption-by-default
+    fi
+
+    if [[ "${encryptionEnabled}" == "false" ]]; then
+      info "Disabling KMS Volume Encryption"
+      aws --region "${region}" ec2 disable-ebs-encryption-by-default
+    fi
+  else
+    info "Volume Encryption State - expected: ${encryptionEnabled} - current: ${current_state}"
+  fi
+}
+
 #-- ECS --
 function create_ecs_scheduled_task() {
   local region="$1"; shift
