@@ -1625,7 +1625,6 @@ function cleanup_ssm_document() {
 
   if [[ -n "${listDocument}" ]]; then
 
-    # if document doesn't exist create it
     info "Removing Document ${name}"
     aws --region "${region}" ssm delete-document --name "${name}" || return $?
 
