@@ -259,7 +259,7 @@ function main() {
         CRYPTO_TEXT="${CRYPTO_TEXT:-$JSON_TEXT}"
 
         [[ (("${CRYPTO_OPERATION}" == "encrypt") && (-z "${CRYPTO_TEXT}")) ]] &&
-            fatal "Nothing to encrypt"
+            fatal "Nothing to encrypt" && return 255
     else
         if [[ -z "${CRYPTO_TEXT}" ]]; then
             [[ -z "${CRYPTO_FILE}" ]] && insufficientArgumentsError && return 255
@@ -270,6 +270,21 @@ function main() {
             CRYPTO_TEXT="${CRYPTO_TEXT:-$FILE_TEXT}"
         fi
     fi
+
+    # Force options if required
+    case ${CRYPTO_OPERATION} in
+        encrypt)
+            CRYPTO_VISIBLE="false"
+            ;;
+        decrypt)
+            CRYPTO_DECODE="true"
+            ;;
+        reencrypt)
+            CRYPTO_VISIBLE="false"
+            CRYPTO_DECODE="true"
+            ;;
+    esac
+
 
     # Strip any explicit prefix indication of encoding/encryption engine
     if [[ $(grep "^${PREFIX}:" <<< "${CRYPTO_TEXT}") ]]; then
@@ -340,17 +355,15 @@ function main() {
     RESULT=$?
 
     if [[ "${RESULT}" -eq 0 ]]; then
-        # Decode if required
-        if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
-            CRYPTO_TEXT=$(dos2unix <<< "${CRYPTO_TEXT}" | base64 -d)
-        fi
 
         # Update if required
         if [[ "${CRYPTO_UPDATE}" == "true" ]]; then
             if [[ -n "${JSON_PATH}" ]]; then
-                if [[ "${CRYPTO_OPERATION}" == "encrypt" ]]; then
-                    CRYPTO_TEXT="${PREFIX:+${PREFIX}:}${CRYPTO_TEXT}"
-                fi
+                case ${CRYPTO_OPERATION} in
+                    encrypt|reencrypt)
+                        CRYPTO_TEXT="${PREFIX:+${PREFIX}:}${CRYPTO_TEXT}"
+                        ;;
+                esac
                 jq --indent 4 "${ESCAPED_JSON_PATH}=\"${CRYPTO_TEXT}\"" < "${TARGET_FILE}"  > "${tmp_dir}/${CRYPTO_FILENAME_DEFAULT}"
                 RESULT=$?
                 if [[ "${RESULT}" -eq 0 ]]; then
@@ -371,11 +384,16 @@ function main() {
     fi
 
     if [[ ("${RESULT}" -eq 0) && ( "${CRYPTO_QUIET}" != "true") ]]; then
+        # Decode if required
+        if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
+            CRYPTO_TEXT=$(dos2unix <<< "${CRYPTO_TEXT}" | base64 -d)
+        fi
+
         # Display result
         echo "${CRYPTO_TEXT}"
     fi
 
-    return 0
+    return ${RESULT}
 }
 
 main "$@"
