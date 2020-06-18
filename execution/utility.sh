@@ -1423,9 +1423,11 @@ function syncFilesToBucket() {
 
     local target_url="s3://${bucket}/${prefix}${prefix:+/}"
 
-    # Now synch with s3
+    # Now synch with s3 - cli guesses content-type based on extension
     aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "${target_url}"; return_status=$?
+
     if [[ "${return_status}" -eq 0 ]]; then
+      # Handle encoded files specially to set the encoding metadata on the resulting S3 objects
       readarray -t encoded_files < <(find "${tmp_dir}" -type f -name "encoded--*--*" )
       for f in "${encoded_files[@]}"; do
         local filename=$(fileName "${f}")
@@ -1434,10 +1436,27 @@ function syncFilesToBucket() {
         [[ "$filename" =~ ^encoded--(.+)--(.+)$ ]] || continue
         local encoding="${BASH_REMATCH[1]}"
 
+        # Encoding specific processing
+        case "${encoding,,}" in
+          gzip)
+            [[ "$filename" =~ ^(.+)\.([^\.]+)\.([^\.]+)$ ]] || continue
+            local encoding_extension="${BASH_REMATCH[2],,}"
+            case "${encoding_extension}" in
+              gzip|gz)
+                # Encoding applied
+                ;;
+              *)
+                # Extension doesn't match encoding
+                continue
+                ;;
+            esac
+            ;;
+        esac
+
         # Work out the relative path
         local relative_path="${f#${tmp_dir}/}"
 
-        # Copy the file
+        # Copy the file and set the encoding metadata
         aws --region ${region} s3 cp --content-encoding "${encoding}" "${f}" "${target_url}${relative_path}"; return_status=$?
       done
     fi
