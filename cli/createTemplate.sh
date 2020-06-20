@@ -876,23 +876,25 @@ function process_template() {
 
     # Cleanup output directory
     if [[ "${deployment_unit_state_subdirectories}" == "true" ]]; then
+      # Don't cleanup output directory when compiling test cases.
+      if [[ ! -z "${OUTPUT_DIR}" ]]; then
+        # Remove existing files for the current level being careful to preserve stacks
+        readarray -t existing_files < <(find "${cf_dir}" -mindepth 1 -maxdepth 1 -type f \
+        \(  -name "${cleanup_level}-*" \
+            -and -not -name "${cleanup_level}-*-stack.json" \
+            -and -not -name "${cleanup_level}-*-lastchange.json" \) )
 
-      # Remove existing files for the current level being careful to preserve stacks
-      readarray -t existing_files < <(find "${cf_dir}" -mindepth 1 -maxdepth 1 -type f \
-      \(  -name "${cleanup_level}-*" \
-          -and -not -name "${cleanup_level}-*-stack.json" \
-          -and -not -name "${cleanup_level}-*-lastchange.json" \) )
+        for e in "${existing_files[@]}"; do
+          local existing_filename="$(fileName "${e}")"
+          debug "... checking file ${existing_filename} ..."
+          # If generated, then ignore
+          $(inArray "results_list" "${existing_filename}") && continue
 
-      for e in "${existing_files[@]}"; do
-        local existing_filename="$(fileName "${e}")"
-        debug "... checking file ${existing_filename} ..."
-        # If generated, then ignore
-        $(inArray "results_list" "${existing_filename}") && continue
-
-        # Wasn't generated so remove
-        info "... removing ${existing_filename} ..."
-        rm  -f "${cf_dir}/${existing_filename}"
-      done
+          # Wasn't generated so remove
+          info "... removing ${existing_filename} ..."
+          rm  -f "${cf_dir}/${existing_filename}"
+        done
+      fi
     fi
 
   else
