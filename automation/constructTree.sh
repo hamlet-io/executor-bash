@@ -124,6 +124,9 @@ BASE_DIR_TEMP="${BASE_DIR}/temp"
 
 if [[ !("${EXCLUDE_PRODUCT_DIRECTORIES}" == "true") ]]; then
 
+    # Multiple products in the product config repo
+    MULTI_PRODUCT_REPO=false
+
     # Pull in the product config repo
     ${AUTOMATION_DIR}/manageRepo.sh -c -l "product config" \
         -n "${PRODUCT_CONFIG_REPO}" -v "${PRODUCT_GIT_PROVIDER}" \
@@ -139,13 +142,26 @@ if [[ !("${EXCLUDE_PRODUCT_DIRECTORIES}" == "true") ]]; then
     # - product(s) +/- account(s)
     if [[ -n $(findDir "${BASE_DIR_TEMP}" "infrastructure") ]]; then
         # Mix of infrastructure and config
-        if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+        ACCOUNT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}")"
+        # Ensure we definitely have an account
+        if [[ ( -n "${ACCOUNT_CANDIDATE_DIR}" ) &&
+                (
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/account.json" ) ||
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/config/account.json" )
+                ) ]]; then
             # Everything in one repo
             PRODUCT_CONFIG_DIR="${BASE_DIR}/cmdb"
         else
-            if [[ -n $(findDir "${BASE_DIR_TEMP}" "${PRODUCT}") ]]; then
+            PRODUCT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${PRODUCT}")"
+            # Ensure we definitely have a product
+            if [[ ( -n "${PRODUCT_CANDIDATE_DIR}" ) &&
+                  (
+                      ( -d "${PRODUCT_CANDIDATE_DIR}/product.json" ) ||
+                      ( -d "${PRODUCT_CANDIDATE_DIR}/config/product.json" )
+                  ) ]]; then
                 # Multi-product repo
                 PRODUCT_CONFIG_DIR="${BASE_DIR}/products"
+                MULTI_PRODUCT_REPO=true
             else
                 # Single product repo
                 PRODUCT_CONFIG_DIR="${BASE_DIR}/${PRODUCT}"
@@ -153,13 +169,26 @@ if [[ !("${EXCLUDE_PRODUCT_DIRECTORIES}" == "true") ]]; then
         fi
     else
         # Just config
-        if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+        ACCOUNT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}")"
+        # Ensure we definitely have an account
+        if [[ ( -n "${ACCOUNT_CANDIDATE_DIR}" ) &&
+                (
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/account.json" ) ||
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/config/account.json" )
+                ) ]]; then
             # products and accounts
             PRODUCT_CONFIG_DIR="${BASE_DIR}/config"
         else
-            if [[ -n $(findDir "${BASE_DIR_TEMP}" "${PRODUCT}") ]]; then
+            PRODUCT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${PRODUCT}")"
+            # Ensure we definitely have a product
+            if [[ ( -n "${PRODUCT_CANDIDATE_DIR}" ) &&
+                  (
+                      ( -d "${PRODUCT_CANDIDATE_DIR}/product.json" ) ||
+                      ( -d "${PRODUCT_CANDIDATE_DIR}/config/product.json" )
+                  ) ]]; then
                 # Multi-product repo
                 PRODUCT_CONFIG_DIR="${BASE_DIR}/config/products"
+                MULTI_PRODUCT_REPO=true
             else
                 # Single product repo
                 PRODUCT_CONFIG_DIR="${BASE_DIR}/config/${PRODUCT}"
@@ -183,11 +212,18 @@ if [[ !("${EXCLUDE_PRODUCT_DIRECTORIES}" == "true") ]]; then
         [[ (! -f "${BASE_DIR_TEMP}/.gitignore") || ($(grep -q "temp_\*" "${BASE_DIR_TEMP}/.gitignore") -ne 0) ]] && \
           echo "temp_*" >> "${BASE_DIR_TEMP}/.gitignore"
 
-        if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+        ACCOUNT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}")"
+        # Ensure we definitely have an account
+        if [[ ( -n "${ACCOUNT_CANDIDATE_DIR}" ) &&
+                (
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/account.json" ) ||
+                    ( -d "${ACCOUNT_CANDIDATE_DIR}/config/account.json" )
+                ) ]]; then
             # products and accounts
             PRODUCT_INFRASTRUCTURE_DIR="${BASE_DIR}/infrastructure"
         else
-            if [[ -n $(findDir "${BASE_DIR_TEMP}" "${PRODUCT}") ]]; then
+            # Is product repo contains multiple products, assume the infrastructure repo does too
+            if [[ "${MULTI_PRODUCT_REPO}" == "true" ]]; then
                 # Multi-product repo
                 PRODUCT_INFRASTRUCTURE_DIR="${BASE_DIR}/infrastructure/products"
             else
@@ -204,6 +240,9 @@ fi
 
 if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
 
+    # Multiple accounts in the account config repo
+    MULTI_ACCOUNT_REPO=false
+
     # Pull in the account config repo
     ACCOUNT_CONFIG_DIR=$(findGen3AccountDir "${BASE_DIR}" "${ACCOUNT}")
     if [[ -z "${ACCOUNT_CONFIG_DIR}" ]]; then
@@ -218,17 +257,31 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
 
         if [[ -n $(findDir "${BASE_DIR_TEMP}" "infrastructure") ]]; then
             # Mix of infrastructure and config
-            if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+            ACCOUNT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}")"
+            # Ensure we definitely have an account
+            if [[ ( -n "${ACCOUNT_CANDIDATE_DIR}" ) &&
+                  (
+                      ( -d "${ACCOUNT_CANDIDATE_DIR}/account.json" ) ||
+                      ( -d "${ACCOUNT_CANDIDATE_DIR}/config/account.json" )
+                  ) ]]; then
                 # Multi-account repo
                 ACCOUNT_CONFIG_DIR="${BASE_DIR}/accounts"
+                MULTI_ACCOUNT_REPO=true
             else
                 # Single account repo
                 ACCOUNT_CONFIG_DIR="${BASE_DIR}/${ACCOUNT}"
             fi
         else
-            if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+            ACCOUNT_CANDIDATE_DIR="$(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}")"
+            # Ensure we definitely have an account
+            if [[ ( -n "${ACCOUNT_CANDIDATE_DIR}" ) &&
+                  (
+                      ( -d "${ACCOUNT_CANDIDATE_DIR}/account.json" ) ||
+                      ( -d "${ACCOUNT_CANDIDATE_DIR}/config/account.json" )
+                  ) ]]; then
                 # Multi-account repo
                 ACCOUNT_CONFIG_DIR="${BASE_DIR}/config/accounts"
+                MULTI_ACCOUNT_REPO=true
             else
                 # Single account repo
                 ACCOUNT_CONFIG_DIR="${BASE_DIR}/config/${ACCOUNT}"
@@ -250,7 +303,8 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
         [[ (! -f "${BASE_DIR_TEMP}/.gitignore") || ($(grep -q "temp_\*" "${BASE_DIR_TEMP}/.gitignore") -ne 0) ]] && \
           echo "temp_*" >> "${BASE_DIR_TEMP}/.gitignore"
 
-        if [[ -n $(findDir "${BASE_DIR_TEMP}" "${ACCOUNT}") ]]; then
+        # Is account repo contains multiple accounts, assume the infrastructure repo does too
+        if [[ "${MULTI_ACCOUNT_REPO}" == "true" ]]; then
             # Multi-account repo
             ACCOUNT_INFRASTRUCTURE_DIR="${BASE_DIR}/infrastructure/accounts"
         else

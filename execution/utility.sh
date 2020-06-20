@@ -1242,6 +1242,31 @@ function update_ec2_autoscalegroup() {
   aws --region "${region}" autoscaling update-auto-scaling-group --auto-scaling-group-name "${groupName}" --cli-input-json "file://${configfile}" || return $?
 }
 
+function manage_ec2_volume_encryption() {
+  local region="$1"; shift
+  local encryptionEnabled="$1"; shift
+  local kmsKeyArn="$1"; shift
+
+  current_state="$(aws --region "${region}" ec2 get-ebs-encryption-by-default --output text --query 'EbsEncryptionByDefault' | tr '[:upper:]' '[:lower:]' )"
+  encryptionEnabled="$( echo ${encryptionEnabled} | tr '[:upper:]' '[:lower:]')"
+
+  if [[ "${current_state}" != "${encryptionEnabled}" ]]; then
+    aws --region "${region}" ec2 modify-ebs-default-kms-key-id --kms-key-id "${kmsKeyArn}"
+
+    if [[ "${encryptionEnabled}" == "true" ]]; then
+        info "Enabling KMS Volume Encryption"
+        aws --region "${region}" ec2 enable-ebs-encryption-by-default
+    fi
+
+    if [[ "${encryptionEnabled}" == "false" ]]; then
+      info "Disabling KMS Volume Encryption"
+      aws --region "${region}" ec2 disable-ebs-encryption-by-default
+    fi
+  else
+    info "Volume Encryption State - expected: ${encryptionEnabled} - current: ${current_state}"
+  fi
+}
+
 #-- ECS --
 function create_ecs_scheduled_task() {
   local region="$1"; shift
@@ -1398,9 +1423,11 @@ function syncFilesToBucket() {
 
     local target_url="s3://${bucket}/${prefix}${prefix:+/}"
 
-    # Now synch with s3
+    # Now synch with s3 - cli guesses content-type based on extension
     aws --region ${region} s3 sync "${optional_arguments[@]}" "${tmp_dir}/" "${target_url}"; return_status=$?
+
     if [[ "${return_status}" -eq 0 ]]; then
+      # Handle encoded files specially to set the encoding metadata on the resulting S3 objects
       readarray -t encoded_files < <(find "${tmp_dir}" -type f -name "encoded--*--*" )
       for f in "${encoded_files[@]}"; do
         local filename=$(fileName "${f}")
@@ -1409,10 +1436,27 @@ function syncFilesToBucket() {
         [[ "$filename" =~ ^encoded--(.+)--(.+)$ ]] || continue
         local encoding="${BASH_REMATCH[1]}"
 
+        # Encoding specific processing
+        case "${encoding,,}" in
+          gzip)
+            [[ "$filename" =~ ^(.+)\.([^\.]+)\.([^\.]+)$ ]] || continue
+            local encoding_extension="${BASH_REMATCH[2],,}"
+            case "${encoding_extension}" in
+              gzip|gz)
+                # Encoding applied
+                ;;
+              *)
+                # Extension doesn't match encoding
+                continue
+                ;;
+            esac
+            ;;
+        esac
+
         # Work out the relative path
         local relative_path="${f#${tmp_dir}/}"
 
-        # Copy the file
+        # Copy the file and set the encoding metadata
         aws --region ${region} s3 cp --content-encoding "${encoding}" "${f}" "${target_url}${relative_path}"; return_status=$?
       done
     fi
@@ -1617,22 +1661,18 @@ function delete_ssh_credentials() {
 
 # -- SSM --
 
-function update_ssm_document() {
+function cleanup_ssm_document() {
   local region="$1"; shift
   local name="$1"; shift
-  local version="$1"; shift
-  local contentfile="$1"; shift
 
-  local currentHash="$(aws ssm describe-document --region "${region}" --name "${name}" --document-version "${version}" --query 'Document.Hash' --output text || return $?)"
-  local newHash="$(shasum -a 256 ${contentfile} | cut -d " " -f 1 || return $?)"
+  listDocument="$(aws --region "${region}" ssm list-documents  --filters Key=Name,Values="${name}" --query 'DocumentIdentifiers[*].Name' --output text )"
 
-  if [[ "${currentHash}" != "${newHash}" ]]; then
-    aws ssm update-document --region "${region}" --name "${name}" --document-version "${version}" --content "file://${contentfile}" || return $?
-  else
-    info "No changes required"
+  if [[ -n "${listDocument}" ]]; then
+
+    info "Removing Document ${name}"
+    aws --region "${region}" ssm delete-document --name "${name}" || return $?
+
   fi
-
-  return $?
 }
 
 # -- Transit Gateway --
