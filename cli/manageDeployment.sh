@@ -11,7 +11,6 @@ DEPLOYMENT_MONITOR_DEFAULT="true"
 DEPLOYMENT_OPERATION_DEFAULT="update"
 DEPLOYMENT_WAIT_DEFAULT=30
 DEPLOYMENT_SCOPE_DEFAULT="resourceGroup"
-RESOURCE_GROUP_DEFAULT="default"
 
 function usage() {
   cat <<EOF
@@ -23,7 +22,7 @@ function usage() {
   where
 
   (o) -d (DEPLOYMENT_OPERATION=delete)  to delete the deployment
-  (o) -g RESOURCE_GROUP                 Defines the Resource Group to deploy into. Mandatory with DEPLOYMENT_SCOPE as "resourceGroup".
+  (o) -g RESOURCE_GROUP                 Overrides the Resource Group to deploy into, default is to generate a deployment group per deployment unit
       -h                                shows this text
   (o) -i (DEPLOYMENT_MONITOR=false)     initiates but does not monitor the deployment operation.
   (m) -l LEVEL                          is the deployment level - "account", "product", "segment", "solution", "application" or "multiple"
@@ -43,7 +42,6 @@ function usage() {
   DEPLOYMENT_OPERATION = ${DEPLOYMENT_OPERATION_DEFAULT}
   DEPLOYMENT_WAIT      = ${DEPLOYMENT_WAIT_DEFAULT} seconds
   DEPLOYMENT_SCOPE     = ${DEPLOYMENT_SCOPE_DEFAULT}
-  RESOURCE_GROUP       = ${RESOURCE_GROUP_DEFAULT}
 
 EOF
 }
@@ -75,7 +73,6 @@ function options() {
   DEPLOYMENT_INITIATE=${DEPLOYMENT_INITIATE:-${DEPLOYMENT_INITIATE_DEFAULT}}
   DEPLOYMENT_MONITOR=${DEPLOYMENT_MONITOR:-${DEPLOYMENT_MONITOR_DEFAULT}}
   DEPLOYMENT_SCOPE=${DEPLOYMENT_SCOPE:-${DEPLOYMENT_SCOPE_DEFAULT}}
-  RESOURCE_GROUP=${RESOURCE_GROUP:-${RESOURCE_GROUP_DEFAULT}}
 
   # Add component suffix to the deployment name.
   if [[ -n "${DEPLOYMENT_UNIT_SUBSET}" ]]; then
@@ -87,6 +84,8 @@ function options() {
   # Set up the context
   info "Preparing the context..."
   . "${GENERATION_BASE_DIR}/execution/setStackContext.sh"
+
+  RESOURCE_GROUP=${RESOURCE_GROUP:-${STACK_NAME}}
 
   return 0
 }

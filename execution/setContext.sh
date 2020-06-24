@@ -193,6 +193,7 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export TENANT=${TENANT:-$(runJQ -r '.Tenant.Name | select(.!="Tenant") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export AID=${AID:-$(runJQ -r '.Account.Id | select(.!="Account") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export AWSID=${AWSID:-$(runJQ -r '.Account.AWSId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export AZID=${AZID:-$(runJQ -r '.Account.AzureId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export ACCOUNT_REGION=${ACCOUNT_REGION:-$(runJQ -r '.Account.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PID=${PID:-$(runJQ -r '.Product.Id | select(.!="Product") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PRODUCT_REGION=${PRODUCT_REGION:-$(runJQ -r '.Product.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
@@ -264,6 +265,18 @@ if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
             export AWS_DEFAULT_PROFILE="${AWSID}"
         fi
     fi
+fi
+
+# Set the Azure subscription and login
+if [[ -n "${AZID}" ]]; then
+
+    if [[ -z "$(az account list --output tsv)" ]]; then
+        info "Logging in to Azure..."
+        . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
+
+    fi
+
+    az account set --subscription "${AZID}" --output none
 fi
 
 # Handle some MINGW peculiarities
