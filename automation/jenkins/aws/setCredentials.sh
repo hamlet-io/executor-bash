@@ -12,7 +12,7 @@ CRED_ACCOUNT="${1^^}"
 
 CRED_ACCOUNT_CLOUD_PROVIDER_VAR="${CRED_ACCOUNT}_CLOUD_PROVIDER"
 
-if [[ -z "${CRED_ACCOUNT_PROVIDER_VAR}" ]]; then
+if [[ -z "${CRED_ACCOUNT_CLOUD_PROVIDER_VAR}" ]]; then
     if [[ -n "${AZID}" ]]; then
         CLOUD_PROVIDER="azure"
     else
