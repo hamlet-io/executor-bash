@@ -90,6 +90,13 @@ case "${ACCOUNT_PROVIDER}" in
 
         az_login_args=()
 
+        # -- Only show output unless debugging --
+        if willLog "${LOG_LEVEL_DEBUG}"  ]]; then
+            az_login_args+=("--output" "json" )
+        else
+            az_login_args+=("--output" "none" )
+        fi
+
         # find the method - default to prompt based login
         AZ_AUTOMATION_AUTH_METHOD_VAR="${CRED_ACCOUNT}_AZ_AUTH_METHOD"
         if [[ -z "${!AZ_AUTOMATION_AUTH_METHOD_VAR}" ]]; then AZ_AUTOMATION_AUTH_METHOD_VAR="AZ_AUTH_METHOD"; fi
@@ -98,13 +105,16 @@ case "${ACCOUNT_PROVIDER}" in
         # lookup the AZ Account
         AZ_ACCOUNT_ID_VAR="${CRED_ACCOUNT}_AZ_ACCOUNT_ID"
         if [[ -n "${!AZ_ACCOUNT_ID_VAR}" ]]; then
-            AZ_ACCOUNT_ID="${AZ_ACCOUNT_ID_VAR}"
+            AZ_ACCOUNT_ID="${!AZ_ACCOUNT_ID_VAR}"
         fi
 
         # Set the tenant if required - By defeault it uses the Tenant Id
         AZ_ACCOUNT_TENANT_OVERRIDE_VAR="${CRED_ACCOUNT}_AZ_TENANT_ID"
         if [[ -n "${!AZ_ACCOUNT_TENANT_OVERRIDE_VAR}" ]]; then
-            AZ_TENANT_ID="${AZ_ACCOUNT_TENANT_OVERRIDE_VAR}"
+            AZ_TENANT_ID="${!AZ_ACCOUNT_TENANT_OVERRIDE_VAR}"
+        fi
+
+        if [[ -n "${AZ_TENANT_ID}" ]]; then
             az_login_args+=("--tenant" "${AZ_TENANT_ID}")
         fi
 
@@ -116,21 +126,24 @@ case "${ACCOUNT_PROVIDER}" in
                 AZ_CRED_OVERRIDE_PASS_VAR="${CRED_ACCOUNT}_AZ_PASS"
 
                 if [[ ( -n "${!AZ_CRED_OVERRIDE_USERNAME_VAR}") ]]; then
-                    AZ_CRED_USERNAME="${AZ_CRED_OVERRIDE_USERNAME_VAR}"
-                    AZ_CRED_PASS="${AZ_CRED_OVERRIDE_PASS_VAR}"
+                    AZ_CRED_USERNAME="${!AZ_CRED_OVERRIDE_USERNAME_VAR}"
+                    AZ_CRED_PASS="${!AZ_CRED_OVERRIDE_PASS_VAR}"
                 else
-
                     # Tenant wide credentials
                     AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_USERNAME"
                     AZ_CRED_AUTOTMATION_PASS_VAR="AZ_PASS"
-                    if [[ -z "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
-                        AZ_CRED_USERNAME="${AZ_CRED_AUTOMATION_USERNAME_VAR}"
-                        AZ_CRED_PASS="${AZ_CRED_AUTOTMATION_PASS_VAR}"
+                    if [[ -n "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
+                        AZ_CRED_USERNAME="${!AZ_CRED_AUTOMATION_USERNAME_VAR}"
+                        AZ_CRED_PASS="${!AZ_CRED_AUTOTMATION_PASS_VAR}"
                     fi
                 fi
 
-                az login --service-principal --username "${AZ_CRED_USERNAME}" --password "${AZ_CRED_PASS}" "${az_login_args[@]}"
+                if [[ (-z "${AZ_CRED_USERNAME}") || ( -z "${AZ_CRED_PASS}") || ( -z "${AZ_TENANT_ID}") ]]; then
+                    fatal "Azure Service prinicpal login missing information - requires environment - AZ_USERNAME | AZ_PASS | AZ_TENANT_ID"
+                    exit 255
+                fi
 
+                az login --service-principal --username "${AZ_CRED_USERNAME}" --password "${AZ_CRED_PASS}" ${az_login_args[@]}
                 ;;
 
             managed)
