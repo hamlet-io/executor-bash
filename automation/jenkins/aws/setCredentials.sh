@@ -10,19 +10,7 @@ CRED_ACCOUNT="${1^^}"
 
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
 
-CRED_ACCOUNT_CLOUD_PROVIDER_VAR="${CRED_ACCOUNT}_CLOUD_PROVIDER"
-
-if [[ -z "${CRED_ACCOUNT_CLOUD_PROVIDER_VAR}" ]]; then
-    if [[ -n "${AZID}" ]]; then
-        CLOUD_PROVIDER="azure"
-    else
-        CLOUD_PROVIDER="aws"
-    fi
-else
-    CLOUD_PROVIDER="${CRED_ACCOUNT_CLOUD_PROVIDER_VAR}"
-fi
-
-case "${CLOUD_PROVIDER}" in
+case "${ACCOUNT_PROVIDER}" in
     aws)
 
         # Clear any previous results

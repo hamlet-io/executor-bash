@@ -203,6 +203,12 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export COMPONENT_REGION="${DEPLOYMENTUNIT_REGION:-$PRODUCT_REGION}"
     export REGION="${REGION:-$COMPONENT_REGION}"
 
+    if [[ -n "${AZID}" ]]; then
+        ACCOUNT_PROVIDER="azure"
+    else
+        ACCOUNT_PROVIDER="aws"
+    fi
+
     # Perform a few consistency checks
     [[ -z "${REGION}" ]] && fatalCantProceed "The region must be defined in the Product blueprint section." && exit 1
 
