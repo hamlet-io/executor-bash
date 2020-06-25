@@ -274,7 +274,7 @@ if [[ -n "${AZID}" ]]; then
         . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
 
     fi
-    az account set --subscription "${AZID}" --output none || exit $?
+    az account set --subscription "${AZID}" --output none
 fi
 
 # Handle some MINGW peculiarities
