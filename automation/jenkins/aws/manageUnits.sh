@@ -4,7 +4,7 @@
 trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
-#Defaults 
+#Defaults
 DEFAULT_GENERATION_DOCS_BLUEPRINT="false"
 
 function usage() {
@@ -147,21 +147,31 @@ function main() {
         # Manage the stack if required
         if [[ -n "${DEPLOYMENT_MODE}" ]]; then
           if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOP}" || "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOPSTART}" ]]; then
-              ${GENERATION_DIR}/manageStack.sh -d -l "${level}" -u "${unit}" ||
+              if [[ -n "${AZID}" ]]; then
+                ${GENERATION_DIR}/manageDeployment.sh -d -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Deletion of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+              else
+                ${GENERATION_DIR}/manageStack.sh -d -l "${level}" -u "${unit}" ||
                   { exit_status=$?; fatal "Deletion of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+              fi
           fi
           if [[ "${DEPLOYMENT_MODE}" != "${DEPLOYMENT_MODE_STOP}"   ]]; then
-              ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
+              if [[ -n "${AZID}" ]]; then
+                ${GENERATION_DIR}/manageDeployment.sh -l "${level}" -u "${unit}" ||
                   { exit_status=$?; fatal "Create/update of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+              else
+                ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Create/update of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+              fi
           fi
         fi
       done
-      
+
       # Update blueprint if a stack is being managed
       # - Currently the blueprint only generates a segment level blueprin
       if [[ "${level}" != "account" && "${level}" != "product" && "${GENERATION_DOCS_BLUEPRINT}" == "true" ]]; then
           info "Generating deployment blueprint... \n"
-          ${GENERATION_DIR}/createTemplate.sh -l blueprint 2>/dev/null || 
+          ${GENERATION_DIR}/createTemplate.sh -l blueprint 2>/dev/null ||
               { warning "An issue occurred generating the blueprint - This will not break things but could be an issue with your components"; }
       fi
     done
@@ -171,4 +181,3 @@ function main() {
 }
 
 main "$@"
-
