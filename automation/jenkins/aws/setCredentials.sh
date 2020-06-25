@@ -115,20 +115,17 @@ case "${ACCOUNT_PROVIDER}" in
                 AZ_CRED_OVERRIDE_USERNAME_VAR="${CRED_ACCOUNT}_AZ_USERNAME"
                 AZ_CRED_OVERRIDE_PASS_VAR="${CRED_ACCOUNT}_AZ_PASS"
 
-                if [[ ( -n "${!AZ_CRED_OVERRIDE_USERNAME_VAR}") && (-n "${!AZ_CRED_OVERRIDE_PASS_VAR}") ]]; then
+                if [[ ( -n "${!AZ_CRED_OVERRIDE_USERNAME_VAR}") ]]; then
                     AZ_CRED_USERNAME="${AZ_CRED_OVERRIDE_USERNAME_VAR}"
                     AZ_CRED_PASS="${AZ_CRED_OVERRIDE_PASS_VAR}"
                 else
 
                     # Tenant wide credentials
-                    AZ_CRED_AUTOMATION_USERNAME_VAR="${CRED_ACCOUNT}_AUTOMATION_USER"
+                    AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_USERNAME"
+                    AZ_CRED_AUTOTMATION_PASS_VAR="AZ_PASS"
                     if [[ -z "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
-                        AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_AUTOMATION_USER"
-                    fi
-
-                    if  [[ -n "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
-                        AZ_CRED_USERNAME="${AZ_CRED_AUTOMATION_USERNAME_VAR}_AZ_USERNAME"
-                        AZ_CRED_PASS="${AZ_CRED_AUTOMATION_USERNAME_VAR}_AZ_PASS"
+                        AZ_CRED_USERNAME="${AZ_CRED_AUTOMATION_USERNAME_VAR}"
+                        AZ_CRED_PASS="${AZ_CRED_AUTOTMATION_PASS_VAR}"
                     fi
                 fi
 
