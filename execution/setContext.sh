@@ -267,16 +267,14 @@ if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
     fi
 fi
 
-# Set the Azure subscription and login
+# Set the Azure subscription and login if we haven't already
 if [[ -n "${AZID}" ]]; then
-
     if [[ -z "$(az account list --output tsv)" ]]; then
         info "Logging in to Azure..."
         . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
 
     fi
-
-    az account set --subscription "${AZID}" --output none
+    az account set --subscription "${AZID}" --output none || exit $?
 fi
 
 # Handle some MINGW peculiarities

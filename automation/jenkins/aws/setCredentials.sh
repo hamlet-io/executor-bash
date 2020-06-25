@@ -100,6 +100,8 @@ case "${CLOUD_PROVIDER}" in
 
     azure)
 
+        az_login_args=()
+
         # find the method - default to prompt based login
         AZ_AUTOMATION_AUTH_METHOD_VAR="${CRED_ACCOUNT}_AZ_AUTH_METHOD"
         if [[ -z "${!AZ_AUTOMATION_AUTH_METHOD_VAR}" ]]; then AZ_AUTOMATION_AUTH_METHOD_VAR="AZ_AUTH_METHOD"; fi
@@ -111,10 +113,11 @@ case "${CLOUD_PROVIDER}" in
             AZ_ACCOUNT_ID="${AZ_ACCOUNT_ID_VAR}"
         fi
 
-        # Set the tenant - this can be account specific but most likely global
+        # Set the tenant if required - By defeault it uses the Tenant Id
         AZ_ACCOUNT_TENANT_OVERRIDE_VAR="${CRED_ACCOUNT}_AZ_TENANT_ID"
         if [[ -n "${!AZ_ACCOUNT_TENANT_OVERRIDE_VAR}" ]]; then
             AZ_TENANT_ID="${AZ_ACCOUNT_TENANT_OVERRIDE_VAR}"
+            az_login_args+=("--tenant" "${AZ_TENANT_ID}")
         fi
 
         case "${AZ_AUTH_METHOD}" in
@@ -131,27 +134,27 @@ case "${CLOUD_PROVIDER}" in
 
                     # Tenant wide credentials
                     AZ_CRED_AUTOMATION_USERNAME_VAR="${CRED_ACCOUNT}_AUTOMATION_USER"
-                    if [[ -z "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_AUTOMATION_USER" ; fi
+                    if [[ -z "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
+                        AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_AUTOMATION_USER"
+                    fi
 
-                    if  [[ -n "${!AWS_CRED_AUTOMATION_USER_VAR}" ]]; then
+                    if  [[ -n "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
                         AZ_CRED_USERNAME="${AZ_CRED_AUTOMATION_USERNAME_VAR}_AZ_USERNAME"
                         AZ_CRED_PASS="${AZ_CRED_AUTOMATION_USERNAME_VAR}_AZ_PASS"
                     fi
                 fi
 
-                az login --service-principal --username "${AZ_CRED_USERNAME}" --password "${AZ_CRED_PASS}" --tenant "${AZ_TENANT_ID}"
+                az login --service-principal --username "${AZ_CRED_USERNAME}" --password "${AZ_CRED_PASS}" "${az_login_args[@]}"
 
                 ;;
 
             managed)
-                az login --identity
+                az login --identity "${az_login_args[@]}"
                 ;;
 
             interactive)
-                az login
+                az login "${az_login_args[@]}"
                 ;;
         esac
-
-        az account set --subscription "${AZ_ACCOUNT_ID}"
         ;;
 esac
