@@ -280,7 +280,18 @@ if [[ -n "${AZID}" ]]; then
         . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
 
     fi
-    az account set --subscription "${AZID}" --output none
+
+    az_cli_args=()
+    # -- Only show errors unless debugging --
+    if willLog "${LOG_LEVEL_DEBUG}"  ]]; then
+        az_cli_args+=("--output" "json" )
+        echo "debug output"
+    else
+        az_cli_args+=("--output" "none" )
+        echo "normal output"
+    fi
+
+    az account set --subscription "${AZID}" "${az_cli_args[@]}"
 fi
 
 # Handle some MINGW peculiarities
