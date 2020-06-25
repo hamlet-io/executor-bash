@@ -401,6 +401,7 @@ function main() {
   # if not already defined or provided on the command line
   arrayFromList accounts_list "${ACCOUNTS_LIST}"
   findAndDefineSetting "ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}" "value" "${accounts_list[0]}"
+  [[ -z "${ACCOUNT}" ]] && findAndDefineSetting "ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}_${SEGMENT}" "value" "${accounts_list[0]}"
 
   # Default account/product git provider - "github"
   # ORG is product specific so not defaulted here
@@ -598,6 +599,8 @@ function main() {
           fi
 
           findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${FROM_ENVIRONMENT}" "value"
+          [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}_${SEGMENT}" "value"
+
           if [[ (-n "${FROM_ENVIRONMENT}") &&
                   (-n "${FROM_ACCOUNT}")]]; then
               defineGitProviderSettings    "FROM_ACCOUNT" "" "${FROM_ACCOUNT}" "" "github"
@@ -626,6 +629,8 @@ function main() {
           fi
 
           findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${HOTFIX_FROM_ENVIRONMENT}" "value"
+          [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${HOTFIX_FROM_ENVIRONMENT}_${SEGMENT}" "value"
+
           if [[ (-n "${FROM_ENVIRONMENT}") &&
                   (-n "${FROM_ACCOUNT}")]]; then
               for REGISTRY_TYPE in "${REGISTRY_TYPES[@]}"; do
@@ -730,4 +735,3 @@ function main() {
 }
 
 main "$@"
-

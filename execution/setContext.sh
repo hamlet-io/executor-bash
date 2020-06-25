@@ -203,6 +203,12 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export COMPONENT_REGION="${DEPLOYMENTUNIT_REGION:-$PRODUCT_REGION}"
     export REGION="${REGION:-$COMPONENT_REGION}"
 
+    if [[ -n "${AZID}" ]]; then
+        ACCOUNT_PROVIDER="azure"
+    else
+        ACCOUNT_PROVIDER="aws"
+    fi
+
     # Perform a few consistency checks
     [[ -z "${REGION}" ]] && fatalCantProceed "The region must be defined in the Product blueprint section." && exit 1
 
@@ -274,7 +280,16 @@ if [[ -n "${AZID}" ]]; then
         . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
 
     fi
-    az account set --subscription "${AZID}" --output none || exit $?
+
+    az_cli_args=()
+    # -- Only show errors unless debugging --
+    if willLog "${LOG_LEVEL_DEBUG}"  ]]; then
+        az_cli_args+=("--output" "json" )
+    else
+        az_cli_args+=("--output" "none" )
+    fi
+
+    az account set --subscription "${AZID}" "${az_cli_args[@]}"
 fi
 
 # Handle some MINGW peculiarities
