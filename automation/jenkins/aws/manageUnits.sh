@@ -147,22 +147,30 @@ function main() {
         # Manage the stack if required
         if [[ -n "${DEPLOYMENT_MODE}" ]]; then
           if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOP}" || "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOPSTART}" ]]; then
-              if [[ -n "${AZID}" ]]; then
-                ${GENERATION_DIR}/manageDeployment.sh -d -l "${level}" -u "${unit}" ||
+              case "${ACCOUNT_PROVIDER}" in
+                azure)
+                  ${GENERATION_DIR}/manageDeployment.sh -d -l "${level}" -u "${unit}" ||
                   { exit_status=$?; fatal "Deletion of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
-              else
-                ${GENERATION_DIR}/manageStack.sh -d -l "${level}" -u "${unit}" ||
+                  ;;
+
+                *)
+                  ${GENERATION_DIR}/manageStack.sh -d -l "${level}" -u "${unit}" ||
                   { exit_status=$?; fatal "Deletion of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
-              fi
+                  ;;
+              esac
           fi
           if [[ "${DEPLOYMENT_MODE}" != "${DEPLOYMENT_MODE_STOP}"   ]]; then
-              if [[ -n "${AZID}" ]]; then
-                ${GENERATION_DIR}/manageDeployment.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Create/update of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
-              else
-                ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Create/update of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
-              fi
+              case "${ACCOUNT_PROVIDER}" in
+                azure)
+                  ${GENERATION_DIR}/manageDeployment.sh -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Deletion of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+
+                *)
+                  ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Deletion of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+              esac
           fi
         fi
       done

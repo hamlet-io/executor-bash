@@ -430,18 +430,22 @@ function main() {
 
   # - provider
   findAndDefineSetting "ACCOUNT_PROVIDER" "ACCOUNT_PROVIDER" "${ACCOUNT}" "" "value" "aws"
-  AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/${ACCOUNT_PROVIDER}"
-
 
   # - access credentials
   case "${ACCOUNT_PROVIDER}" in
       aws)
+          AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/${ACCOUNT_PROVIDER}"
           . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
           save_context_property ACCOUNT_AWS_ACCESS_KEY_ID_VAR      "${AWS_CRED_AWS_ACCESS_KEY_ID_VAR}"
           save_context_property ACCOUNT_AWS_SECRET_ACCESS_KEY_VAR  "${AWS_CRED_AWS_SECRET_ACCESS_KEY_VAR}"
           save_context_property ACCOUNT_TEMP_AWS_ACCESS_KEY_ID     "${AWS_CRED_TEMP_AWS_ACCESS_KEY_ID}"
           save_context_property ACCOUNT_TEMP_AWS_SECRET_ACCESS_KEY "${AWS_CRED_TEMP_AWS_SECRET_ACCESS_KEY}"
           save_context_property ACCOUNT_TEMP_AWS_SESSION_TOKEN     "${AWS_CRED_TEMP_AWS_SESSION_TOKEN}"
+          ;;
+
+        azure)
+          AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/aws"
+          . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
           ;;
   esac
 
