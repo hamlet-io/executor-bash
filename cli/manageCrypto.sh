@@ -283,6 +283,11 @@ function main() {
             CRYPTO_VISIBLE="false"
             CRYPTO_DECODE="true"
             ;;
+        listcmk)
+            CRYPTO_VISIBLE="false"
+            CRYPTO_DECODE="true"
+            CRYPTO_UPDATE="false"
+            ;;
     esac
 
 
@@ -342,9 +347,6 @@ function main() {
                 --query "Aliases[0].AliasName")
             # List only - force settings accordingly
             CRYPTO_TEXT="ALIAS=${CMK_ALIAS#alias/} ARN=${CMK_ARN}"
-            CRYPTO_VISIBLE=false
-            CRYPTO_UPDATE=false
-            #
             ;;
         noop)
             # Don't touch CRYPTO_TEXT so either existing value will be displayed, or
