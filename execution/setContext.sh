@@ -283,7 +283,7 @@ if [[ -n "${AZID}" ]]; then
 
     az_cli_args=()
     # -- Only show errors unless debugging --
-    if willLog "${LOG_LEVEL_DEBUG}"  ]]; then
+    if willLog "${LOG_LEVEL_DEBUG}"; then
         az_cli_args+=("--output" "json" )
     else
         az_cli_args+=("--output" "none" )
