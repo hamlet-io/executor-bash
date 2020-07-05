@@ -75,23 +75,28 @@ function updateDetail() {
     local UD_FORMATS="${4,,:-?}"
     local UD_SCOPE="${5,,:-?}"
 
+    local DETAIL=""
+
     if [[ ("${UD_COMMIT}" != "?") || ("${UD_TAG}" != "?") ]]; then
-        DETAIL_MESSAGE="${DETAIL_MESSAGE}, ${UD_DEPLOYMENT_UNIT}="
+        DETAIL="${UD_DEPLOYMENT_UNIT}="
         if [[ "${UD_FORMATS}" != "?" ]]; then
-            DETAIL_MESSAGE="${DETAIL_MESSAGE}${UD_FORMATS}:"
+            DETAIL="${DETAIL}${UD_FORMATS}:"
         fi
         if [[ "${UD_TAG}" != "?" ]]; then
             # Format is tag then commit if provided
-            DETAIL_MESSAGE="${DETAIL_MESSAGE}${UD_TAG}"
+            DETAIL="${DETAIL}${UD_TAG}"
             if [[ "${UD_COMMIT}" != "?" ]]; then
-                DETAIL_MESSAGE="${DETAIL_MESSAGE} (${UD_COMMIT:0:7})"
+                DETAIL="${DETAIL} (${UD_COMMIT:0:7})"
             fi
         else
             # Format is just the commit
-            DETAIL_MESSAGE="${DETAIL_MESSAGE}${UD_COMMIT:0:7}"
+            DETAIL="${DETAIL}${UD_COMMIT:0:7}"
         fi
         if [[ "${UD_SCOPE}" != "?" ]]; then
-            DETAIL_MESSAGE="${DETAIL_MESSAGE}:${UD_SCOPE}"
+            DETAIL="${DETAIL}:${UD_SCOPE}"
+        fi
+        if [[ ! ("${DETAIL_MESSAGE}" =~ ${DETAIL}) ]]; then
+            DETAIL_MESSAGE="${DETAIL_MESSAGE}, ${DETAIL}"
         fi
     fi
 }
