@@ -1757,6 +1757,15 @@ function process_cmdb() {
 
     [[ -z "${current_version}" ]] && current_version="v0.0.0"
 
+    # Support forcing updates by adjusting the pinned values
+    if [[ -n "${pin_version}" ]]; then
+      local pin_check="$(semver_compare "${pin_version}" "${current_version}")"
+      if [[ "${pin_check}" == "1" ]]; then
+        debug "${action^} of repo "${cmdb_repo}" to pinned version ${pin_version} required ..."
+        versions+=(${pin_version})
+      fi
+    fi
+
     # Most of the time we expect no upgrade to be required
     local last_check="$(semver_compare "${current_version}" "${versions[-1]}")"
     if [[ "${last_check}" != "-1" ]]; then
