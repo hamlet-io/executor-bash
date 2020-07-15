@@ -2094,7 +2094,7 @@ function clone_git_repo() {
   local credentials_var="${repo_provider^^}_CREDENTIALS"
   local repo_url="https://${!credentials_var}@${repo_host}/${repo_path}"
 
-  trace "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
+  debug "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
 
   git clone -b "${repo_branch}" "${repo_url}" "${local_dir}"
   RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't clone ${repo_url} repo" && return 1
@@ -2129,7 +2129,7 @@ function push_git_repo() {
 
     if [[ -n "$(git status --porcelain)" ]]; then
         # Commit changes
-        trace "Committing to the ${repo_url} repo..."
+        debug "Committing to the ${repo_url} repo..."
         git commit -m "${commit_message}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${repo_url} repo" && return 1
 
@@ -2138,7 +2138,7 @@ function push_git_repo() {
 
     # Update upstream repo
     if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
-        trace "Pushing the ${repo_url} repo upstream..."
+        debug "Pushing the ${repo_url} repo upstream..."
         git push ${repo_remote} ${repo_branch}
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
             fatal "Can't push the ${repo_url} repo changes to upstream repo ${repo_remote}" && return 1
