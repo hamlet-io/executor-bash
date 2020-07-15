@@ -22,8 +22,8 @@ export LOG_LEVEL_FATAL="fatal"
 
 declare -A LOG_LEVEL_ORDER
 LOG_LEVEL_ORDER=(
-  ["${LOG_LEVEL_DEBUG}"]="0"
-  ["${LOG_LEVEL_TRACE}"]="1"
+  ["${LOG_LEVEL_TRACE}"]="0"
+  ["${LOG_LEVEL_DEBUG}"]="1"
   ["${LOG_LEVEL_INFORMATION}"]="3"
   ["${LOG_LEVEL_WARNING}"]="5"
   ["${LOG_LEVEL_ERROR}"]="7"
