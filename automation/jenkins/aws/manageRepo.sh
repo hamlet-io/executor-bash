@@ -61,7 +61,7 @@ EOF
 }
 
 function init() {
-    trace "Initialising the ${REPO_LOG_NAME} repo..."
+    debug "Initialising the ${REPO_LOG_NAME} repo..."
     git status >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
         # Convert directory into a repo
@@ -93,7 +93,7 @@ function init() {
 }
 
 function clone() {
-    trace "Cloning the ${REPO_LOG_NAME} repo and checking out the ${REPO_BRANCH} branch ..."
+    debug "Cloning the ${REPO_LOG_NAME} repo and checking out the ${REPO_BRANCH} branch ..."
     [[ (-z "${REPO_URL}") ||
         (-z "${REPO_BRANCH}") ]] && fatalMandatory && return 1
 
@@ -119,7 +119,7 @@ function push() {
 
     if [[ -n "$(git status --porcelain)" ]]; then
         # Commit changes
-        trace "Committing to the ${REPO_LOG_NAME} repo..."
+        debug "Committing to the ${REPO_LOG_NAME} repo..."
         git commit -m "${REPO_MESSAGE}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
 
@@ -132,7 +132,7 @@ function push() {
         if [[ -n "${EXISTING_TAG}" ]]; then
             warning "Tag ${REPO_TAG} not added to the ${REPO_LOG_NAME} repo - it is already present"
         else
-            trace "Adding tag \"${REPO_TAG}\" to the ${REPO_LOG_NAME} repo..."
+            debug "Adding tag \"${REPO_TAG}\" to the ${REPO_LOG_NAME} repo..."
             git tag -a "${REPO_TAG}" -m "${REPO_MESSAGE}"
             RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't tag the ${REPO_LOG_NAME} repo" && return 1
 
@@ -145,12 +145,12 @@ function push() {
     REPO_PUSHED=false
     if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
         for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
-            trace "Rebasing ${REPO_LOG_NAME} in case of changes..."
+            debug "Rebasing ${REPO_LOG_NAME} in case of changes..."
             git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
             RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
                 fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
 
-            trace "Pushing the ${REPO_LOG_NAME} repo upstream..."
+            debug "Pushing the ${REPO_LOG_NAME} repo upstream..."
             if git push --tags ${REPO_REMOTE} ${REPO_BRANCH}; then
                 # Push succeeded
                 REPO_PUSHED=true
