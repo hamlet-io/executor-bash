@@ -603,7 +603,7 @@ function main() {
           fi
 
           findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${FROM_ENVIRONMENT}" "value"
-          [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}_${SEGMENT}" "value"
+          [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${FROM_ENVIRONMENT}_${SEGMENT}" "value"
 
           if [[ (-n "${FROM_ENVIRONMENT}") &&
                   (-n "${FROM_ACCOUNT}")]]; then
