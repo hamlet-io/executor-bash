@@ -119,7 +119,7 @@ function env_setup() {
     # yarn install
     yarn global add \
         expo-cli@"${EXPO_VERSION}" \
-        turtle-cli@"${TURTLE_VERSION}" || return $?
+        turtle-cli@"${DEFAULT_TURTLE_VERSION}" || return $?
 }
 
 function usage() {
@@ -208,7 +208,6 @@ function options() {
 
     #Defaults
     RUN_SETUP="${RUN_SETUP:-DEFAULT_RUN_SETUP}"
-    TURTLE_VERSION="${TURTLE_VERSION:-$DEFAULT_TURTLE_VERSION}"
     EXPO_VERSION="${EXPO_VERSION:-$DEFAULT_EXPO_VERSION}"
     BINARY_EXPIRATION="${BINARY_EXPIRATION:-$DEFAULT_BINARY_EXPIRATION}"
     FORCE_BINARY_BUILD="${FORCE_BINARY_BUILD:-$DEFAULT_FORCE_BINARY_BUILD}"
@@ -503,10 +502,13 @@ function main() {
                 echo "Using turtle to build the binary image"
 
                 # Setup Turtle
-                turtle setup:"${build_format}" --sdk-version "${EXPO_SDK_VERSION}" || return $?
+                if [[ "${TURTLE_VERSION}" != "${TURTLE_DEFAULT_VERSION}" ]]; then
+                    npm install turtle-cli@"${TURTLE_VERSION}"
+                fi
+                npx turtle setup:"${build_format}" --sdk-version "${EXPO_SDK_VERSION}" || return $?
 
                 # Build using turtle
-                turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
+                npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
                 ;;
 
             "fastlane")
