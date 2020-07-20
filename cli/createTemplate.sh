@@ -69,7 +69,10 @@ function options() {
           g) RESOURCE_GROUP="${OPTARG}" ;;
           h) usage; return 1 ;;
           i) GENERATION_INPUT_SOURCE="${OPTARG}" ;;
-          l) LEVEL="${OPTARG}" ;;
+          l)
+            LEVEL="${OPTARG}"
+            DEPLOYMENT_GROUP="${OPTARG}"
+            ;;
           o) OUTPUT_DIR="${OPTARG}" ;;
           p) GENERATION_PROVIDERS+=("${OPTARG}") ;;
           q) REQUEST_REFERENCE="${OPTARG}" ;;
@@ -285,6 +288,7 @@ function process_template_pass() {
   local pass_alternative="${1,,}"; shift
   local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
+  local deployment_group="${1,,}"; shift
   local resource_group="${1,,}"; shift
   local deployment_unit_subset="${1,,}"; shift
   local account="$1"; shift
@@ -305,8 +309,9 @@ function process_template_pass() {
 
   # Set up the level specific template information
   local template_dir="${GENERATION_ENGINE_DIR}/client"
-  local template="create${level^}Template.ftl"
-  [[ ! -f "${template_dir}/${template}" ]] && template="create${level^}.ftl"
+  #local template="create${level^}Template.ftl"
+  #[[ ! -f "${template_dir}/${template}" ]] && template="create${level^}.ftl"
+  local template="createDeployment.ftl"
   local template_composites=()
 
   # Define the possible passes
@@ -449,6 +454,7 @@ function process_template_pass() {
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
   [[ -n "${output_format}" ]]             && args+=("-v" "outputFormat=${output_format}")
   [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
+  [[ -n "${deployment_group}" ]]          && args+=("-v" "deploymentGroup=${deployment_group}")
   [[ -n "${resource_group}" ]]            && args+=("-v" "resourceGroup=${resource_group}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-v" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
@@ -671,6 +677,7 @@ function process_template_pass() {
 function process_template() {
   local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
+  local deployment_group="${1,,}"; shift
   local resource_group="${1,,}"; shift
   local deployment_unit_subset="${1,,}"; shift
   local account="$1"; shift
@@ -778,6 +785,7 @@ function process_template() {
       "" \
       "${level}" \
       "${deployment_unit}" \
+      "${deployment_group}" \
       "${resource_group}" \
       "${deployment_unit_subset}" \
       "${account}" \
@@ -835,6 +843,7 @@ function process_template() {
       "${task_parameters[@]}" \
       "${level}" \
       "${deployment_unit}" \
+      "${deployment_group}" \
       "${resource_group}" \
       "${deployment_unit_subset}" \
       "${account}" \
@@ -917,7 +926,7 @@ function main() {
     blueprint-disabled)
       process_template \
         "${LEVEL}" \
-        "${DEPLOYMENT_UNIT}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
+        "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "" "${ACCOUNT_REGION}" \
         "" \
         "${REQUEST_REFERENCE}" \
@@ -928,7 +937,7 @@ function main() {
     *)
       process_template \
         "${LEVEL}" \
-        "${DEPLOYMENT_UNIT}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
+        "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "${ACCOUNT}" "${ACCOUNT_REGION}" \
         "${REGION}" \
         "${REQUEST_REFERENCE}" \
