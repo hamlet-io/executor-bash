@@ -619,7 +619,7 @@ function main() {
                 fastlane run automatic_code_signing use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"iPhone Distribution" || return $?
 
                 # Build App
-                fastlane run cocoapods podfile:"${FASTLANE_IOS_PODFILE}" || return $?
+                fastlane run cocoapods podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
                 fastlane run build_ios_app workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" || return $?
 
                 ;;
