@@ -358,6 +358,11 @@ function main() {
 
     if [[ "${RESULT}" -eq 0 ]]; then
 
+        # Decode if required
+        if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
+            CRYPTO_TEXT=$(dos2unix <<< "${CRYPTO_TEXT}" | base64 -d)
+        fi
+
         # Update if required
         if [[ "${CRYPTO_UPDATE}" == "true" ]]; then
             if [[ -n "${JSON_PATH}" ]]; then
@@ -386,11 +391,6 @@ function main() {
     fi
 
     if [[ ("${RESULT}" -eq 0) && ( "${CRYPTO_QUIET}" != "true") ]]; then
-        # Decode if required
-        if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
-            CRYPTO_TEXT=$(dos2unix <<< "${CRYPTO_TEXT}" | base64 -d)
-        fi
-
         # Display result
         echo "${CRYPTO_TEXT}"
     fi
