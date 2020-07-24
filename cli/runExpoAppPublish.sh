@@ -73,6 +73,8 @@ DEFAULT_BINARY_BUILD_PROCESS="turtle"
 
 DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 
+DEFAULT_APP_VERSION_SOURCE="manifest"
+
 export FASTLANE_SKIP_UPDATE_CHECK="true"
 export FASTLANE_HIDE_CHANGELOG="true"
 
@@ -140,7 +142,8 @@ where
 (o) -m SUBMIT_BINARY          submit the binary for testing
 (o) -o DISABLE_OTA            don't publish the OTA to the CDN
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
-(q) -q QR_BUILD_FORMATS       specify the formats you would like to generate QR urls for
+(0) -q QR_BUILD_FORMATS       specify the formats you would like to generate QR urls for
+(o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -154,6 +157,7 @@ DISABLE_OTA  = ${DEPLOY_OTA}
 QR_BUILD_FORMATS = ${DEFAULT_QR_BUILD_FORMATS}
 BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
+APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
 
 NOTES:
 RELEASE_CHANNEL default is environment
@@ -165,7 +169,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":bfhmsq:t:u:" opt; do
+    while getopts ":bfhmsq:t:u:v:" opt; do
         case $opt in
             b)
                 BINARY_BUILD_PROCESS="${OPTARG}"
@@ -197,6 +201,9 @@ function options() {
             t)
                 BINARY_EXPIRATION="${OPTARG}"
                 ;;
+            v)
+                APP_VERSION_SOURCE="${OPTARG}"
+                ;;
             \?)
                 fatalOption
                 ;;
@@ -216,6 +223,7 @@ function options() {
     BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
     DISABLE_OTA="${DISABLE_OTA:-${DEFAULT_DISABLE_OTA}}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
+    APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
 }
 
 
@@ -281,10 +289,6 @@ function main() {
   BUILD_FORMAT_LIST="$( jq -r '.BuildConfig.APP_BUILD_FORMATS' < "${CONFIG_FILE}" )"
   arrayFromList BUILD_FORMATS "${BUILD_FORMAT_LIST}"
 
-  APP_REFERENCE="$( jq -r '.BuildConfig.APP_REFERENCE |  select (.!=null)' <"${CONFIG_FILE}" )"
-  [[ -z "${APP_REFERENCE}" ]] && APP_REFERENCE="0.0.1"
-  APP_REFERENCE="${APP_REFERENCE#v}"
-
   BUILD_REFERENCE="$( jq -r '.BuildConfig.BUILD_REFERENCE' <"${CONFIG_FILE}" )"
   BUILD_NUMBER="$(date +"%Y%m%d.1%H%M%S")"
   RELEASE_CHANNEL="$( jq -r '.BuildConfig.RELEASE_CHANNEL' <"${CONFIG_FILE}" )"
@@ -321,9 +325,24 @@ function main() {
 
   # get the version of the expo SDK which is required
   EXPO_SDK_VERSION="$(jq -r '.expo.sdkVersion' < ./app.json)"
-  EXPO_APP_VERSION="$(jq -r '.expo.version' < ./app.json)"
   EXPO_PROJECT_SLUG="$(jq -r '.expo.slug' < ./app.json)"
-  EXPO_CURRENT_APP_VERSION="${EXPO_APP_VERSION}"
+
+  case "${APP_VERSION_SOURCE}" in
+    "manfiest")
+        EXPO_APP_VERSION="$(jq -r '.expo.version' < ./app.json)"
+        ;;
+
+    "cmdb")
+        EXPO_APP_VERSION="$( jq -r '.BuildConfig.APP_REFERENCE |  select (.!=null)' <"${CONFIG_FILE}" )"
+        [[ -z "${APP_REFERENCE}" ]] && APP_REFERENCE="0.0.1"
+        EXPO_APP_VERSION="${APP_REFERENCE#v}"
+        ;;
+
+    *)
+        fatal "Invalid APP_VERSION_SOURCE - ${APP_VERSION_SOURCE}" && exit 255
+        ;;
+   esac
+   EXPO_CURRENT_APP_VERSION="${EXPO_APP_VERSION}"
 
   # Determine Binary Build status
   EXPO_CURRENT_SDK_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
@@ -526,7 +545,7 @@ function main() {
                 INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Supporting/Info.plist"
                 [[ ! -e "ios/${INFO_PLIST_PATH}" ]] && INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Info.plist"
                 fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
-                fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${APP_REFERENCE}" || return $?
+                fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
                 if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
                     cd "${SRC_PATH}/ios"
                     fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
@@ -535,13 +554,6 @@ function main() {
 
                 if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
                     # Bare workflow support (SDK 37+)
-
-                    # Updates enabled?
-                    if [[ "${DISABLE_OTA}" == "false" ]]; then
-                        fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesEnabled value:"true" || return $?
-                    else
-                        fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesEnabled value:"false" || return $?
-                    fi
 
                     # Updates URL
                     fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${PUBLIC_URL}" || return $?
@@ -609,7 +621,7 @@ function main() {
                     TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
                     if [[ -f "${TARGET_PLIST_PATH}" ]]; then
                         fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
-                        fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleShortVersionString value:"${APP_REFERENCE}" || return $?
+                        fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
                         if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
                             fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleIdentifier value:"${IOS_DIST_BUNDLE_ID}.${TARGET}" || return $?
                         fi
