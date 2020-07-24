@@ -328,7 +328,7 @@ function main() {
   EXPO_PROJECT_SLUG="$(jq -r '.expo.slug' < ./app.json)"
 
   case "${APP_VERSION_SOURCE}" in
-    "manfiest")
+    "manifest")
         EXPO_APP_VERSION="$(jq -r '.expo.version' < ./app.json)"
         ;;
 
