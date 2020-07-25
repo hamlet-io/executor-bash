@@ -309,9 +309,6 @@ function process_template_pass() {
 
   # Set up the level specific template information
   local template_dir="${GENERATION_ENGINE_DIR}/client"
-  #local template="create${level^}Template.ftl"
-  #[[ ! -f "${template_dir}/${template}" ]] && template="create${level^}.ftl"
-
   local template_composites=()
 
   # Define the possible passes
