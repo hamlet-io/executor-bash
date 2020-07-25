@@ -451,6 +451,7 @@ function process_template_pass() {
   [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
   [[ -n "${resource_group}" ]]            && args+=("-v" "resourceGroup=${resource_group}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-v" "logLevel=${GENERATION_LOG_LEVEL}")
+  [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-v" "inputSource=${GENERATION_INPUT_SOURCE}")
 
   # Include the template composites
