@@ -11,7 +11,7 @@ function usage() {
 
 Generate a document using the Freemarker template engine
 
-Usage: $(basename $0) -t TEMPLATE (-d TEMPLATEDIR)+ -o OUTPUT (-v VARIABLE=VALUE)* (-g CMDB=PATH)* -b CMDB (-c CMDB)*
+Usage: $(basename $0) -t TEMPLATE (-d TEMPLATEDIR)+ -o OUTPUT (-v VARIABLE=VALUE)* (-g CMDB=PATH)* -b CMDB (-c CMDB)* -l LOGLEVEL
 
 where
 
@@ -21,6 +21,7 @@ where
 (o) -g CMDB=PATH      defines a cmdb and the corresponding path
 (o) -g PATH           finds all cmdbs under PATH based on a .cmdb marker file
     -h                shows this text
+(o) -l LOGLEVEL       required log level
 (m) -o OUTPUT         is the path of the resulting document
 (o) -r VARIABLE=VALUE defines a variable and corresponding value to be made available in the template
 (m) -t TEMPLATE       is the filename of the Freemarker template to use
@@ -50,7 +51,7 @@ CMDBS=()
 CMDB_MAPPINGS=()
 
 # Parse options
-while getopts ":b:c:d:g:ho:r:t:v:" opt; do
+while getopts ":b:c:d:g:hl:o:r:t:v:" opt; do
     case $opt in
         b)
             BASE_CMDB="${OPTARG}"
@@ -66,6 +67,9 @@ while getopts ":b:c:d:g:ho:r:t:v:" opt; do
             ;;
         h)
             usage
+            ;;
+        l)
+            LOGLEVEL="${OPTARG}"
             ;;
         o)
             OUTPUT="${OPTARG}"
@@ -116,12 +120,13 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.11.1.jar" \
+java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.12.jar" \
     -i $TEMPLATE "${TEMPLATEDIRS[@]}" \
     -o $OUTPUT \
     "${VARIABLES[@]}" \
     "${RAW_VARIABLES[@]}" \
     "${CMDB_MAPPINGS[@]}" \
     ${BASE_CMDB:+-b "${BASE_CMDB}"} \
+    ${LOGLEVEL:+--${LOGLEVEL}}
     "${CMDBS[@]}"
 RESULT=$?
