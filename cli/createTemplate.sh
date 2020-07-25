@@ -311,7 +311,7 @@ function process_template_pass() {
   local template_dir="${GENERATION_ENGINE_DIR}/client"
   #local template="create${level^}Template.ftl"
   #[[ ! -f "${template_dir}/${template}" ]] && template="create${level^}.ftl"
-  local template="createDeployment.ftl"
+
   local template_composites=()
 
   # Define the possible passes
@@ -346,6 +346,7 @@ function process_template_pass() {
   case "${level}" in
 
     unitlist)
+      local template="createUnitlist.ftl"
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
@@ -358,6 +359,7 @@ function process_template_pass() {
       ;;
 
     blueprint)
+      local template="createBlueprint.ftl"
       template_composites+=("FRAGMENT" )
 
       # Blueprint applies across accounts and regions
@@ -372,6 +374,7 @@ function process_template_pass() {
       ;;
 
     buildblueprint)
+      local template="createBuildblueprint.ftl"
       template_composites+=("FRAGMENT" )
 
       # Blueprint applies across accounts and regions
@@ -385,6 +388,7 @@ function process_template_pass() {
       ;;
 
     account)
+      local template="createDeployment.ftl"
       for p in "${pass_list[@]}"; do pass_region_prefix["${p}"]="${account_region}-"; done
       template_composites+=("ACCOUNT")
 
@@ -395,6 +399,7 @@ function process_template_pass() {
       ;;
 
     solution)
+      local template="createDeployment.ftl"
       template_composites+=("FRAGMENT")
       if [[ -f "${cf_dir}/solution-${region}-template.json" ]]; then
         for p in "${pass_list[@]}"; do
@@ -408,6 +413,7 @@ function process_template_pass() {
       ;;
 
     segment)
+      local template="createDeployment.ftl"
       for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="seg-"; done
       template_composites+=("FRAGMENT" )
 
@@ -437,6 +443,7 @@ function process_template_pass() {
       ;;
 
     application)
+      local template="createDeployment.ftl"
       for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="app-"; done
       template_composites+=("FRAGMENT" )
       ;;
