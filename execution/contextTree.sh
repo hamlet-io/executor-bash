@@ -718,7 +718,8 @@ function isValidUnit() {
     ["application"]="true" \
     ["solution"]="true" \
     ["segment"]="true" \
-    ["multiple"]="true" )
+    ["multiple"]="true" \
+    ["schema"]="true")
 
   # Ensure arguments have been provided
   [[ (-z "${unit_required[${level}]}") || ((-z "${unit}") && ("${unit_required[${level}]}" == "true")) ]] && return 1
@@ -733,6 +734,7 @@ function isValidUnit() {
     declare -ga SOLUTION_UNITS_ARRAY=(${unit})
     declare -ga SEGMENT_UNITS_ARRAY=(${unit})
     declare -ga MULTIPLE_UNITS_ARRAY=("iam" "dashboard")
+    declare -ga SCHEMA_UNITS_ARRAY=(${unit})
 
     # Apply explicit unit lists and check for presence of unit
     # Allow them to be separated by commas or spaces in line with the separator

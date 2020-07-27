@@ -310,7 +310,7 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config")
+  local pass_list=("generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
 
   # Initialise the components of the pass filenames
   declare -A pass_level_prefix
@@ -377,6 +377,17 @@ function process_template_pass() {
 
       pass_level_prefix["config"]="build_blueprint-"
       pass_description["config"]="buildblueprint"
+      ;;
+
+    schema)
+
+      for p in "${pass_list[@]}"; do
+        pass_account_prefix["${p}"]=""
+        pass_region_prefix["${p}"]=""
+      done
+
+      pass_level_prefix["schema"]=""
+      pass_description["schema"]="schema"
       ;;
 
     account)
@@ -689,6 +700,10 @@ function process_template() {
 
     unitlist|blueprint|buildblueprint)
       local cf_dir_default="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
+      ;;
+
+    schema)
+      local cf_dir_default="${PRODUCT_STATE_DIR}/cot"
       ;;
 
     account)
