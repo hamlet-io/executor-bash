@@ -397,7 +397,8 @@ function main() {
 
   # Create a build for the SDK
   info "Creating an OTA for this version of the SDK"
-  expo export --dump-sourcemap --public-url "${PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_URL}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}"  || return $?
+  EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_SDK_VERSION}"
+  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -557,7 +558,7 @@ function main() {
                     # Bare workflow support (SDK 37+)
 
                     # Updates URL
-                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${PUBLIC_URL}" || return $?
+                    fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${EXPO_MANIFEST_URL}" || return $?
 
                     # SDK Version
                     fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
