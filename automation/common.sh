@@ -43,6 +43,12 @@ function save_product_infrastructure() {
   save_repo "${PRODUCT_INFRASTRUCTURE_DIR}" "infrastructure" "${arguments[@]}"
 }
 
+function save_product_state() {
+  local arguments=("$@")
+
+  save_repo "${PRODUCT_STATE_DIR}" "state" "${arguments[@]}"
+}
+
 function save_product_code() {
   local arguments=("$@")
 

@@ -9,6 +9,7 @@ STACK_INITIATE_DEFAULT="true"
 STACK_MONITOR_DEFAULT="true"
 STACK_OPERATION_DEFAULT="update"
 STACK_WAIT_DEFAULT=30
+QUIET_MODE="false"
 
 function usage() {
   cat <<EOF
@@ -25,6 +26,7 @@ where
 (m) -l LEVEL                    is the stack level - "account", "product", "segment", "solution", "application" or "multiple"
 (o) -m (STACK_INITIATE=false)   monitors but does not initiate the stack operation
 (o) -n STACK_NAME               to override standard stack naming
+(o) -q                          quiet mode - minimise output generated
 (o) -r REGION                   is the AWS region identifier for the region in which the stack should be managed
 (m) -u DEPLOYMENT_UNIT          is the deployment unit used to determine the stack template
 (o) -w STACK_WAIT               is the interval between checking the progress of the stack operation
@@ -55,7 +57,7 @@ EOF
 
 function options() {
   # Parse options
-  while getopts ":dhil:mn:r:u:w:yz:" option; do
+  while getopts ":dhil:mn:qr:u:w:yz:" option; do
     case "${option}" in
       d) STACK_OPERATION=delete ;;
       h) usage; return 1 ;;
@@ -63,6 +65,7 @@ function options() {
       l) LEVEL="${OPTARG}" ;;
       m) STACK_INITIATE=false ;;
       n) STACK_NAME="${OPTARG}" ;;
+      q) QUIET_MODE=true ;;
       r) REGION="${OPTARG}" ;;
       u) DEPLOYMENT_UNIT="${OPTARG}" ;;
       w) STACK_WAIT="${OPTARG}" ;;
@@ -197,7 +200,7 @@ function process_stack() {
           STACK_OPERATION="create"
 
         [[ (-n "${DRYRUN}") && ("${STACK_OPERATION}" == "create") ]] &&
-            fatal "Dryrun not applicable when creating a stack" && return 1
+            warn "${STACK_NAME} doesn't exist yet. Skipping change set generation ..." && return 0
 
         if [[ "${STACK_OPERATION}" == "update" ]]; then
 
@@ -214,12 +217,17 @@ function process_stack() {
 
           if [[ -n "${DRYRUN}" ]]; then
 
-            info "Dry run results"
-
-            # Return the change set results
+            # Obtain the change set results
             aws --region ${REGION} cloudformation describe-change-set \
-              --stack-name "${STACK_NAME}" --change-set-name "${INITIAL_CHANGE_SET_NAME}" && return $?
+              --stack-name "${STACK_NAME}" --change-set-name "${INITIAL_CHANGE_SET_NAME}" > "${potential_change_file}" || return $?
 
+            if [[ "QUIET_MODE" == "true" ]]; then
+              cp "${potential_change_file}" "${PLANNED_CHANGE}"
+            else
+              info "Dry run results for ${STACK_NAME}"
+              cat "${potential_change_file}"
+            fi
+            return 0
           else
 
             # Check ChangeSet for results

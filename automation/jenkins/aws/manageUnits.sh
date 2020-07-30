@@ -146,6 +146,20 @@ function main() {
 
         # Manage the stack if required
         if [[ -n "${DEPLOYMENT_MODE}" ]]; then
+          if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_PLAN}" ]]; then
+              case "${ACCOUNT_PROVIDER}" in
+                azure)
+                  ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+
+                *)
+                  ${GENERATION_DIR}/manageStack.sh -y -q -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Planning the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+              esac
+              continue
+          fi
           if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOP}" || "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOPSTART}" ]]; then
               case "${ACCOUNT_PROVIDER}" in
                 azure)
@@ -163,12 +177,12 @@ function main() {
               case "${ACCOUNT_PROVIDER}" in
                 azure)
                   ${GENERATION_DIR}/manageDeployment.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Deletion of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  { exit_status=$?; fatal "Processing of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
 
                 *)
                   ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Deletion of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  { exit_status=$?; fatal "Processing of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
               esac
           fi
