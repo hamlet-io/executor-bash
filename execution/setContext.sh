@@ -275,21 +275,27 @@ fi
 
 # Set the Azure subscription and login if we haven't already
 if [[ -n "${AZID}" ]]; then
-    if [[ -z "$(az account list --output tsv)" ]]; then
-        info "Logging in to Azure..."
-        . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-
-    fi
-
-    az_cli_args=()
-    # -- Only show errors unless debugging --
-    if willLog "${LOG_LEVEL_DEBUG}"; then
-        az_cli_args+=("--output" "json" )
+    if [[ "${AZ_AUTH_METHOD}" == "none" ]]; then
+        info "Skipping azure authentication - AZ_AUTH_METHOD=${AZ_AUTH_METHOD}"
     else
-        az_cli_args+=("--output" "none" )
-    fi
+        if [[ -z "$(az account list --output tsv)" ]]; then
+            info "Logging in to Azure..."
+            . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
 
-    az account set --subscription "${AZID}" "${az_cli_args[@]}"
+        fi
+
+        if [[ "${AZ_AUTH_METHOD}" != "none" ]]; then
+            az_cli_args=()
+            # -- Only show errors unless debugging --
+            if willLog "${LOG_LEVEL_DEBUG}"; then
+                az_cli_args+=("--output" "json" )
+            else
+                az_cli_args+=("--output" "none" )
+            fi
+
+            az account set --subscription "${AZID}" "${az_cli_args[@]}"
+        fi
+    fi
 fi
 
 # Handle some MINGW peculiarities

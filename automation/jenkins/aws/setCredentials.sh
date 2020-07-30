@@ -153,6 +153,10 @@ case "${ACCOUNT_PROVIDER}" in
             interactive)
                 az login "${az_login_args[@]}"
                 ;;
+
+            none)
+                info "Skipping Login to Azure - AZ_AUTH_METHOD = ${AZ_AUTH_METHOD}"
+                ;;
         esac
         ;;
 esac
