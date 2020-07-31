@@ -149,8 +149,9 @@ function main() {
           if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_PLAN}" ]]; then
               case "${ACCOUNT_PROVIDER}" in
                 azure)
-                  ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  # TODO: Confirm what plans generate from an Azure perspective
+                  # ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
+                  # { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
 
                 *)
