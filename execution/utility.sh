@@ -2072,6 +2072,42 @@ function update_rds_ca_identifier() {
   aws --region "${region}" rds modify-db-instance --apply-immediately --db-instance-identifier ${db_identifier} --ca-certificate-identifier "${ca_identifier}" 1> /dev/null || return $?
 }
 
+# -- WAF --
+function manage_waf_logging() {
+  local region="$1"; shift
+  local wafACLId="$1"; shift
+  local wafType="$1"; shift
+  local action="$1"; shift
+  local loggingConfigFile="$1"; shift
+
+  if [[ "${wafType}" == "regional" ]]; then
+    wafCommand="waf-regional"
+  else
+    wafCommand="waf"
+  fi
+
+  wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" || return $?)"
+  wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
+
+  if [[ "${action}" == "enable" ]]; then
+    info "Enabling WAF Logging - WAF Arn: ${wafACLArn}"
+
+    wafLoggingConfig="$(cat "${loggingConfigFile}" | jq --arg wafArn "${wafACLArn}" '. * { "LoggingConfiguration" : { "ResourceArn" : $wafArn }}')"
+    aws --region "${region}" $wafCommand put-logging-configuration --cli-input-json "${wafLoggingConfig}" || return $?
+  fi
+
+  if [[ "${action}" == "disable" ]]; then
+
+    info "Checking WAF Logging state..."
+    loggingEnabledArn="$(aws --region "${region}" $wafCommand list-logging-configurations --limit 100 --query "LoggingConfigurations[?ResourceArn == '$wafACLArn' ].ResourceArn" --output text || return $? )"
+
+    if [[ -n "${loggingEnabledArn}" ]];  then
+      info "Disabling WAF Logging - WAF Arn: ${wafACLArn}"
+      aws --region "${region}" $wafCommand delete-logging-configuration --resource-arn "${wafACLArn}" || return $?
+    fi
+  fi
+}
+
 # -- Git Repo Management --
 
 function in_git_repo() {
