@@ -16,7 +16,7 @@ function main() {
     in_git_repo && git checkout -b "${BRANCH}"
 
     # Create the templates and corresponding change sets
-    ${AUTOMATION_DIR}/manageUnits.sh -l "application" -m "${DEPLOYMENT_MODE_PLAN}" -a "${DEPLOYMENT_UNIT_LIST}" -r "${PRODUCT_CONFIG_COMMIT}" || return $?
+    ${AUTOMATION_DIR}/manageUnits.sh -m "${DEPLOYMENT_MODE_PLAN}" -r "${PRODUCT_CONFIG_COMMIT}" || return $?
 
     # Commit the results for later review
     save_product_state "${DETAIL_MESSAGE}" "${BRANCH}" || return $?
