@@ -145,10 +145,14 @@ function push() {
     REPO_PUSHED=false
     if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
         for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
-            debug "Rebasing ${REPO_LOG_NAME} in case of changes..."
-            git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-                fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
+            # Check if remote branch exists
+            EXISTING_BRANCH=$(git ls-remote --heads 2>/dev/null | grep "refs/heads/${REPO_BRANCH}$")
+            if [[ -n "${EXISTING_BRANCH}" ]]; then
+                debug "Rebasing ${REPO_LOG_NAME} in case of changes..."
+                git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
+                RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
+                    fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
+            fi
 
             debug "Pushing the ${REPO_LOG_NAME} repo upstream..."
             if git push --tags ${REPO_REMOTE} ${REPO_BRANCH}; then
@@ -157,7 +161,7 @@ function push() {
                 break
             else
                 # Take a breather
-                info "Waiting to retry rebasing ${REPO_LOG_NAME} repo ..."
+                info "Waiting to retry push to ${REPO_LOG_NAME} repo ..."
                 sleep 5
             fi
         done

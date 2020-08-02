@@ -12,14 +12,14 @@ function main() {
     # Switch to the plan branch
     BRANCH="plan-${PRODUCT}-${ENVIRONMENT}-${SEGMENT}-${JOB_IDENTIFIER}"
 
-    # Create the plan branch
-    git checkout -b "${BRANCH}"
+    # Create the plan branch if in a git repo
+    in_git_repo && git checkout -b "${BRANCH}"
 
     # Create the templates and corresponding change sets
     ${AUTOMATION_DIR}/manageUnits.sh -l "application" -m "${DEPLOYMENT_MODE_PLAN}" -a "${DEPLOYMENT_UNIT_LIST}" -r "${PRODUCT_CONFIG_COMMIT}" || return $?
 
     # Commit the results for later review
-    save_product_state "${DETAIL_MESSAGE}" "${PRODUCT_INFRASTRUCTURE_REFERENCE}" || return $?
+    save_product_state "${DETAIL_MESSAGE}" "${BRANCH}" || return $?
 }
 
 main "$@"
