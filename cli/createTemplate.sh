@@ -385,7 +385,7 @@ function process_template_pass() {
       ;;
 
     schema)
-
+      local template="createSchema.ftl"
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
