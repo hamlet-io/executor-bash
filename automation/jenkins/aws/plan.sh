@@ -10,7 +10,7 @@ function main() {
     cd "${PRODUCT_STATE_DIR}"
 
     # Switch to the plan branch
-    BRANCH="plan-${PRODUCT}-${ENVIRONMENT}-${SEGMENT}-${JOB_IDENTIFIER}"
+    BRANCH="plan-${PRODUCT}-${ENVIRONMENT}-${SEGMENT}${DEPLOYMENT_MODE:+-${DEPLOYMENT_MODE}}-${JOB_IDENTIFIER}"
 
     # Create the plan branch if in a git repo
     in_git_repo && git checkout -b "${BRANCH}"
