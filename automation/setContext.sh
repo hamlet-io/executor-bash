@@ -36,7 +36,7 @@ ACCOUNT=\${ACCOUNT_LIST[0]}
 NOTES:
 
 1. The setting values are saved in context.properties in the current directory
-2. DEPLOYMENT_MODE is one of "${DEPLOYMENT_MODE_PLAN}", "${DEPLOYMENT_MODE_UPDATE}", "${DEPLOYMENT_MODE_STOPSTART}" and "${DEPLOYMENT_MODE_STOP} or custom update deployment modes"
+2. DEPLOYMENT_MODE is one of "${DEPLOYMENT_MODE_UPDATE}", "${DEPLOYMENT_MODE_STOPSTART}" and "${DEPLOYMENT_MODE_STOP} or custom update deployment modes"
 3. RELEASE_MODE is one of "${RELEASE_MODE_CONTINUOUS}", "${RELEASE_MODE_SELECTIVE}", "${RELEASE_MODE_ACCEPTANCE}", "${RELEASE_MODE_PROMOTION}" and "${RELEASE_MODE_HOTFIX}"
 
 EOF
@@ -364,7 +364,6 @@ function main() {
 
   # Release and Deployment modes
 
-  define_context_property DEPLOYMENT_MODE_PLAN      "plan"
   define_context_property DEPLOYMENT_MODE_UPDATE    "update"
   define_context_property DEPLOYMENT_MODE_STOPSTART "stopstart"
   define_context_property DEPLOYMENT_MODE_STOP      "stop"
