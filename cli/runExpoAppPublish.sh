@@ -460,7 +460,6 @@ function main() {
     aws --region "${AWS_REGION}" s3 sync --no-progress "${SRC_PATH}/app/dist/multi/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/multi" || return $?
   fi
 
-   DETAILED_HTML_QR_MESSAGE="<h4>Expo Client App QR Codes</h4> <p>Use these codes to load the app through the Expo Client</p>"
    DETAILED_HTML_BINARY_MESSAGE="<h4>Expo Binary Builds</h4>"
    if [[ "${BUILD_BINARY}" == "false" ]]; then
      DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE} <p> No binary builds were generated for this publish </p>"
@@ -670,6 +669,8 @@ function main() {
   DETAILED_HTML="<html><body> <h4>Expo Mobile App Publish</h4> <p> A new Expo mobile app publish has completed </p> <ul>"
 
   if [[ "${BINARY_BUILD_PROCESS}" == "turtle" ]]; then
+
+    DETAILED_HTML_QR_MESSAGE="<h4>Expo Client App QR Codes</h4> <p>Use these codes to load the app through the Expo Client</p>"
     for qr_build_format in "${EXPO_QR_BUILD_FORMATS[@]}"; do
 
         #Generate EXPO QR Code
