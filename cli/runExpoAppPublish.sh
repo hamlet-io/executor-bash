@@ -66,7 +66,6 @@ DEFAULT_BINARY_EXPIRATION="1210000"
 DEFAULT_RUN_SETUP="false"
 DEFAULT_FORCE_BINARY_BUILD="false"
 DEFAULT_SUBMIT_BINARY="false"
-DEFAULT_DISABLE_OTA="false"
 
 DEFAULT_QR_BUILD_FORMATS="ios,android"
 DEFAULT_BINARY_BUILD_PROCESS="turtle"
@@ -140,7 +139,6 @@ where
 (o) -f FORCE_BINARY_BUILD     force the build of binary images
 (o) -n NODE_PACKAGE_MANAGER   Set the node package manager for app installation
 (o) -m SUBMIT_BINARY          submit the binary for testing
-(o) -o DISABLE_OTA            don't publish the OTA to the CDN
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
 (0) -q QR_BUILD_FORMATS       specify the formats you would like to generate QR urls for
 (o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
@@ -153,7 +151,6 @@ BUILD_FORMATS = ${DEFAULT_BUILD_FORMATS}
 BINARY_EXPIRATION = ${DEFAULT_BINARY_EXPIRATION}
 RUN_SETUP = ${DEFAULT_RUN_SETUP}
 SUBMIT_BINARY = ${DEFAULT_SUBMIT_BINARY}
-DISABLE_OTA  = ${DEPLOY_OTA}
 QR_BUILD_FORMATS = ${DEFAULT_QR_BUILD_FORMATS}
 BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
@@ -185,9 +182,6 @@ function options() {
                 ;;
             n)
                 NODE_PACKAGE_MANAGER="${OPTARG}"
-                ;;
-            o)
-                DISABLE_OTA="true"
                 ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
@@ -221,7 +215,6 @@ function options() {
     SUBMIT_BINARY="${SUBMIT_BINARY:-DEFAULT_SUBMIT_BINARY}"
     QR_BUILD_FORMATS="${QR_BUILD_FORMATS:-$DEFAULT_QR_BUILD_FORMATS}"
     BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
-    DISABLE_OTA="${DISABLE_OTA:-${DEFAULT_DISABLE_OTA}}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
 }
@@ -343,7 +336,10 @@ function main() {
         fatal "Invalid APP_VERSION_SOURCE - ${APP_VERSION_SOURCE}" && exit 255
         ;;
    esac
-   EXPO_CURRENT_APP_VERSION="${EXPO_APP_VERSION}"
+   EXPO_APP_VERSION="$( semver_clean ${EXPO_APP_VERSION} )"
+
+   arrayFromList EXPO_APP_VERSION_PARTS "$( semver_valid ${EXPO_APP_VERSION} )"
+   EXPO_APP_MAJOR_VERSION="${EXPO_APP_VERSION_PARTS[0]}"
 
   # Determine Binary Build status
   EXPO_CURRENT_SDK_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
@@ -370,7 +366,7 @@ function main() {
   fi
 
   # variable for sentry source map upload
-  SENTRY_SOURCE_MAP_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}"
+  SENTRY_SOURCE_MAP_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"
   echo "SENTRY_SOURCE_MAP_S3_URL=${SENTRY_SOURCE_MAP_S3_URL}" >> ${AUTOMATION_DATA_DIR}/chain.properties
   echo "SENTRY_URL_PREFIX=~/${PUBLIC_PREFIX}" >> ${AUTOMATION_DATA_DIR}/chain.properties
 
@@ -382,6 +378,7 @@ function main() {
     --arg BUILD_NUMBER "${BUILD_NUMBER}" \
     '.expo.releaseChannel=$RELEASE_CHANNEL | .expo.extra.BUILD_REFERENCE=$BUILD_REFERENCE | .expo.ios.buildNumber=$BUILD_NUMBER | .expo.extra=.expo.extra + $envConfig[]["AppConfig"]' <  "./app.json" > "${tmpdir}/environment-app.json"
   mv "${tmpdir}/environment-app.json" "./app.json"
+
   ## Optional app.json overrides
   IOS_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.IOS_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
@@ -395,10 +392,10 @@ function main() {
     mv "${tmpdir}/android-bundle-app.json" "./app.json"
   fi
 
-  # Create a build for the SDK
-  info "Creating an OTA for this version of the SDK"
-  EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_SDK_VERSION}"
-  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}"  || return $?
+  # Create base OTA
+  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | SDK: ${EXPO_SDJ_VERSION}"
+  EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"
+  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -411,23 +408,26 @@ function main() {
 
   fi
 
-  if [[ "${DISABLE_OTA}" == "false" ]]; then
+  if [[ -n "${BUILD_REFERENCE}" ]]; then
+    info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
+    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
+    mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json"
 
-    if [[ -n "${BUILD_REFERENCE}" ]]; then
-      info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
-      mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json"
+    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
+    mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json"
+  fi
 
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
-      mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json"
+  info "Copying OTA to CDN"
+  aws --region "${AWS_REGION}" s3 sync --no-progress --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}" || return $?
 
-    fi
+  # Multi-manifest is only supported or required by the Expo Client based apps
+  # Not required for bare or native expo worflows
+  if [[ "${BINARY_BUILD_PROCESS}" == "turtle" ]]; then
 
-    info "Copying OTA to CDN"
-    aws --region "${AWS_REGION}" s3 sync --no-progress --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" || return $?
+    EXPO_MULTI_PUBLIC_URL="${PUBLIC_URL}/multi"
 
-    # Merge all existing SDK packages into a master distribution
-    aws --region "${AWS_REGION}" s3 cp --no-progress --recursive --exclude "${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
+    # Get all of the base OTA updates
+    aws --region "${AWS_REGION}" s3 cp --no-progress --recursive --exclude "${EXPO_SDK_VERSION}/*" --exclude "${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
     EXPO_EXPORT_MERGE_ARGUMENTS=""
     for dir in ${SRC_PATH}/app/dist/packages/*/ ; do
         EXPO_EXPORT_MERGE_ARGUMENTS="${EXPO_EXPORT_MERGE_ARGUMENTS} --merge-src-dir "${dir}""
@@ -435,29 +435,29 @@ function main() {
 
     # Create master export
     info "Creating master OTA artefact with Extra Dirs: ${EXPO_EXPORT_MERGE_ARGUMENTS}"
-    expo export --public-url "${PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/master/" ${EXPO_EXPORT_MERGE_ARGUMENTS}  || return $?
+    expo export --public-url "${EXPO_MULTI_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/multi/" ${EXPO_EXPORT_MERGE_ARGUMENTS}  || return $?
 
     if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
 
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/master/ios-index.json" > "${tmpdir}/ios-master-expo-override.json"
-        mv "${tmpdir}/ios-master-expo-override.json" "${SRC_PATH}/app/dist/master/ios-index.json"
+        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/mulit/ios-index.json" > "${tmpdir}/ios-multi-expo-override.json"
+        mv "${tmpdir}/ios-multi-expo-override.json" "${SRC_PATH}/app/dist/multi/ios-index.json"
 
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/master/android-index.json" > "${tmpdir}/android-master-expo-override.json"
-        mv "${tmpdir}/android-master-expo-override.json" "${SRC_PATH}/app/dist/master/android-index.json"
+        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/multi/android-index.json" > "${tmpdir}/android-mulit-expo-override.json"
+        mv "${tmpdir}/android-multi-expo-override.json" "${SRC_PATH}/app/dist/multi/android-index.json"
 
     fi
 
     if [[ -n "${BUILD_REFERENCE}" ]]; then
-      info "Override revisionId in master export to match the build reference ${BUILD_REFERENCE}"
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/master/ios-index.json" > "${tmpdir}/ios-expo-override.json"
-      mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/master/ios-index.json"
+      info "Override revisionId in multi export to match the build reference ${BUILD_REFERENCE}"
+      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/multi/ios-index.json" > "${tmpdir}/ios-multi-ref-expo-override.json"
+      mv "${tmpdir}/ios-multi-ref-override.json" "${SRC_PATH}/app/dist/multi/ios-index.json"
 
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/master/android-index.json" > "${tmpdir}/android-expo-override.json"
-      mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/master/android-index.json"
+      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/multi/android-index.json" > "${tmpdir}/android-multi-ref-expo-override.json"
+      mv "${tmpdir}/android-multi-ref-expo-override.json" "${SRC_PATH}/app/dist/multi/android-index.json"
 
     fi
 
-    aws --region "${AWS_REGION}" s3 sync --no-progress "${SRC_PATH}/app/dist/master/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}" || return $?
+    aws --region "${AWS_REGION}" s3 sync --no-progress "${SRC_PATH}/app/dist/multi/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/multi" || return $?
   fi
 
    DETAILED_HTML_QR_MESSAGE="<h4>Expo Client App QR Codes</h4> <p>Use these codes to load the app through the Expo Client</p>"
@@ -516,10 +516,11 @@ function main() {
 
         EXPO_BINARY_FILE_NAME="${BINARY_FILE_PREFIX}-${EXPO_APP_VERSION}-${BUILD_NUMBER}.${BINARY_FILE_EXTENSION}"
         EXPO_BINARY_FILE_PATH="${BINARY_PATH}/${EXPO_BINARY_FILE_NAME}"
-        EXPO_MANIFEST_URL="${PUBLIC_URL}/packages/${EXPO_SDK_VERSION}/${build_format}-index.json"
+
 
         case "${BINARY_BUILD_PROCESS}" in
             "turtle")
+                EXPO_MANIFEST_URL="${EXPO_MULTI_PUBLIC_URL}/${build_format}-index.json"
                 echo "Using turtle to build the binary image"
 
                 # Setup Turtle
@@ -533,6 +534,7 @@ function main() {
                 ;;
 
             "fastlane")
+                EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
                 echo "Using fastlane to build the binary image"
                 export FASTLANE_DISABLE_COLORS=1
 
@@ -576,17 +578,13 @@ function main() {
                     # Legacy Expokit support
                     # Update Expo Details and seed with latest expo expot bundles
                     BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
-                    if [[ "${DISABLE_OTA}" == "false" ]]; then
-                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
-                    fi
+                    cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
 
                     # Get the bundle file name from the manifest
                     BUNDLE_URL="$( jq -r '.bundleUrl' < "${BINARY_BUNDLE_FILE}")"
                     BUNDLE_FILE_NAME="$( basename "${BUNDLE_URL}")"
 
-                    if [[ "${DISABLE_OTA}" == "false" ]]; then
-                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
-                    fi
+                    cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
 
                     jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <  "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" > "${tmpdir}/EXShell.json"
                     mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
@@ -669,20 +667,30 @@ function main() {
 
   done
 
-  for qr_build_format in "${EXPO_QR_BUILD_FORMATS[@]}"; do
+  DETAILED_HTML="<html><body> <h4>Expo Mobile App Publish</h4> <p> A new Expo mobile app publish has completed </p> <ul>"
 
-      #Generate EXPO QR Code
-      EXPO_QR_FILE_PREFIX="${qr_build_format}"
-      EXPO_QR_FILE_NAME="${EXPO_QR_FILE_PREFIX}-qr.png"
-      EXPO_QR_FILE_PATH="${REPORTS_PATH}/${EXPO_QR_FILE_NAME}"
+  if [[ "${BINARY_BUILD_PROCESS}" == "turtle" ]]; then
+    for qr_build_format in "${EXPO_QR_BUILD_FORMATS[@]}"; do
 
-      qr "exp://${PUBLIC_URL#*//}/${qr_build_format}-index.json?release-channel=${RELEASE_CHANNEL}" > "${EXPO_QR_FILE_PATH}" || return $?
+        #Generate EXPO QR Code
+        EXPO_QR_FILE_PREFIX="${qr_build_format}"
+        EXPO_QR_FILE_NAME="${EXPO_QR_FILE_PREFIX}-qr.png"
+        EXPO_QR_FILE_PATH="${REPORTS_PATH}/${EXPO_QR_FILE_NAME}"
 
-      DETAILED_HTML_QR_MESSAGE="${DETAILED_HTML_QR_MESSAGE}<p><strong>${qr_build_format}</strong> <br> <img src=\"./${EXPO_QR_FILE_NAME}\" alt=\"EXPO QR Code\" width=\"200px\" /></p>"
+        qr "exp://${EXPO_MULTI_PUBLIC_URL#*//}/${qr_build_format}-index.json?release-channel=${RELEASE_CHANNEL}" > "${EXPO_QR_FILE_PATH}" || return $?
 
-  done
+        DETAILED_HTML_QR_MESSAGE="${DETAILED_HTML_QR_MESSAGE}<p><strong>${qr_build_format}</strong> <br> <img src=\"./${EXPO_QR_FILE_NAME}\" alt=\"EXPO QR Code\" width=\"200px\" /></p>"
 
-  DETAILED_HTML="<html><body> <h4>Expo Mobile App Publish</h4> <p> A new Expo mobile app publish has completed </p> <ul> <li><strong>Public URL</strong> ${PUBLIC_URL}</li> <li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_QR_MESSAGE} ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
+    done
+
+     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_MULTI_PUBLIC_URL}</li>"
+  fi
+
+  if [[ "${BINARY_BUILD_PROCESS}" == "fastlane" ]]; then
+    DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"
+  fi
+
+  DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_QR_MESSAGE} ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
   echo "${DETAILED_HTML}" > "${REPORTS_PATH}/build-report.html"
 
   aws --region "${AWS_REGION}" s3 sync  --no-progress "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
