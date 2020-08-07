@@ -393,9 +393,9 @@ function main() {
   fi
 
   # Create base OTA
-  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | SDK: ${EXPO_SDJ_VERSION}"
+  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | SDK: ${EXPO_SDK_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"
-  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"  || return $?
+  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
