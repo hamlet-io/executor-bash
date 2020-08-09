@@ -828,17 +828,6 @@ function manage_iam_userpassword() {
   return 0
 }
 
-function create_iam_service_linked_role() {
-    local region="$1"; shift
-    local serviceName="$1"; shift
-
-    if [[ -z "$( aws --region "${region}" iam list-roles --path-prefix "/aws-service-role/${serviceName}/" --query "Roles[*].Arn" --output text )" ]]; then
-      aws --region "${region}" iam create-service-linked-role --aws-service-name "${serviceName}"
-    else
-      info "Service linked role ${serviceName} already exists"
-    fi
-}
-
 # -- CloudWatch Events --
 function delete_cloudwatch_event() {
     local region="$1"; shift
