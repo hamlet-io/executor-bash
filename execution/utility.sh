@@ -1664,6 +1664,37 @@ function cleanup_ssm_document() {
   fi
 }
 
+# -- Transfer --
+function manage_transfer_security_groups() {
+    local region="$1"; shift
+    local operation="$1"; shift
+    local cfnStackName="$1"; shift
+    local securityGroupId="$1"; shift
+    local transferServerId="$1"; shift
+
+    securityGroup="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${securityGroupId}" "ref" || return $?)"
+    defaultSecurityGroup="$( aws --region "${region}" ec2 describe-security-groups --filter Name=group-name,Values=default --query 'SecurityGroups[0].GroupId' --output text || return $?)"
+
+    transferServer="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${transferServerId}" "name" || return $?)"
+    vpcEndpoint="$( aws --region "${region}" transfer describe-server --server-id "${transferServer}" --query 'Server.EndpointDetails.VpcEndpointId' --output text || return $?)"
+
+    case ${operation} in
+      delete)
+        if [[ -n "${defaultSecurityGroup}" ]]; then
+          aws --region "${region}" ec2 modify-vpc-endpoint --vpc-endpoint-id "${vpcEndpoint}" --add-security-group-ids "${defaultSecurityGroup}" --output text || return $?
+        fi
+        aws --region "${region}" ec2 modify-vpc-endpoint --vpc-endpoint-id "${vpcEndpoint}" --remove-security-group-ids "${securityGroup}" --output text || return $?
+        ;;
+
+      update|create)
+        aws --region "${region}" ec2 modify-vpc-endpoint --vpc-endpoint-id "${vpcEndpoint}" --add-security-group-ids "${securityGroup}" --output text || return $?
+        if [[ -n "${defaultSecurityGroup}" ]]; then
+          aws --region "${region}" ec2 modify-vpc-endpoint --vpc-endpoint-id "${vpcEndpoint}" --remove-security-group-ids "${defaultSecurityGroup}" --output text || return $?
+        fi
+        ;;
+    esac
+}
+
 # -- Transit Gateway --
 
 function get_transitgateway_vpn_attachment() {
