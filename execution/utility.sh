@@ -49,7 +49,7 @@ function outputLogEntry() {
   local severity="${1^}"; shift
   local parts=("$@")
 
-  echo -e "\n(${severity})" "${parts[@]}"
+  echo -e "(${severity})" "${parts[@]}"
   return 0
 }
 

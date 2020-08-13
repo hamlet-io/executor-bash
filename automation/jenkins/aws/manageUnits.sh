@@ -5,14 +5,14 @@ trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 #Defaults
-DEFAULT_GENERATION_DOCS_BLUEPRINT="false"
+GENERATION_DOCS_BLUEPRINT_DEFAULT="false"
 
 function usage() {
     cat <<EOF
 
 Manage one or more deployment units in one or more levels
 
-Usage: $(basename $0) -l LEVELS_LIST -r REFERENCE -m DEPLOYMENT_MODE
+Usage: $(basename $0) -l LEVELS_LIST -r REFERENCE -m DEPLOYMENT_MODE -y
                       -c ACCOUNT_UNITS_LIST
                       -p PRODUCT_UNITS_LIST
                       -a APPLICATION_UNITS_LIST
@@ -24,6 +24,7 @@ Usage: $(basename $0) -l LEVELS_LIST -r REFERENCE -m DEPLOYMENT_MODE
 where
 
 (o) -a APPLICATION_UNITS_LIST is the list of application level units to process
+(o) -b GENERATION_DOCS_BLUEPRINT  create a build print for documentation
 (o) -c ACCOUNT_UNITS_LIST     is the list of account level units to process
 (o) -g SEGMENT_UNITS_LIST     is the list of segment level units to process
     -h                        shows this text
@@ -34,14 +35,14 @@ where
 (o) -r REFERENCE              reference to use when preparing templates
 (o) -s SOLUTION_UNITS_LIST    is the list of solution level units to process
 (o) -u MULTIPLE_UNITS_LIST    is the list of multi-level units to process
-(o) -b GENERATION_DOCS_BLUEPRINT  create a build print for documentation
+(o) -y (DRYRUN=(Dryrun))      for a dryrun - show what will happen without actually updating the target
 
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
 
 ACCOUNT_LIST=\${ACCOUNT}
-GENERATION_DOCS_BLUEPRINT=${DEFAULT_GENERATION_DOCS_BLUEPRINT
+GENERATION_DOCS_BLUEPRINT=${DEFAULT_GENERATION_DOCS_BLUEPRINT}
 
 NOTES:
 
@@ -53,7 +54,7 @@ EOF
 
 function options() {
     # Parse options
-    while getopts ":a:bc:g:hl:m:n:p:r:s:u:" option; do
+    while getopts ":a:bc:g:hl:m:n:p:r:s:u:y" option; do
         case $option in
             a) APPLICATION_UNITS_LIST="${OPTARG}" ;;
             b) GENERATION_DOCS_BLUEPRINT="true" ;;
@@ -67,6 +68,7 @@ function options() {
             r) REFERENCE="${OPTARG}" ;;
             s) SOLUTION_UNITS_LIST="${OPTARG}" ;;
             u) MULTIPLE_UNITS_LIST="${OPTARG}" ;;
+            y) DRYRUN="(Dryrun) " ;;
             \?) fatalOption; return 1 ;;
             :) fatalOptionArgument; return 1 ;;
          esac
@@ -79,7 +81,7 @@ function main() {
 
   options "$@" || return $?
 
-  GENERATION_DOCS_BLUEPRINT="${GENERATION_DOCS_BLUEPRINT:-${DEFAULT_GENERATION_DOCS_BLUEPRINT}}"
+  GENERATION_DOCS_BLUEPRINT="${GENERATION_DOCS_BLUEPRINT:-${GENERATION_DOCS_BLUEPRINT_DEFAULT}}"
 
   # Process each account
   arrayFromList accounts_required "${ACCOUNTS_LIST:-${ACCOUNT}}"
@@ -94,13 +96,13 @@ function main() {
 
   for account in "${accounts_required[@]}"; do
 
-    info "Processing account ${account} ...\n"
+    info "${DRYRUN}Processing account ${account} ...\n"
 
     # setContext will have set up for the first account in the list
     if [[ "${account}" != "${ACCOUNT}" ]]; then
       export ACCOUNT="${account}"
 
-      info "Getting credentials for account ${account} ...\n"
+      info "${DRYRUN}Getting credentials for account ${account} ...\n"
 
       . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
       export ACCOUNT_AWS_ACCESS_KEY_ID_VAR="${AWS_CRED_AWS_ACCESS_KEY_ID_VAR}"
@@ -137,7 +139,7 @@ function main() {
         unit="${build_reference_parts[0]}"
 
         # Say what we are doing
-        info "Processing \"${level}\" level, \"${unit}\" unit ...\n"
+        info "${DRYRUN}Processing \"${level}\" level, \"${unit}\" unit ...\n"
 
         # Generate the template if required
         if [[ -n "${REFERENCE}" ]]; then
@@ -146,6 +148,21 @@ function main() {
 
         # Manage the stack if required
         if [[ -n "${DEPLOYMENT_MODE}" ]]; then
+          if [[ -n "${DRYRUN}" ]]; then
+              case "${ACCOUNT_PROVIDER}" in
+                azure)
+                  # TODO: Confirm what plans generate from an Azure perspective
+                  # ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
+                  # { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+
+                *)
+                  ${GENERATION_DIR}/manageStack.sh -y -q -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Planning the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ;;
+              esac
+              continue
+          fi
           if [[ "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOP}" || "${DEPLOYMENT_MODE}" == "${DEPLOYMENT_MODE_STOPSTART}" ]]; then
               case "${ACCOUNT_PROVIDER}" in
                 azure)
@@ -163,12 +180,12 @@ function main() {
               case "${ACCOUNT_PROVIDER}" in
                 azure)
                   ${GENERATION_DIR}/manageDeployment.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Deletion of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  { exit_status=$?; fatal "Processing of the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
 
                 *)
                   ${GENERATION_DIR}/manageStack.sh -l "${level}" -u "${unit}" ||
-                  { exit_status=$?; fatal "Deletion of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  { exit_status=$?; fatal "Processing of the ${level} level stack for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
               esac
           fi
@@ -178,7 +195,7 @@ function main() {
       # Update blueprint if a stack is being managed
       # - Currently the blueprint only generates a segment level blueprin
       if [[ "${level}" != "account" && "${level}" != "product" && "${GENERATION_DOCS_BLUEPRINT}" == "true" ]]; then
-          info "Generating deployment blueprint... \n"
+          info "${DRYRUN}Generating deployment blueprint... \n"
           ${GENERATION_DIR}/createTemplate.sh -l blueprint 2>/dev/null ||
               { warning "An issue occurred generating the blueprint - This will not break things but could be an issue with your components"; }
       fi

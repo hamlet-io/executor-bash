@@ -9,6 +9,7 @@ STACK_INITIATE_DEFAULT="true"
 STACK_MONITOR_DEFAULT="true"
 STACK_OPERATION_DEFAULT="update"
 STACK_WAIT_DEFAULT=30
+QUIET_MODE_DEFAULT="false"
 
 function usage() {
   cat <<EOF
@@ -25,10 +26,11 @@ where
 (m) -l LEVEL                    is the stack level - "account", "product", "segment", "solution", "application" or "multiple"
 (o) -m (STACK_INITIATE=false)   monitors but does not initiate the stack operation
 (o) -n STACK_NAME               to override standard stack naming
+(o) -q (QUIET_MODE=true)        minimise output generated
 (o) -r REGION                   is the AWS region identifier for the region in which the stack should be managed
 (m) -u DEPLOYMENT_UNIT          is the deployment unit used to determine the stack template
 (o) -w STACK_WAIT               is the interval between checking the progress of the stack operation
-(o) -y (DRYRUN=--dryrun)        for a dryrun - show what will happen without actually updating the stack
+(o) -y (DRYRUN=(Dryrun))        for a dryrun - show what will happen without actually updating the stack
 (o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
 
 (m) mandatory, (o) optional, (d) deprecated
@@ -39,6 +41,7 @@ STACK_INITIATE  = ${STACK_INITIATE_DEFAULT}
 STACK_MONITOR   = ${STACK_MONITOR_DEFAULT}
 STACK_OPERATION = ${STACK_OPERATION_DEFAULT}
 STACK_WAIT      = ${STACK_WAIT_DEFAULT} seconds
+QUIET_MODE      = ${QUIET_MODE_DEFAULT}
 
 NOTES:
 1. You must be in the correct directory corresponding to the requested stack level
@@ -55,7 +58,7 @@ EOF
 
 function options() {
   # Parse options
-  while getopts ":dhil:mn:r:u:w:yz:" option; do
+  while getopts ":dhil:mn:qr:u:w:yz:" option; do
     case "${option}" in
       d) STACK_OPERATION=delete ;;
       h) usage; return 1 ;;
@@ -63,10 +66,11 @@ function options() {
       l) LEVEL="${OPTARG}" ;;
       m) STACK_INITIATE=false ;;
       n) STACK_NAME="${OPTARG}" ;;
+      q) QUIET_MODE=true ;;
       r) REGION="${OPTARG}" ;;
       u) DEPLOYMENT_UNIT="${OPTARG}" ;;
       w) STACK_WAIT="${OPTARG}" ;;
-      y) DRYRUN="--dryrun" ;;
+      y) DRYRUN="(Dryrun) " ;;
       z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
       \?) fatalOption; return 1 ;;
       :) fatalOptionArgument; return 1  ;;
@@ -78,9 +82,10 @@ function options() {
   STACK_WAIT=${STACK_WAIT:-${STACK_WAIT_DEFAULT}}
   STACK_INITIATE=${STACK_INITIATE:-${STACK_INITIATE_DEFAULT}}
   STACK_MONITOR=${STACK_MONITOR:-${STACK_MONITOR_DEFAULT}}
+  QUIET_MODE=${QUIET_MODE:-${QUIET_MODE_DEFAULT}}
 
   # Set up the context
-  info "Preparing the context..."
+  info "${DRYRUN}Preparing the context..."
   . "${GENERATION_BASE_DIR}/execution/setStackContext.sh"
 
   return 0
@@ -191,17 +196,17 @@ function process_stack() {
         jq -c '.' < ${TEMPLATE} > "${stripped_template_file}"
 
         # Check if stack needs to be created
-        info "Check if the "${STACK_NAME}" stack is already present..."
+        info "${DRYRUN}Check if the "${STACK_NAME}" stack is already present..."
         aws --region ${REGION} cloudformation describe-stacks \
-            --stack-name $STACK_NAME > $STACK 2>/dev/null ||
+            --stack-name ${STACK_NAME} &> /dev/null ||
           STACK_OPERATION="create"
 
         [[ (-n "${DRYRUN}") && ("${STACK_OPERATION}" == "create") ]] &&
-            fatal "Dryrun not applicable when creating a stack" && return 1
+            warn "${DRYRUN}${STACK_NAME} doesn't exist yet. Skipping change set generation ..." && return 0
 
         if [[ "${STACK_OPERATION}" == "update" ]]; then
 
-          info "Update operation - submitting change set to determine update action..."
+          info "${DRYRUN}Update operation - submitting change set to determine update action..."
           INITIAL_CHANGE_SET_NAME="initial-$(date +'%s')"
           aws --region ${REGION} cloudformation create-change-set \
               --stack-name "${STACK_NAME}" --change-set-name "${INITIAL_CHANGE_SET_NAME}" \
@@ -214,12 +219,17 @@ function process_stack() {
 
           if [[ -n "${DRYRUN}" ]]; then
 
-            info "Dry run results"
-
-            # Return the change set results
+            # Obtain the change set results
             aws --region ${REGION} cloudformation describe-change-set \
-              --stack-name "${STACK_NAME}" --change-set-name "${INITIAL_CHANGE_SET_NAME}" && return $?
+              --stack-name "${STACK_NAME}" --change-set-name "${INITIAL_CHANGE_SET_NAME}" > "${potential_change_file}" || return $?
 
+            if [[ "${QUIET_MODE}" == "true" ]]; then
+              cp "${potential_change_file}" "${PLANNED_CHANGE}"
+            else
+              info "${DRYRUN}Results for ${STACK_NAME}"
+              cat "${potential_change_file}"
+            fi
+            return 0
           else
 
             # Check ChangeSet for results
@@ -334,8 +344,12 @@ function main() {
   pushd ${CF_DIR} > /dev/null 2>&1
 
   # Run the prologue script if present
-  [[ -s "${PROLOGUE}" ]] && \
-    { info "Processing prologue script ..." && . "${PROLOGUE}" || return $?; }
+  if [[ -s "${PROLOGUE}" ]]; then
+    info "${DRYRUN}Processing prologue script ..."
+    if [[ -z "${DRYRUN}" ]]; then
+      . "${PROLOGUE}" || return $?
+    fi
+  fi
 
   process_stack_status=0
   # Process the stack
@@ -346,7 +360,7 @@ function main() {
   # Check to see if the work has already been completed
   case ${process_stack_status} in
     0)
-      info "${STACK_OPERATION} completed for ${STACK_NAME}"
+      info "${DRYRUN}${STACK_OPERATION^} completed for ${STACK_NAME}"
     ;;
     *)
       fatal "Change set for ${STACK_NAME} did not complete"
@@ -356,8 +370,12 @@ function main() {
 
   # Run the epilogue script if present
   # by the epilogue script
-  [[ -s "${EPILOGUE}" ]] && \
-  { info "Processing epilogue script ..." && . "${EPILOGUE}" || return $?; }
+  if [[ -s "${EPILOGUE}" ]]; then
+    info "${DRYRUN}Processing epilogue script ..."
+    if [[ -z "${DRYRUN}" ]]; then
+      . "${EPILOGUE}" || return $?
+    fi
+  fi
 
   return 0
 }
