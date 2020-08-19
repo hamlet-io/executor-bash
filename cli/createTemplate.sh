@@ -344,6 +344,7 @@ function process_template_pass() {
 
     unitlist)
       local template="createUnitlist.ftl"
+      template_composites+=("FRAGMENT")
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
