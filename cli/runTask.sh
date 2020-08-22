@@ -160,6 +160,11 @@ fi
 CLUSTER_ARN="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.State.Attributes.ECSHOST' )"
 
 ENGINE="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.Engine' )"
+PLATFORM_VERSION="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution["aws:FargatePlatform"] | select (.!=null)' )"
+if [[ -z "${PLATFORM_VERSION}" ]]; then
+    PLATFORM_VERSION="LATEST"
+fi
+
 NETWORK_MODE="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.NetworkMode' )"
 
 DEFAULT_CONTAINER="$( echo "${COMPONENT_BLUEPRINT}" | jq -r '.Configuration.Solution.Containers | keys | .[0]' )"
@@ -205,7 +210,7 @@ CLI_CONFIGURATION="{}"
 # Task hosting engine
 case $ENGINE in
     fargate)
-        CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq '. * { launchType: "FARGATE" }' )"
+        CLI_CONFIGURATION="$( echo "${CLI_CONFIGURATION}" | jq --arg platformVersion "${PLATFORM_VERSION}" '. * { launchType: "FARGATE", platformVersion : $platformVersion  }' )"
         ;;
 esac
 
@@ -236,7 +241,12 @@ fi
 
 CLI_CONFIGURATION="$(echo "${CLI_CONFIGURATION}" | jq -c '.' )"
 
-TASK_ARN="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 --query 'tasks[0].taskArn' ${TASK_ARGS} --cli-input-json "${CLI_CONFIGURATION}" --output text || exit $? )"
+TASK_ARN="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 --query 'tasks[0].taskArn' ${TASK_ARGS} --cli-input-json "${CLI_CONFIGURATION}" --output text  )"
+
+if [[ -z "${TASK_ARN}" ]]; then
+    fatal "Task did not start"
+    exit 255
+fi
 
 info "Watching task..."
 while true; do
@@ -250,7 +260,7 @@ while true; do
     sleep $DELAY
 done
 
-# Show the exit codes and return an error if they are not 0
+# Show the exit codes if they are not 0
 TASK_FINAL_STATUS="$( aws --region "${REGION}" ecs describe-tasks --cluster "${CLUSTER_ARN}" --tasks "${TASK_ARN}" --query "tasks[?taskArn=='${TASK_ARN}'].{taskArn: taskArn, overrides: overrides, containers: containers }" || exit $? )"
 
 info "Task Results"
