@@ -64,12 +64,17 @@ case $LEVEL in
         ;;
 esac
 
-# Adjust for deployment unit subdirectories
-readarray -t legacy_files < <(find "${CF_DIR}" -mindepth 1 -maxdepth 1 -name "*${DEPLOYMENT_UNIT}*" )
+# Check for "legacy" files i.e. deployment files that are still in the segment directory 
+legacy_files=()
+if [[ -d "${CF_DIR}" ]]; then
+    readarray -t legacy_files < <(find "${CF_DIR}" -mindepth 1 -maxdepth 1 -name "*${DEPLOYMENT_UNIT}*" )
+fi
 
+# Adjust for deployment unit subdirectories
 if [[ (-d "${CF_DIR}/${DEPLOYMENT_UNIT}") || "${#legacy_files[@]}" -eq 0 ]]; then
     CF_DIR=$(getUnitCFDir "${CF_DIR}" "${LEVEL}" "${DEPLOYMENT_UNIT}" "" "${REGION}" )
 fi
+
 
 case $LEVEL in
     account)
