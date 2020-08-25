@@ -68,7 +68,7 @@ function options() {
     done
 
     #Defaults
-    INCLUDE_LOG_TAIL=${INCLUDE_LOG_TAIL:-$INCLUDE_LOG_TAIL_DEFAULT}
+    INCLUDE_LOG_TAIL="${INCLUDE_LOG_TAIL:-$INCLUDE_LOG_TAIL_DEFAULT}"
 }
 
 function main() {
@@ -76,7 +76,10 @@ function main() {
     options "$@" || return $?
 
     # Ensure mandatory arguments have been provided
-    [[ -z "${DEPLOYMENT_UNIT}" || -z "${FUNCTION_ID}" ]] && fatalMandatory; return $?
+    if [[ -z "${DEPLOYMENT_UNIT}" || -z "${FUNCTION_ID}" ]]; then
+        fatalMandatory
+        return 255
+    fi
 
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -85,7 +88,7 @@ function main() {
     checkInSegmentDirectory
 
     # Create build blueprint
-    ${GENERATION_DIR}/createBuildblueprint.sh -u "${DEPLOYMENT_UNIT}"  -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
+    ${GENERATION_DIR}/createBuildblueprint.sh -u "${DEPLOYMENT_UNIT}" >/dev/null || return $?
 
     COT_TEMPLATE_DIR="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
     BUILD_BLUEPRINT="${COT_TEMPLATE_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
