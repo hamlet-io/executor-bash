@@ -11,6 +11,8 @@ DEPLOYMENT_MONITOR_DEFAULT="true"
 DEPLOYMENT_OPERATION_DEFAULT="update"
 DEPLOYMENT_WAIT_DEFAULT=30
 DEPLOYMENT_SCOPE_DEFAULT="resourceGroup"
+QUIET_MODE_DEFAULT="false"
+DRYRUN_DEFAULT="false"
 
 function usage() {
   cat <<EOF
@@ -31,6 +33,7 @@ function usage() {
   (o) -s DEPLOYMENT_SCOPE               the deployment scope - "subscription" or "resourceGroup"
   (m) -u DEPLOYMENT_UNIT                is the deployment unit used to determine the deployment template.
   (o) -w DEPLOYMENT_WAIT                the interval between checking the progress of a stack operation.
+  (o) -y (DRYRUN=(Dryrun) )             see what would be updated if a deployment were executed without doing so.
   (o) -z DEPLOYMENT_UNIT_SUBSET         is the subset of the deployment unit required.
 
   (m) mandatory, (o) optional, (d) deprecated
@@ -42,13 +45,14 @@ function usage() {
   DEPLOYMENT_OPERATION = ${DEPLOYMENT_OPERATION_DEFAULT}
   DEPLOYMENT_WAIT      = ${DEPLOYMENT_WAIT_DEFAULT} seconds
   DEPLOYMENT_SCOPE     = ${DEPLOYMENT_SCOPE_DEFAULT}
+  QUIET_MODE           = ${QUIET_MODE_DEFAULT}
 
 EOF
 }
 
 function options() {
   # Parse options
-  while getopts ":dg:hil:mr:s:u:w:z:" option; do
+  while getopts ":dg:hil:mqr:s:u:w::yz:" option; do
     case "${option}" in
       d) DEPLOYMENT_OPERATION=delete ;;
       g) RESOURCE_GROUP="${OPTARG}" ;;
@@ -56,11 +60,12 @@ function options() {
       i) DEPLOYMENT_MONITOR=false ;;
       l) LEVEL="${OPTARG}" ;;
       m) DEPLOYMENT_INITIATE=false ;;
+      q) QUIET_MODE="true" ;;
       r) REGION="${OPTARG}" ;;
       s) DEPLOYMENT_SCOPE="${OPTARG}" ;;
       u) DEPLOYMENT_UNIT="${OPTARG}" ;;
       w) DEPLOYMENT_WAIT="${OPTARG}" ;;
-      # TODO(rossmurr4y): Impliment az cli dry-run when available - https://github.com/Azure/azure-cli/issues/5549
+      y) DRYRUN="(Dryrun) " ;;
       z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
       \?) fatalOption; return 1 ;;
       :) fatalOptionArgument; return 1;;
@@ -73,6 +78,7 @@ function options() {
   DEPLOYMENT_INITIATE=${DEPLOYMENT_INITIATE:-${DEPLOYMENT_INITIATE_DEFAULT}}
   DEPLOYMENT_MONITOR=${DEPLOYMENT_MONITOR:-${DEPLOYMENT_MONITOR_DEFAULT}}
   DEPLOYMENT_SCOPE=${DEPLOYMENT_SCOPE:-${DEPLOYMENT_SCOPE_DEFAULT}}
+  QUIET_MODE=${QUIET_MODE:-${QUIET_MODE_DEFAULT}}
 
   # Add component suffix to the deployment name.
   if [[ -n "${DEPLOYMENT_UNIT_SUBSET}" ]]; then
@@ -82,7 +88,7 @@ function options() {
   fi
 
   # Set up the context
-  info "Preparing the context..."
+  info "${DRYRUN}Preparing the context..."
   . "${GENERATION_BASE_DIR}/execution/setStackContext.sh"
 
   RESOURCE_GROUP=${RESOURCE_GROUP:-${STACK_NAME}}
@@ -191,7 +197,7 @@ function process_deployment() {
   exit_status=0
 
   # Register Resource Providers
-  info "Registering Resource Providers."
+  info "${DRYRUN}Registering Resource Providers."
   register_resource_providers "${TEMPLATE}"
 
   if [[ "${DEPLOYMENT_INITIATE}" = "true" ]]; then
@@ -202,7 +208,7 @@ function process_deployment() {
         if [[ "${DEPLOYMENT_SCOPE}" == "resourceGroup" ]]; then
 
           # Check resource group status
-          info "Creating resource group ${RESOURCE_GROUP} if required..."
+          info "${DRYRUN}Creating resource group ${RESOURCE_GROUP} if required..."
           deployment_group_exists=$(az group exists --resource-group "${RESOURCE_GROUP}")
           if [[ ${deployment_group_exists} = "false" ]]; then
             az group create --resource-group "${RESOURCE_GROUP}" --location "${REGION}" > /dev/null || return $?
@@ -230,12 +236,15 @@ function process_deployment() {
           group_deployment_args=(
             "${group_deployment_args[@]}"
             "name ${DEPLOYMENT_NAME}"
-            "no-wait"
           )
 
           # Execute the deployment to the resource group
-          info "Starting deployment of ${DEPLOYMENT_NAME} to the Resource Group ${RESOURCE_GROUP}."
-          az deployment group create ${group_deployment_args[@]/#/--} > /dev/null || return $?
+          info "${DRYRUN}Starting deployment of ${DEPLOYMENT_NAME} to the Resource Group ${RESOURCE_GROUP}."
+          if [ -z ${DRYRUN} ]; then
+            az deployment group create ${group_deployment_args[@]/#/--} --no-wait > /dev/null || return $?
+          else
+            az deployment group what-if ${group_deployment_args[@]/#/--}  --no-pretty-print > ${potential_change_file} || return $?
+          fi
 
         elif [[ "${DEPLOYMENT_SCOPE}" == "subscription" ]]; then
 
@@ -259,13 +268,26 @@ function process_deployment() {
           subscription_deployment_args=(
             "${subscription_deployment_args[@]}"
             "name ${DEPLOYMENT_NAME}"
-            "no-wait"
           )
 
           # Execute the deployment to the subscription
           info "Starting deployment of ${DEPLOYMENT_NAME} to the subscription."
-          az deployment sub create ${subscription_deployment_args[@]/#/--} > /dev/null || return $?
+          if [ -z "${DRYRUN}"]; then
+            az deployment sub create ${subscription_deployment_args[@]/#/--} --no-wait > /dev/null || return $?
+          else
+            az deployment sub what-if ${subscription_deployment_args[@]/#/--} --no-pretty-print > ${potential_change_file} || return $?
+          fi
 
+        fi
+
+        if [[ -n "${DRYRUN}" ]]; then
+          if [[ "${QUIET_MODE}" == "true" ]]; then
+            cp "${potential_change_file}" "${PLANNED_CHANGE}"
+          else
+            info "${DRYRUN}Results for ${DEPLOYMENT_NAME}"
+            cat "${potential_change_file}"
+          fi
+          return 0
         fi
 
         wait_for_deployment_execution
@@ -308,17 +330,22 @@ function main() {
   pushTempDir "manage_deployment_XXXXXX"
   export tmp_dir="$(getTopTempDir)"
   export tmpdir="${tmp_dir}"
+  potential_change_file="${tmp_dir}/potential_changes"
 
   pushd ${CF_DIR} > /dev/null 2>&1
 
   # Run the prologue script if present
   # Refresh the stack outputs in case something from pseudo stack is needed
-  [[ -s "${PROLOGUE}" ]] && \
-    { info "Processing prologue script ..." && . "${PROLOGUE}" || return $?; }
+  if [[ -s "${PROLOGUE}" ]]; then
+    info "${DRYRUN}Processing prologue script ..."
+    if [[ -z "${DRYRUN}" ]]; then
+      . "${PROLOGUE}" || return $?
+    fi
+  fi
 
   # Run the ARM Template deployment, if present
   if [[ -f "${TEMPLATE}" ]]; then
-    info "processing the deployment ..."
+    info "${DRYRUN}processing the deployment ..."
     process_deployment_status=0
 
     process_deployment || process_deployment_status=$?
@@ -326,7 +353,7 @@ function main() {
     # Check for completion
     case ${process_deployment_status} in
       0)
-        info "${DEPLOYMENT_OPERATION} completed for ${RESOURCE_GROUP:-DEPLOYMENT_NAME}."
+        info "${DRYRUN}${DEPLOYMENT_OPERATION} completed for ${RESOURCE_GROUP:-DEPLOYMENT_NAME}."
       ;;
       *)
         fatal "There was an issue during deployment."
@@ -337,8 +364,12 @@ function main() {
   # Run the epilogue script if present
   # Refresh the stack outputs in case something from the just created stack is needed
   # by the epilogue script
-  [[ -s "${EPILOGUE}" ]] && \
-  { info "Processing epilogue script ..." && . "${EPILOGUE}" || return $?; }
+  if [[ -s "${EPILOGUE}" ]]; then
+    info "Processing epilogue script ..."
+    if [[ -z "${DRYRUN}" ]]; then 
+      . "${EPILOGUE}" || return $?
+    fi
+  fi
 
   return 0
 }

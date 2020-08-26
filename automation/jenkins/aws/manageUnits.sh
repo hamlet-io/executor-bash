@@ -151,9 +151,8 @@ function main() {
           if [[ -n "${DRYRUN}" ]]; then
               case "${ACCOUNT_PROVIDER}" in
                 azure)
-                  # TODO: Confirm what plans generate from an Azure perspective
-                  # ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
-                  # { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
+                  ${GENERATION_DIR}/manageDeployment.sh -y -q -l "${level}" -u "${unit}" ||
+                  { exit_status=$?; fatal "Planning the ${level} level deployment for the ${unit} deployment unit failed"; return "${exit_status}"; }
                   ;;
 
                 *)
