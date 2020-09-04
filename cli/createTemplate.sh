@@ -312,7 +312,7 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
+  local pass_list=("managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
 
   # Initialise the components of the pass filenames
   declare -A pass_level_prefix
