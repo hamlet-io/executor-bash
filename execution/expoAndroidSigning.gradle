@@ -1,0 +1,73 @@
+apply plugin: HamletSigningOverridePlugin
+
+// This plugin provides a standardised configuration to all anrdoid signing configuation settings
+
+class HamletSigningOverridePlugin implements Plugin<Gradle> {
+
+    void apply(Gradle gradle) {
+        gradle.allprojects { project ->
+            afterEvaluate {
+                if (project.pluginManager.hasPlugin("com.android.application")) {
+
+                    println "------------------------------------------------"
+                    println "Applying Hamlet Build Overrides for publishing"
+                    println "------------------------------------------------"
+
+                    ext {
+                        // Signing Details
+                        hamletKeyAlias = System.getenv("ANDROID_DIST_KEY_ALIAS")
+                        hamletKeyPassword = System.getenv("ANDROID_DIST_KEY_PASSWORD")
+                        hamletStoreFile = System.getenv("ANDROID_DIST_KEYSTORE_FILE")
+                        hamletStorePassword = System.getenv("ANDROID_DIST_KEYSTORE_PASSWORD")
+
+                        // Override versioning and naming details
+                        hamletAppId = System.getenv("ANDROID_DIST_BUNDLE_ID")
+                        hamletVersionCode = System.getenv("ANDROID_VERSION_CODE")
+                        hamletVersionName = System.getenv("ANDROID_VERSION_NAME")
+                    }
+
+                    println "------------------------------------------------"
+                    println "Applying Hamlet Build Overrides for publishing"
+                    println "------------------------------------------------"
+
+                    // Override the App id if one has been provided via env
+                    if ( hamletAppId ) {
+                        android {
+                            defaultConfig {
+                                applicationId = hamletAppId
+                            }
+                        }
+                    }
+
+                    // We generate version details as part of the publish process to ensure they are unique
+                    android {
+                        defaultConfig {
+                            versionCode = hamletVersionCode.toInteger()
+                            versionName = hamletVersionName
+                        }
+                    }
+
+                    //Override Signing so we know where to find the details on signing
+                    android {
+                        signingConfigs {
+                            hamlet_release {
+                                keyAlias = hamletKeyAlias
+                                keyPassword = hamletKeyPassword
+                                storeFile = file(hamletStoreFile)
+                                storePassword = hamletStorePassword
+                            }
+                        }
+                    }
+
+                    android{
+                        buildTypes {
+                            all { buildType ->
+                                signingConfig = android.signingConfigs.hamlet_release
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

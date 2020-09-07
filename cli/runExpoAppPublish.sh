@@ -100,6 +100,30 @@ function decrypt_kms_file() {
     fi
 }
 
+function set_android_manifest_property() {
+    local manifest_content="$1"; shift
+    local name="$1"; shift
+    local value="$1"; shift
+
+    # Manifest Url
+    android_manifest_properties="$( echo "{}" | jq -c --arg name "${name}" --arg propValue "${value}"  '{ "@android:name" : $name, "@android:value" : $propValue }' )"
+
+    # Set the Url if its not there
+    manifest_content="$( echo "${manifest_content}" | xq --xml-output \
+        --arg propName "${name}" \
+        --argjson manifest_props "${android_manifest_properties}" \
+        'if ( .manifest.application["meta-data"] | map( select( .["@android:name"] == $propName )) | length ) == 0 then .manifest.application["meta-data"] |= . + [ $manifest_props ]  else . end' )"
+
+    #Update the Expo Update Url
+    manifest_content="$( echo "${manifest_content}" | xq --xml-output \
+        --arg propName "${name}" \
+        --argjson manifest_props "${android_manifest_properties}" \
+        'walk(if type == "object" and .["@android:name"] == $propName then . |= $manifest_props else . end )' )"
+
+    echo "${manifest_content}"
+    return 0
+}
+
 function env_setup() {
 
     # hombrew install
@@ -388,9 +412,9 @@ function main() {
     mv "${tmpdir}/ios-bundle-app.json" "./app.json"
   fi
 
-  ANDROID_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROID_BUNDLE_ID' < "${CONFIG_FILE}" )"
-  if [[ "${ANDROID_BUNDLE_ID}" != "null" && -n "${ANDROID_BUNDLE_ID}" ]]; then
-    jq --arg ANDROID_BUNDLE_ID "${ANDROID_BUNDLE_ID}" '.expo.android.package=$ANDROID_BUNDLE_ID' <  "./app.json" > "${tmpdir}/android-bundle-app.json"
+  ANDROID_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROID_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
+  if [[ "${ANDROID_DIST_BUNDLE_ID}" != "null" && -n "${ANDROID_DIST_BUNDLE_ID}" ]]; then
+    jq --arg ANDROID_DIST_BUNDLE_ID "${ANDROID_DIST_BUNDLE_ID}" '.expo.android.package=$ANDROID_DIST_BUNDLE_ID' <  "./app.json" > "${tmpdir}/android-bundle-app.json"
     mv "${tmpdir}/android-bundle-app.json" "./app.json"
   fi
 
@@ -472,19 +496,25 @@ function main() {
       BINARY_FILE_PREFIX="${build_format}"
       case "${build_format}" in
         "android")
-            BINARY_FILE_EXTENSION="apk"
-            ANDROID_KEYSTORE_ALIAS="$( jq -r '.BuildConfig.ANDROID_KEYSTORE_ALIAS' < "${CONFIG_FILE}" )"
+            BINARY_FILE_EXTENSION="aab"
+            export ANDROID_DIST_KEYSTORE_ALIAS="$( jq -r '.BuildConfig.ANDROID_DIST_KEYSTORE_ALIAS' < "${CONFIG_FILE}" )"
 
-            ANDROID_KEYSTORE_PASSWORD="$( jq -r '.BuildConfig.ANDROID_KEYSTORE_PASSWORD' < "${CONFIG_FILE}" )"
-            export ANDROID_KEYSTORE_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_KEYSTORE_PASSWORD#"base64:"}")"
+            ANDROID_DIST_KEYSTORE_PASSWORD="$( jq -r '.BuildConfig.ANDROID_KEYSTORE_PASSWORD' < "${CONFIG_FILE}" )"
+            export ANDROID_DIST_KEYSTORE_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_DIST_KEYSTORE_PASSWORD#"base64:"}")"
 
-            ANDROID_KEY_PASSWORD="$( jq -r '.BuildConfig.ANDROID_KEY_PASSWORD' < "${CONFIG_FILE}" )"
-            export ANDROID_KEY_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_KEY_PASSWORD#"base64:"}")"
+            # Set password for turtle
+            export EXPO_ANDROID_KEYSTORE_PASSWORD="${ANDROID_DIST_KEYSTORE_PASSWORD}"
 
-            ANDROID_KEYSTORE_FILE="${OPS_PATH}/android_keystore.jks"
+            ANDROID_DIST_KEY_PASSWORD="$( jq -r '.BuildConfig.ANDROID_DIST_KEY_PASSWORD' < "${CONFIG_FILE}" )"
+            export ANDROID_DIST_KEY_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_KEY_PASSWORD#"base64:"}")"
 
-            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_KEYSTORE_FILE} --keystore-alias ${ANDROID_KEYSTORE_ALIAS}"
+            export EXPO_ANDROID_KEY_PASSWORD="${ANDROID_DIST_KEY_PASSWORD}"
+
+            export ANDROID_DIST_KEYSTORE_FILE="${OPS_PATH}/android_keystore.jks"
+
+            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEYSTORE_ALIAS}"
             ;;
+
         "ios")
             BINARY_FILE_EXTENSION="ipa"
             export IOS_DIST_APPLE_ID="$( jq -r '.BuildConfig.IOS_DIST_APPLE_ID' < "${CONFIG_FILE}" )"
@@ -639,8 +669,45 @@ function main() {
 
                 if [[ "${build_format}" == "android" ]]; then
 
-                    if [[ -e "${SRC_PATH}/android/app/main/AndroidManifest.xml" ]]; then
+                    # Bundle Overrides
+                    export ANDROID_DIST_BUNDLE_ID="${ANDROID_DIST_BUNDLE_ID}"
+                    export ANDROID_VERSION_CODE="$( echo "${BUILD_NUMBER//".1"}" | cut -c 3- | rev | cut -c 3- | rev )"
+                    export ANDROID_VERSION_NAME="${EXPO_APP_VERSION}"
 
+                    if [[ -e "${SRC_PATH}/android/app/src/main/AndroidManifest.xml" ]]; then
+
+                        # Update Expo Details
+                        manifest_content="$( cat ${SRC_PATH}/android/app/src/main/AndroidManifest.xml)"
+
+                        # Update Url
+                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${MANIFEST_URL}" )"
+
+                        #Sdk Version
+                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_SDK_VERSION" "${EXPO_SDK_VERSION}" )"
+
+                        #Check for updates
+                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" "ALWAYS" )"
+
+                        #Check for updates
+                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" "10000" )"
+
+                        if [[ -n "${manifest_content}" ]]; then
+                            echo "${manifest_content}" > "${SRC_PATH}/android/app/src/main/AndroidManifest.xml"
+                        else
+                            error "Couldn't update manifest details for expo Updates"
+                            exit 128
+                        fi
+
+                        # Run the react build
+                        cd "${SRC_PATH}/android"
+                        ./gradlew -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
+
+                        if [[ -f "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" ]]; then
+                            cp "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" "${EXPO_BINARY_FILE_PATH}"
+                        else
+                            error "Could not find android build file"
+                            return 128
+                        fi
                     fi
                 fi
 
@@ -653,7 +720,7 @@ function main() {
             EXPO_BINARY_PRESIGNED_URL="$(aws --region "${AWS_REGION}" s3 presign --expires-in "${BINARY_EXPIRATION}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/${EXPO_BINARY_FILE_NAME}" )"
             DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<p><strong>${build_format}</strong> <a href="${EXPO_BINARY_PRESIGNED_URL}">${build_format} - ${EXPO_APP_VERSION} - ${BUILD_NUMBER}</a>"
 
-            if [[ "${SUBMIT_BINARY}" == "true" && -n "${IOS_TESTFLIGHT_USERNAME}" ]]; then
+            if [[ "${SUBMIT_BINARY}" == "true" ]]; then
                 case "${build_format}" in
                     "ios")
 
@@ -667,7 +734,18 @@ function main() {
                         export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
                         fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
                         DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to TestFlight</strong>"
-                    ;;
+                        ;;
+
+                    "android")
+                        if [[ -z "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
+                            fatal "Play Store details not found please provide ANDROID_PLAYSTORE_JSON_KEY"
+                            return 255
+                        fi
+
+                        info "Submitting Android build to play store"
+                        fastlane supply --aab "${EXPO_BINARY_FILE_PATH}" --track "beta" --json_key_data "${ANDROID_PLAYSTORE_JSON_KEY}"
+                        DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to Play Store</strong>"
+                        ;;
                 esac
             fi
         fi
