@@ -702,7 +702,7 @@ function main() {
 
                     # Build App
                     fastlane run cocoapods silent:"${FASTLANE_IOS_SILENT}" podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
-                    fastlane run build_ios_app silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" || return $?
+                    fastlane run build_ios_app suppress_xcode_output:"${FASTLANE_IOS_SILENT}" silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" include_symbols:"true" include_bitcode:"true" || return $?
                 fi
 
 
