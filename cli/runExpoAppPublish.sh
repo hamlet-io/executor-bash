@@ -135,7 +135,11 @@ function env_setup() {
 
     brew cask upgrade || return $?
     brew cask install \
-        fastlane || return $?
+        fastlane \
+        android-studio || return $?
+
+    # Install android sdk components
+    ~/Library/Android/sdk/tools/bin/sdkmanager 'platforms;android-30' 'platforms;android-10'
 
     # Make sure we have required software installed
     pip3 install \
@@ -256,6 +260,13 @@ function main() {
 
    # make sure fastlane is on path
    export PATH="$HOME/.fastlane/bin:$PATH"
+
+  # Add android SDK tools to path
+  export ANDROID_HOME=$HOME/Library/Android/sdk
+  export PATH=$PATH:$ANDROID_HOME/emulator
+  export PATH=$PATH:$ANDROID_HOME/tools
+  export PATH=$PATH:$ANDROID_HOME/tools/bin
+  export PATH=$PATH:$ANDROID_HOME/platform-tools
 
   # Ensure mandatory arguments have been provided
   [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory && return 1
