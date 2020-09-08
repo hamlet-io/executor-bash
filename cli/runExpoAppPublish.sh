@@ -527,7 +527,7 @@ function main() {
       case "${build_format}" in
         "android")
             BINARY_FILE_EXTENSION="aab"
-            export ANDROID_DIST_KEYSTORE_ALIAS="$( jq -r '.BuildConfig.ANDROID_DIST_KEYSTORE_ALIAS' < "${CONFIG_FILE}" )"
+            export ANDROID_DIST_KEY_ALIAS="$( jq -r '.BuildConfig.ANDROID_DIST_KEY_ALIAS' < "${CONFIG_FILE}" )"
 
             ANDROID_DIST_KEYSTORE_PASSWORD="$( jq -r '.BuildConfig.ANDROID_KEYSTORE_PASSWORD' < "${CONFIG_FILE}" )"
             export ANDROID_DIST_KEYSTORE_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_DIST_KEYSTORE_PASSWORD#"base64:"}")"
@@ -545,7 +545,7 @@ function main() {
             ANDROID_PLAYSTORE_JSON_KEY="$(jq -r '.BuildConfig.ANDROID_PLAYSTORE_JSON_KEY' < "${CONFIG_FILE}")"
             export ANDROID_PLAYSTORE_JSON_KEY="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_PLAYSTORE_JSON_KEY#"base64:"}")"
 
-            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEYSTORE_ALIAS}"
+            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEY_ALIAS}"
             ;;
 
         "ios")
