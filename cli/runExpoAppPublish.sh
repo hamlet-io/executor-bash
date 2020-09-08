@@ -697,7 +697,7 @@ function main() {
                     # Build App
                     fastlane run cocoapods podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
 
-                    if [[ "${BUILD_LOGS}" == "true" ]];t hen
+                    if [[ "${BUILD_LOGS}" == "true" ]]; then
                         FASTLANE_IOS_SILENT="false"
                     else
                         FASTLANE_IOS_SILENT="true"
