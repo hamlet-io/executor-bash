@@ -739,7 +739,7 @@ function main() {
 
                         gradle_args="--console=plain"
                         if [[ "${BUILD_LOGS}" == "false" ]]; then
-                            gradle_args="${gradle_args --quiet}"
+                            gradle_args="${gradle_args} --quiet"
                         fi
 
                         # Run the react build
