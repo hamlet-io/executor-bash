@@ -139,7 +139,18 @@ function env_setup() {
         android-studio || return $?
 
     # Install android sdk components
-    ~/Library/Android/sdk/tools/bin/sdkmanager 'platforms;android-30' 'platforms;android-10'
+    # - Download the command line tools so that we can then install the appropriate tools in a shared location
+    export ANDROID_HOME=$HOME/Library/Android/sdk
+    rm -rf /usr/local/share/android-commandlinetools
+    mkdir -p /usr/local/share/android-commandlinetools
+    curl -o /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip --url https://dl.google.com/android/repository/commandlinetools-mac-6609375_latest.zip
+    unzip /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip -d /usr/local/share/android-commandlinetools/
+
+    # Accept Licenses
+    yes |  /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses
+
+    # Install required packages
+    /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} 'cmdline-tools;latest' 'platforms;android-30' 'platforms;android-10'
 
     # Make sure we have required software installed
     pip3 install \
