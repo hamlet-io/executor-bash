@@ -74,6 +74,8 @@ DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 
 DEFAULT_APP_VERSION_SOURCE="manifest"
 
+DEFAULT_BUILD_LOGS="false"
+
 export FASTLANE_SKIP_UPDATE_CHECK="true"
 export FASTLANE_HIDE_CHANGELOG="true"
 export FASTLANE_DISABLE_COLORS=1
@@ -183,6 +185,7 @@ where
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
 (0) -q QR_BUILD_FORMATS       specify the formats you would like to generate QR urls for
 (o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
+(o) -l BUILD_LOGS             show the build logs for binary builds
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -196,6 +199,7 @@ QR_BUILD_FORMATS = ${DEFAULT_QR_BUILD_FORMATS}
 BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
+BUILD_LOGS = ${DEFAULT_BUILD_LOGS}
 
 NOTES:
 RELEASE_CHANNEL default is environment
@@ -217,6 +221,9 @@ function options() {
                 ;;
             h)
                 usage
+                ;;
+            l)
+                BUILD_LOGS="true"
                 ;;
             m)
                 SUBMIT_BINARY="true"
@@ -258,6 +265,7 @@ function options() {
     BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
+    BUILD_LOGS="${BUILD_LOGS:-${BUILD_LOGS}}"
 }
 
 
@@ -688,7 +696,14 @@ function main() {
 
                     # Build App
                     fastlane run cocoapods podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
-                    fastlane run build_ios_app workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" || return $?
+
+                    if [[ "${BUILD_LOGS}" == "true" ]];t hen
+                        FASTLANE_IOS_SILENT="false"
+                    else
+                        FASTLANE_IOS_SILENT="true"
+                    fi
+
+                    fastlane run build_ios_app silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" || return $?
                 fi
 
 
@@ -723,9 +738,14 @@ function main() {
                             exit 128
                         fi
 
+                        gradle_args="--console=plain"
+                        if [[ "${BUILD_LOGS}" == "false" ]]; then
+                            gradle_args="${gradle_args --quiet}"
+                        fi
+
                         # Run the react build
                         cd "${SRC_PATH}/android"
-                        ./gradlew -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
+                        ./gradlew $gradle_args -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
 
                         if [[ -f "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" ]]; then
                             cp "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" "${EXPO_BINARY_FILE_PATH}"
