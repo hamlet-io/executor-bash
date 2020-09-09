@@ -92,7 +92,7 @@ function get_configfile_property() {
     local kmsPrefix="$1"; shift
     local awsRegion="${1}"; shift
 
-    propertyValue="$( jq -r -arg propertyName "${propertyName}" '.BuildConfig[$propertyName]' < "${CONFIG_FILE}" )"
+    propertyValue="$( jq -r --arg propertyName "${propertyName}" '.BuildConfig[$propertyName] | select (.!=null)' < "${CONFIG_FILE}" )"
 
     if [[ "${propertyValue}" == ${kmsPrefix}* ]]; then
         echo "AWS KMS - Decrypting property ${propertyName}..."
