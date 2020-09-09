@@ -7,6 +7,9 @@ class HamletSigningOverridePlugin implements Plugin<Gradle> {
     void apply(Gradle gradle) {
         gradle.allprojects { project ->
             afterEvaluate {
+
+
+
                 if (project.pluginManager.hasPlugin("com.android.application")) {
 
                     println "------------------------------------------------"
@@ -24,11 +27,16 @@ class HamletSigningOverridePlugin implements Plugin<Gradle> {
                         hamletAppId = System.getenv("ANDROID_DIST_BUNDLE_ID")
                         hamletVersionCode = System.getenv("ANDROID_VERSION_CODE")
                         hamletVersionName = System.getenv("ANDROID_VERSION_NAME")
+
+                        // Force override of build dir so we can find the builds
+                        hamletBuildDir = System.getenv("BINARY_PATH")
                     }
 
                     println "------------------------------------------------"
                     println "Applying Hamlet Build Overrides for publishing"
                     println "------------------------------------------------"
+
+                    buildDir = hamletBuildDir
 
                     // Override the App id if one has been provided via env
                     if ( hamletAppId ) {
