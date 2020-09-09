@@ -339,7 +339,7 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # Operations data - Credentials, config etc.
   OPSDATA_BUCKET="$( jq -r '.BuildConfig.OPSDATA_BUCKET' < "${CONFIG_FILE}" )"
@@ -373,7 +373,7 @@ function main() {
 
   # Prepare the code build environment
   info "Getting source code from from s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip"
-  aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip" "${tmpdir}/scripts.zip" || return $?
+  aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip" "${tmpdir}/scripts.zip" || return $?
 
   unzip -q "${tmpdir}/scripts.zip" -d "${SRC_PATH}" || return $?
 
@@ -392,7 +392,7 @@ function main() {
 
   # decrypt secrets from credentials store
   info "Getting credentials from s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}"
-  aws --region "${AWS_REGION}" s3 sync --no-progress "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
+  aws --region "${AWS_REGION}" s3 sync --only-show-errors "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
   find "${OPS_PATH}" -name \*.kms -exec decrypt_kms_file "${AWS_REGION}" "{}" \;
 
   # get the version of the expo SDK which is required
@@ -427,7 +427,7 @@ function main() {
   if [[ -n "${EXPO_CURRENT_SDK_BUILD}" ]]; then
     for sdk_file in "${EXPO_CURRENT_SDK_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
-            aws --region "${AWS_REGION}" s3 cp --no-progress "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
+            aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
             break
         fi
     done
@@ -496,7 +496,7 @@ function main() {
   fi
 
   info "Copying OTA to CDN"
-  aws --region "${AWS_REGION}" s3 sync --no-progress --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}" || return $?
+  aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}" || return $?
 
   # Multi-manifest is only supported or required by the Expo Client based apps
   # Not required for bare or native expo worflows
@@ -505,7 +505,7 @@ function main() {
     EXPO_MULTI_PUBLIC_URL="${PUBLIC_URL}/multi"
 
     # Get all of the base OTA updates
-    aws --region "${AWS_REGION}" s3 cp --no-progress --recursive --exclude "${EXPO_SDK_VERSION}/*" --exclude "${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
+    aws --region "${AWS_REGION}" s3 cp --only-show-errors --recursive --exclude "${EXPO_SDK_VERSION}/*" --exclude "${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
     EXPO_EXPORT_MERGE_ARGUMENTS=""
     for dir in ${SRC_PATH}/app/dist/packages/*/ ; do
         EXPO_EXPORT_MERGE_ARGUMENTS="${EXPO_EXPORT_MERGE_ARGUMENTS} --merge-src-dir "${dir}""
@@ -535,7 +535,7 @@ function main() {
 
     fi
 
-    aws --region "${AWS_REGION}" s3 sync --no-progress "${SRC_PATH}/app/dist/multi/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/multi" || return $?
+    aws --region "${AWS_REGION}" s3 sync --only-show-errors "${SRC_PATH}/app/dist/multi/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/multi" || return $?
   fi
 
    DETAILED_HTML_BINARY_MESSAGE="<h4>Expo Binary Builds</h4>"
@@ -768,7 +768,7 @@ function main() {
 
 
         if [[ -f "${EXPO_BINARY_FILE_PATH}" ]]; then
-            aws --region "${AWS_REGION}" s3 sync --no-progress --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
+            aws --region "${AWS_REGION}" s3 sync --only-show-errors --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
             EXPO_BINARY_PRESIGNED_URL="$(aws --region "${AWS_REGION}" s3 presign --expires-in "${BINARY_EXPIRATION}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/${EXPO_BINARY_FILE_NAME}" )"
             DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<p><strong>${build_format}</strong> <a href="${EXPO_BINARY_PRESIGNED_URL}">${build_format} - ${EXPO_APP_VERSION} - ${BUILD_NUMBER}</a>"
 
@@ -835,7 +835,7 @@ function main() {
   DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_QR_MESSAGE} ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
   echo "${DETAILED_HTML}" > "${REPORTS_PATH}/build-report.html"
 
-  aws --region "${AWS_REGION}" s3 sync  --no-progress "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
+  aws --region "${AWS_REGION}" s3 sync  --only-show-errors "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
 
   if [[ "${BUILD_BINARY}" == "true" ]]; then
     if [[ "${SUBMIT_BINARY}" == "true" ]]; then
