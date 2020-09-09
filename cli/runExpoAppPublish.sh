@@ -75,6 +75,7 @@ DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 DEFAULT_APP_VERSION_SOURCE="manifest"
 
 DEFAULT_BUILD_LOGS="false"
+DEFAULT_KMS_PREFIX="base64:"
 
 export FASTLANE_SKIP_UPDATE_CHECK="true"
 export FASTLANE_HIDE_CHANGELOG="true"
@@ -84,6 +85,23 @@ tmpdir="$(getTempDir "cote_inf_XXX")"
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+
+function get_configfile_property() {
+    local configfile="$1"; shift
+    local propertyName="$1"; shift
+    local kmsPrefix="$1"; shift
+    local awsRegion="${1}"; shift
+
+    propertyValue="$( jq -r -arg propertyName "${propertyName}" '.BuildConfig[$propertyName]' < "${CONFIG_FILE}" )"
+
+    if [[ -n "${$propertyValue}" && "${propertyValue}" == ${kmsPrefix}*) ]]; then
+        echo "AWS KMS - Decrypting property ${propertyName}..."
+        propertyValue"$( decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128 )"
+    fi
+
+    declare $propertyName="${propertyValue}"
+    return 0
+}
 
 function decrypt_kms_file() {
     local region="$1"; shift
@@ -222,6 +240,9 @@ function options() {
             h)
                 usage
                 ;;
+            k)
+                KMS_PREFIX="${OPTARG}"
+                ;;
             l)
                 BUILD_LOGS="true"
                 ;;
@@ -266,6 +287,7 @@ function options() {
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
+    KMS_PREFIX="${KMS_PREFIX:-${DEFAULT_KMS_PREFIX}}"
 }
 
 
@@ -527,45 +549,31 @@ function main() {
       case "${build_format}" in
         "android")
             BINARY_FILE_EXTENSION="aab"
-            export ANDROID_DIST_KEY_ALIAS="$( jq -r '.BuildConfig.ANDROID_DIST_KEY_ALIAS' < "${CONFIG_FILE}" )"
-
-            ANDROID_DIST_KEYSTORE_PASSWORD="$( jq -r '.BuildConfig.ANDROID_KEYSTORE_PASSWORD' < "${CONFIG_FILE}" )"
-            export ANDROID_DIST_KEYSTORE_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_DIST_KEYSTORE_PASSWORD#"base64:"}")"
-
-            # Set password for turtle
-            export EXPO_ANDROID_KEYSTORE_PASSWORD="${ANDROID_DIST_KEYSTORE_PASSWORD}"
-
-            ANDROID_DIST_KEY_PASSWORD="$( jq -r '.BuildConfig.ANDROID_DIST_KEY_PASSWORD' < "${CONFIG_FILE}" )"
-            export ANDROID_DIST_KEY_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_KEY_PASSWORD#"base64:"}")"
-
-            export EXPO_ANDROID_KEY_PASSWORD="${ANDROID_DIST_KEY_PASSWORD}"
 
             export ANDROID_DIST_KEYSTORE_FILE="${OPS_PATH}/android_keystore.jks"
 
-            ANDROID_PLAYSTORE_JSON_KEY="$(jq -r '.BuildConfig.ANDROID_PLAYSTORE_JSON_KEY' < "${CONFIG_FILE}")"
-            export ANDROID_PLAYSTORE_JSON_KEY="$( decrypt_kms_string "${AWS_REGION}" "${ANDROID_PLAYSTORE_JSON_KEY#"base64:"}")"
+            get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_KEYSTORE_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_KEY_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_KEY_ALIAS" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "ANDROID_PLAYSTORE_JSON_KEY" "${KMS_PREFIX}" "${AWS_REGION}"
 
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEY_ALIAS}"
             ;;
 
         "ios")
             BINARY_FILE_EXTENSION="ipa"
-            export IOS_DIST_APPLE_ID="$( jq -r '.BuildConfig.IOS_DIST_APPLE_ID' < "${CONFIG_FILE}" )"
-            export IOS_DIST_APP_ID="$( jq -r '.BuildConfig.IOS_DIST_APP_ID' < "${CONFIG_FILE}" )"
-
-            export IOS_DIST_EXPORT_METHOD="$( jq -r '.BuildConfig.IOS_DIST_EXPORT_METHOD' < "${CONFIG_FILE}" )"
-
-            export IOS_TESTFLIGHT_USERNAME="$(jq -r '.BuildConfig.IOS_TESTFLIGHT_USERNAME' < "${CONFIG_FILE}")"
-            IOS_TESTFLIGHT_PASSWORD="$(jq -r '.BuildConfig.IOS_TESTFLIGHT_PASSWORD' < "${CONFIG_FILE}")"
-            export IOS_TESTFLIGHT_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${IOS_TESTFLIGHT_PASSWORD#"base64:"}")"
-
-            IOS_DIST_P12_PASSWORD="$( jq -r '.BuildConfig.IOS_DIST_P12_PASSWORD' < "${CONFIG_FILE}" )"
-            export EXPO_IOS_DIST_P12_PASSWORD="$( decrypt_kms_string "${AWS_REGION}" "${IOS_DIST_P12_PASSWORD#"base64:"}")"
 
             export IOS_DIST_PROVISIONING_PROFILE_BASE="ios_profile"
             export IOS_DIST_PROVISIONING_PROFILE_EXTENSION=".mobileprovision"
             export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
+
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}".
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_EXPORT_METHOD" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_USERNAME" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
 
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
             ;;
