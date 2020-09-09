@@ -754,6 +754,7 @@ function main() {
                         # Run the react build
                         cd "${SRC_PATH}/android"
                         ./gradlew $gradle_args -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
+                        cd "${SRC_PATH}"
 
                         if [[ -f "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" ]]; then
                             cp "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" "${EXPO_BINARY_FILE_PATH}"
