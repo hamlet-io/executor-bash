@@ -96,7 +96,7 @@ function get_configfile_property() {
 
     if [[ "${propertyValue}" == ${kmsPrefix}* ]]; then
         echo "AWS KMS - Decrypting property ${propertyName}..."
-        propertyValue"$( decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128 )"
+        propertyValue="$( decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128 )"
     fi
 
     declare $propertyName="${propertyValue}"
