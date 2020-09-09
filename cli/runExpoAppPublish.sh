@@ -99,7 +99,7 @@ function get_configfile_property() {
         propertyValue="$( decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128 )"
     fi
 
-    declare $propertyName="${propertyValue}"
+    export -gx "${propertyName}=${propertyValue}"
     return 0
 }
 
