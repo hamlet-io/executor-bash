@@ -94,7 +94,7 @@ function get_configfile_property() {
 
     propertyValue="$( jq -r -arg propertyName "${propertyName}" '.BuildConfig[$propertyName]' < "${CONFIG_FILE}" )"
 
-    if [[ -n "${$propertyValue}" && "${propertyValue}" == ${kmsPrefix}* ]]; then
+    if [[ "${propertyValue}" == ${kmsPrefix}* ]]; then
         echo "AWS KMS - Decrypting property ${propertyName}..."
         propertyValue"$( decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128 )"
     fi
