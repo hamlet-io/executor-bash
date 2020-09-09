@@ -758,7 +758,6 @@ function main() {
                         if [[ -f "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" ]]; then
                             cp "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" "${EXPO_BINARY_FILE_PATH}"
                         else
-                            tree "${SRC_PATH}/android/app/build/outputs/"
                             error "Could not find android build file"
                             return 128
                         fi
