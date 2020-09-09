@@ -755,10 +755,10 @@ function main() {
                         cd "${SRC_PATH}/android"
                         ./gradlew $gradle_args -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
 
-                        if [[ -f "${BINARY_PATH}/app.aab" ]]; then
-                            cp "${BINARY_PATH}/app.aab" "${EXPO_BINARY_FILE_PATH}"
+                        if [[ -f "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" ]]; then
+                            cp "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" "${EXPO_BINARY_FILE_PATH}"
                         else
-                            ls -la "${BINARY_PATH}"
+                            tree "${SRC_PATH}/android/app/build/outputs/"
                             error "Could not find android build file"
                             return 128
                         fi
