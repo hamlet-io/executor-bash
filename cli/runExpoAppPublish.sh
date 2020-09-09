@@ -92,6 +92,8 @@ function get_configfile_property() {
     local kmsPrefix="$1"; shift
     local awsRegion="${1}"; shift
 
+    # Sets a global env var based on the property name provided and a lookup of that property in the build config file
+    # Also decrypts the value if it's encrypted by KMS
     propertyValue="$( jq -r --arg propertyName "${propertyName}" '.BuildConfig[$propertyName] | select (.!=null)' < "${CONFIG_FILE}" )"
 
     if [[ "${propertyValue}" == ${kmsPrefix}* ]]; then
@@ -125,6 +127,7 @@ function set_android_manifest_property() {
     local name="$1"; shift
     local value="$1"; shift
 
+    # Upserts properties into the android manfiest metadata
     # Manifest Url
     android_manifest_properties="$( echo "{}" | jq -c --arg name "${name}" --arg propValue "${value}"  '{ "@android:name" : $name, "@android:value" : $propValue }' )"
 
@@ -323,8 +326,7 @@ function main() {
   BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
 
   # Make sure we are in the build source directory
-  export BINARY_PATH="${AUTOMATION_DATA_DIR}/binary"
-
+  BINARY_PATH="${AUTOMATION_DATA_DIR}/binary"
   SRC_PATH="${AUTOMATION_DATA_DIR}/src"
   OPS_PATH="${AUTOMATION_DATA_DIR}/ops"
   REPORTS_PATH="${AUTOMATION_DATA_DIR}/reports"
@@ -558,7 +560,7 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_KEY_ALIAS" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "ANDROID_PLAYSTORE_JSON_KEY" "${KMS_PREFIX}" "${AWS_REGION}"
 
-            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEY_ALIAS}"
+            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEY_ALIAS} --type apk -mode release"
             ;;
 
         "ios")
@@ -569,7 +571,7 @@ function main() {
             export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
 
-            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}".
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_EXPORT_METHOD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_USERNAME" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -728,7 +730,7 @@ function main() {
                         manifest_content="$( cat ${SRC_PATH}/android/app/src/main/AndroidManifest.xml)"
 
                         # Update Url
-                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${MANIFEST_URL}" )"
+                        manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${EXPO_MANIFEST_URL}" )"
 
                         #Sdk Version
                         manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_SDK_VERSION" "${EXPO_SDK_VERSION}" )"
