@@ -549,7 +549,7 @@ function main() {
       BINARY_FILE_PREFIX="${build_format}"
       case "${build_format}" in
         "android")
-            BINARY_FILE_EXTENSION="aab"
+            BINARY_FILE_EXTENSION="apk"
 
             export ANDROID_DIST_KEYSTORE_FILE="${OPS_PATH}/android_keystore.jks"
 
@@ -755,8 +755,8 @@ function main() {
                         cd "${SRC_PATH}/android"
                         ./gradlew $gradle_args -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
 
-                        if [[ -f "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" ]]; then
-                            cp "${SRC_PATH}/android/app/build/outputs/bundle/release/app.aab" "${EXPO_BINARY_FILE_PATH}"
+                        if [[ -f "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" ]]; then
+                            cp "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" "${EXPO_BINARY_FILE_PATH}"
                         else
                             tree "${SRC_PATH}/android/app/build/outputs/"
                             error "Could not find android build file"
@@ -797,7 +797,7 @@ function main() {
                         fi
 
                         info "Submitting Android build to play store"
-                        fastlane supply --aab "${EXPO_BINARY_FILE_PATH}" --track "beta" --json_key_data "${ANDROID_PLAYSTORE_JSON_KEY}"
+                        fastlane supply --apk "${EXPO_BINARY_FILE_PATH}" --track "beta" --json_key_data "${ANDROID_PLAYSTORE_JSON_KEY}"
                         DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to Play Store</strong>"
                         ;;
                 esac
