@@ -8,8 +8,6 @@ class HamletSigningOverridePlugin implements Plugin<Gradle> {
         gradle.allprojects { project ->
             afterEvaluate {
 
-
-
                 if (project.pluginManager.hasPlugin("com.android.application")) {
 
                     println "------------------------------------------------"
