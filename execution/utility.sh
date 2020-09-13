@@ -1257,6 +1257,15 @@ function manage_ec2_volume_encryption() {
 }
 
 #-- ECS --
+function manage_ecs_account_settings() {
+  local region="$1"; shift
+  local setting="$1"; shift
+  local state="$1"; shift
+
+  aws --region "${region}" ecs put-account-setting-default --name "${setting}" --value "${state}" || return $?
+  aws --region "${region}" ecs put-account-setting --name "${setting}" --value "${state}" || return $?
+}
+
 function create_ecs_scheduled_task() {
   local region="$1"; shift
   local ruleName="$1"; shift
