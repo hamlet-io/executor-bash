@@ -762,13 +762,13 @@ function process_template() {
   #
   # The cleanup logic for >=2.0.1 cmdb is also more robust, as it will remove files
   # that are no longer generated.
-  local deployment_unit_state_subdirectories="false"
-  case "${level}" in
-    unitlist|blueprint|buildblueprint)
-      # No subdirectories for deployment units
-      ;;
-    *)
-      if [[ -d "${cf_dir_default}" ]]; then
+  if [[ -z "${OUTPUT_DIR}" ]]; then
+    local deployment_unit_state_subdirectories="false"
+    case "${level}" in
+      unitlist|blueprint|buildblueprint)
+        # No subdirectories for deployment units
+        ;;
+      *)
         readarray -t legacy_files < <(find "${cf_dir_default}" -mindepth 1 -maxdepth 1 -type f -name "*${deployment_unit}*" )
 
         if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
@@ -780,7 +780,8 @@ function process_template() {
         deployment_unit_state_subdirectories="true"
       fi
       ;;
-  esac
+    esac
+  fi
 
   # Permit an override
   cf_dir="${OUTPUT_DIR:-${cf_dir_default}}"
