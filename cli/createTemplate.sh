@@ -762,9 +762,14 @@ function process_template() {
       # No subdirectories for deployment units
       ;;
     *)
-      readarray -t legacy_files < <(find "${cf_dir_default}" -mindepth 1 -maxdepth 1 -type f -name "*${deployment_unit}*" )
+      if [[ -d "${cf_dir_default}" ]]; then
+        readarray -t legacy_files < <(find "${cf_dir_default}" -mindepth 1 -maxdepth 1 -type f -name "*${deployment_unit}*" )
 
-      if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
+        if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
+          local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
+          deployment_unit_state_subdirectories="true"
+        fi
+      else
         local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
         deployment_unit_state_subdirectories="true"
       fi
