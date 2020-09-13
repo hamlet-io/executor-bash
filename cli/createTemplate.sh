@@ -129,63 +129,6 @@ function options() {
         ;;
     esac
 
-    # Add default composite fragments including end fragment
-    if [[ (("${GENERATION_USE_CACHE}" != "true")  &&
-        ("${GENERATION_USE_FRAGMENTS_CACHE}" != "true")) ||
-        (! -f "${CACHE_DIR}/composite_account.ftl") ]]; then
-
-        TEMPLATE_COMPOSITES=("account" "fragment")
-        for composite in "${TEMPLATE_COMPOSITES[@]}"; do
-
-          # define the array holding the list of composite fragment filenames
-          declare -ga "${composite}_array"
-
-          # Legacy start fragments
-          for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start*.ftl; do
-              $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
-              addToArray "${composite}_array" "${fragment}"
-          done
-
-          # only support provision of fragment files via cmdb
-          # others can now be provided via the plugin mechanism
-          if [[ "${composite}" == "fragment" ]]; then
-              for blueprint_alternate_dir in "${blueprint_alternate_dirs[@]}"; do
-                  [[ (-z "${blueprint_alternate_dir}") || (! -d "${blueprint_alternate_dir}") ]] && continue
-                  for fragment in "${blueprint_alternate_dir}"/${composite}_*.ftl; do
-                      fragment_name="$(fileName "${fragment}")"
-                      $(inArray "${composite}_array" "${fragment_name}") && continue
-                      addToArray "${composite}_array" "${fragment}"
-                  done
-              done
-          fi
-
-          # Legacy fragments
-          for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/${composite}_*.ftl; do
-              $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
-              addToArray "${composite}_array" "${fragment}"
-          done
-
-          # Legacy end fragments
-          for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/*end.ftl; do
-              $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
-              addToArray "${composite}_array" "${fragment}"
-          done
-        done
-
-        # create the template composites
-        for composite in "${TEMPLATE_COMPOSITES[@]}"; do
-            namedef_supported &&
-            declare -n composite_array="${composite}_array" ||
-            eval "declare composite_array=(\"\${${composite}_array[@]}\")"
-            debug "${composite^^}=${composite_array[*]}"
-            cat "${composite_array[@]}" > "${CACHE_DIR}/composite_${composite}.ftl"
-        done
-
-        for composite in "segment" "solution" "application" "id" "name" "policy" "resource"; do
-            rm -rf "${CACHE_DIR}/composite_${composite}.ftl"
-        done
-    fi
-
     # Assemble settings
     export COMPOSITE_SETTINGS="${CACHE_DIR}/composite_settings.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
@@ -226,7 +169,62 @@ function options() {
 
   fi
 
+  # Add default composite fragments including end fragment
+  if [[ (("${GENERATION_USE_CACHE}" != "true")  &&
+      ("${GENERATION_USE_FRAGMENTS_CACHE}" != "true")) ||
+      (! -f "${CACHE_DIR}/composite_account.ftl") ]]; then
 
+      TEMPLATE_COMPOSITES=("account" "fragment")
+      for composite in "${TEMPLATE_COMPOSITES[@]}"; do
+
+        # define the array holding the list of composite fragment filenames
+        declare -ga "${composite}_array"
+
+        # Legacy start fragments
+        for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start*.ftl; do
+            $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
+            addToArray "${composite}_array" "${fragment}"
+        done
+
+        # only support provision of fragment files via cmdb
+        # others can now be provided via the plugin mechanism
+        if [[ "${composite}" == "fragment" ]]; then
+            for blueprint_alternate_dir in "${blueprint_alternate_dirs[@]}"; do
+                [[ (-z "${blueprint_alternate_dir}") || (! -d "${blueprint_alternate_dir}") ]] && continue
+                for fragment in "${blueprint_alternate_dir}"/${composite}_*.ftl; do
+                    fragment_name="$(fileName "${fragment}")"
+                    $(inArray "${composite}_array" "${fragment_name}") && continue
+                    addToArray "${composite}_array" "${fragment}"
+                done
+            done
+        fi
+
+        # Legacy fragments
+        for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/${composite}_*.ftl; do
+            $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
+            addToArray "${composite}_array" "${fragment}"
+        done
+
+        # Legacy end fragments
+        for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/*end.ftl; do
+            $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
+            addToArray "${composite}_array" "${fragment}"
+        done
+      done
+
+      # create the template composites
+      for composite in "${TEMPLATE_COMPOSITES[@]}"; do
+          namedef_supported &&
+          declare -n composite_array="${composite}_array" ||
+          eval "declare composite_array=(\"\${${composite}_array[@]}\")"
+          debug "${composite^^}=${composite_array[*]}"
+          cat "${composite_array[@]}" > "${CACHE_DIR}/composite_${composite}.ftl"
+      done
+
+      for composite in "segment" "solution" "application" "id" "name" "policy" "resource"; do
+          rm -rf "${CACHE_DIR}/composite_${composite}.ftl"
+      done
+  fi
 
   return 0
 }
