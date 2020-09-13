@@ -774,12 +774,11 @@ function process_template() {
         if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
           local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
           deployment_unit_state_subdirectories="true"
+        else
+          local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
+          deployment_unit_state_subdirectories="true"
         fi
-      else
-        local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
-        deployment_unit_state_subdirectories="true"
-      fi
-      ;;
+        ;;
     esac
   fi
 
