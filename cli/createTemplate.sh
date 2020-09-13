@@ -211,6 +211,9 @@ function options() {
   # Specific input control for mock input
   if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
 
+    export CACHE_DIR="${GENERATION_BASE_DIR}/.cache"
+    mkdir -p "${CACHE_DIR}"
+
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatalMandatory
       return 1

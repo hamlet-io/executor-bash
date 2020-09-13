@@ -60,8 +60,8 @@ function process_template() {
   # of the account and product trees
   # The blueprint is handled specially as its logic is different to the others
 
-  local GENERATION_DATA_DIR="${GENERATION_BASE_DIR}/build/"
-  local CACHE_DIR="${GENERATION_BASE_DIR}/cache"
+  local GENERATION_DATA_DIR="${GENERATION_BASE_DIR}/.build/"
+  local CACHE_DIR="${GENERATION_BASE_DIR}/.cache"
   mkdir -p "${CACHE_DIR}"
 
   # Filename parts
