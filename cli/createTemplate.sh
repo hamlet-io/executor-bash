@@ -11,6 +11,7 @@ DEPLOYMENT_MODE_DEFAULT="update"
 GENERATION_PROVIDERS_DEFAULT="aws"
 GENERATION_FRAMEWORK_DEFAULT="cf"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
+DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
 
 arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
 
@@ -36,6 +37,7 @@ where
 (o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
 (o) -p GENERATION_PROVIDER     is a provider to load for template generation - multiple providers can be added with extra arguments
 (o) -f GENERATION_FRAMEWORK    is the output framework to use for template generation
+(o) -x DISABLE_OUTPUT_CLEANUP  disable removing existing outputs before adding new outputs
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -47,6 +49,7 @@ DEPLOYMENT_MODE         = "${DEPLOYMENT_MODE_DEFAULT}"
 GENERATION_PROVIDERS    = "${GENERATION_PROVIDERS_DEFAULT}"
 GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
 GENERATION_INPUT_SOURCE = "${GENRATION_INPUT_SOURCE_DEFAULT}"
+DISABLE_OUTPUT_CLEANUP  = "${DISABLE_OUTPUT_CLEANUP_DEFAULT}"
 
 NOTES:
 
@@ -61,7 +64,7 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":c:d:f:g:hi:l:o:p:q:r:u:z:" option; do
+  while getopts ":c:d:f:g:hi:l:o:p:q:r:u:xz:" option; do
       case "${option}" in
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
@@ -78,6 +81,7 @@ function options() {
           q) REQUEST_REFERENCE="${OPTARG}" ;;
           r) REGION="${OPTARG}" ;;
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
+          x) DISABLE_OUTPUT_CLEANUP="true" ;;
           z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
           \?) fatalOption; return 1 ;;
           :) fatalOptionArgument; return 1 ;;
@@ -90,6 +94,7 @@ function options() {
   DEPLOYMENT_MODE="${DEPLOYMENT_MODE:-${DEPLOYMENT_MODE_DEFAULT}}"
   GENERATION_FRAMEWORK="${GENERATION_FRAMEWORK:-${GENERATION_FRAMEWORK_DEFAULT}}"
   GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-${GENERATION_INPUT_SOURCE_DEFAULT}}"
+  DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
 
   if [[ "${#GENERATION_PROVIDERS[@]}" == "0" ]]; then
     GENERATION_PROVIDERS+=("${GENERATION_PROVIDERS_DEFAULT}")
@@ -914,8 +919,7 @@ function process_template() {
 
     # Cleanup output directory
     if [[ "${deployment_unit_state_subdirectories}" == "true" ]]; then
-      # Don't cleanup output directory when compiling test cases.
-      if [[ ! -z "${OUTPUT_DIR}" ]]; then
+      if [[ "${DISABLE_OUTPUT_CLEANUP}" == "false" ]]; then
         # Remove existing files for the current level being careful to preserve stacks
         readarray -t existing_files < <(find "${cf_dir}" -mindepth 1 -maxdepth 1 -type f \
         \(  -name "${cleanup_level}-*" \
