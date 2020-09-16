@@ -1262,8 +1262,21 @@ function manage_ecs_account_settings() {
   local setting="$1"; shift
   local state="$1"; shift
 
+
+  info "Configuring ecs account setting - ${region} - ${setting} - ${state}"
+  # Remove settings applied at the principal level to ensure defaults are respected
+  principal_setting="$(aws --region ap-southeast-2 ecs list-account-settings --name "${setting}" --query 'settings[].name' --no-effective-settings  | jq -r '.[]')"
+  if [[ -n "${principal_setting}" ]]; then
+    info "Removing ecs account settings for automation role principal"
+    aws --region "${region}" ecs delete-account-setting --name "${principal_setting}" || return $?
+  fi
+
+  info "Setting account/region wide default value"
   aws --region "${region}" ecs put-account-setting-default --name "${setting}" --value "${state}" || return $?
-  aws --region "${region}" ecs put-account-setting --name "${setting}" --value "${state}" || return $?
+
+  info "Effective value"
+  aws --region "${region}" ecs list-account-settings --effective-settings --name "${setting}" || return $?
+
 }
 
 function create_ecs_scheduled_task() {
