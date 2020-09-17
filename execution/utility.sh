@@ -1265,7 +1265,7 @@ function manage_ecs_account_settings() {
 
   info "Configuring ecs account setting - ${region} - ${setting} - ${state}"
   # Remove settings applied at the principal level to ensure defaults are respected
-  principal_setting="$(aws --region ${region} ecs list-account-settings --name "${setting}" --query 'settings[].name' --no-effective-settings  | jq -r '.[]')"
+  principal_setting="$(aws --region "${region}" ecs list-account-settings --name "${setting}" --query 'settings[].name' --no-effective-settings  | jq -r '.[]')"
   if [[ -n "${principal_setting}" ]]; then
     info "Removing ecs account settings for automation role principal"
     aws --region "${region}" ecs delete-account-setting --name "${principal_setting}" || return $?
