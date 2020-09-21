@@ -210,6 +210,8 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     fi
 
     # Perform a few consistency checks
+    [[ ! -s "${COMPOSITE_BLUEPRINT}" ]] && fatalCantProceed "The composite blueprint is empty. The likely cause of this is malformed JSON object in the Solution." && exit 1
+    
     [[ -z "${REGION}" ]] && fatalCantProceed "The region must be defined in the Product blueprint section." && exit 1
 
     BLUEPRINT_ACCOUNT=$(runJQ -r '.Account.Name | select(.!=null)' < ${COMPOSITE_BLUEPRINT})
