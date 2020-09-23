@@ -144,7 +144,9 @@ function wait_for_stack_execution() {
         { fatal "Stack ${STACK_NAME} failed, fix stack before retrying"; exit_status=255; break;}
 
       # Finished if complete
-      egrep "(${operation_to_check})_COMPLETE\"" "${stack_status_file}" >/dev/null 2>&1 && \
+      # If the initial create was not saved for any reason, the stack may have a status of CREATE_COMPLETE
+      # even though the current operation is an UPDATE
+      egrep "(CREATE|UPDATE)_COMPLETE\"" "${stack_status_file}" >/dev/null 2>&1 && \
         { [[ -f "${potential_change_file}" ]] && cp "${potential_change_file}" "${CHANGE}"; break; }
 
       # Abort if not still in progress
