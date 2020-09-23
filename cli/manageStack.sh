@@ -164,7 +164,7 @@ function wait_for_stack_execution() {
       0) ;;
       255)
         grep -q "No updates are to be performed" < "${stack_status_file}" &&
-          warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n"; break ||
+          warning "No updates needed for stack ${STACK_NAME} post change set execution. Treating as successful.\n"; break ||
           { cat "${stack_status_file}"; return ${exit_status}; }
       ;;
       *)
@@ -242,7 +242,7 @@ function process_stack() {
 
               cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
               if [[ ${no_change} == 0 ]]; then
-                warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n"
+                warning "No updates needed for existing stack ${STACK_NAME}. Treating as successful.\n"
                 # Grab the latest stack in case it wasn't saved previously
                 aws --region ${REGION} cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${STACK}"
               else
@@ -280,7 +280,7 @@ function process_stack() {
 
                       cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
                       if [[ ${no_change} == 0 ]]; then
-                        warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n"
+                        warning "No updates needed for replacement stack ${STACK_NAME}. Treating as successful.\n"
                         # Grab the latest stack in case it wasn't saved previously
                         aws --region ${REGION} cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${STACK}"
                       else
