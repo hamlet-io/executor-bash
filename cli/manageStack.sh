@@ -240,10 +240,14 @@ function process_stack() {
 
             if [[ $( jq  -r '.Status == "FAILED"' < "${potential_change_file}" ) == "true" ]]; then
 
-              cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes." &&
-                warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n" ||
+              cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
+              if [[ ${no_change} == 0 ]]; then
+                warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n"
+                # Grab the latest stack in case it wasn't saved previously
+                aws --region ${REGION} cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${STACK}"
+              else
                 cat "${potential_change_file}"; return ${exit_status};
-
+              fi
             else
 
               replacement=$( cat "${potential_change_file}" | jq '[.Changes[].ResourceChange.Replacement] | contains(["True"])' )
@@ -274,10 +278,14 @@ function process_stack() {
 
                     if [[ $( jq  -r '.Status == "FAILED"' < "${potential_change_file}" ) == "true" ]]; then
 
-                      cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes." &&
-                        warning "No further updates needed for stack ${STACK_NAME}. Treating as successful.\n" ||
+                      cat "${potential_change_file}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
+                      if [[ ${no_change} == 0 ]]; then
+                        warning "No updates needed for stack ${STACK_NAME}. Treating as successful.\n"
+                        # Grab the latest stack in case it wasn't saved previously
+                        aws --region ${REGION} cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${STACK}"
+                      else
                         cat "${potential_change_file}"; return ${exit_status};
-
+                      fi
                     else
 
                       # Running
