@@ -6,6 +6,7 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' E
 
 # Defaults
 DELAY_DEFAULT=30
+RETRY_COUNT_DEFAULT=120
 ENV_NAMES=()
 ENV_VALUES=()
 
@@ -103,6 +104,7 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
 done
 
 DELAY="${DELAY:-${DELAY_DEFAULT}}"
+RETRY_COUNT="${RETRY_COUNT:-${RETRY_COUNT_DEFAULT}}"
 
 # Ensure mandatory arguments have been provided
 if [[ -z "${TASK}" || -z "${TIER}" || -z "${COMPONENT}" ]]; then
@@ -241,22 +243,36 @@ fi
 
 CLI_CONFIGURATION="$(echo "${CLI_CONFIGURATION}" | jq -c '.' )"
 
-TASK_ARN="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 --query 'tasks[0].taskArn' ${TASK_ARGS} --cli-input-json "${CLI_CONFIGURATION}" --output text  )"
+TASK_START="$(aws --region "${REGION}" ecs run-task --cluster "${CLUSTER_ARN}" --task-definition "${TASK_DEFINITION_ARN}" --count 1 ${TASK_ARGS} --cli-input-json "${CLI_CONFIGURATION}" --output json )"
+TASK_ARN="$( echo "${TASK_START}" | jq -r '.tasks[0].taskArn' )"
 
-if [[ -z "${TASK_ARN}" ]]; then
-    fatal "Task did not start"
+info "Starting Task..."
+
+if [[ -z "${TASK_ARN}" || "${TASK_ARN}" == "null" ]]; then
+    fatal "Task could not be started"
+    echo "${TASK_START}"
     exit 255
 fi
 
 info "Watching task..."
+CURRENT_RETRIES=0
 while true; do
-    LAST_STATUS="$(aws --region ${REGION} ecs describe-tasks --cluster "${CLUSTER_ARN}" --tasks "${TASK_ARN}" --query "tasks[?taskArn=='${TASK_ARN}'].lastStatus" --output text || break $?)"
+    LAST_STATUS="$(aws --region ${REGION} ecs describe-tasks --cluster "${CLUSTER_ARN}" --tasks "${TASK_ARN}" --query "tasks[?taskArn=='${TASK_ARN}'].lastStatus" --output text || break )"
 
     echo "...${LAST_STATUS}"
 
     if [[ "${LAST_STATUS}" == "STOPPED" ]]; then
         break
     fi
+
+    CURRENT_RETRIES=$((CURRENT_RETRIES+1))
+
+    if [[ "${CURRENT_RETRIES}" == "${RETRY_COUNT}" ]]; then
+        fatal "Task has not completed in $(( RETRY_COUNT * DELAY )) seconds and has reached the DELAY and RETRY_COUNT limit"
+        fatal "Stopping monitoring of the task - the task will keep running"
+        exit 255
+    fi
+
     sleep $DELAY
 done
 
