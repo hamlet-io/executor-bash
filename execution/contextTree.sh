@@ -652,6 +652,7 @@ function findGen3Dirs() {
       if [[ -n "${segment}" ]]; then
         debug "SEGMENT_DIR=$(findGen3ProductEnvironmentSegmentDir "${root_dir}" "${product}" "${environment}" "${segment}")"
         declare -gx ${prefix}SEGMENT_SHARED_SETTINGS_DIR=$(getGen3Env   "PRODUCT_SETTINGS_DIR"   "${prefix}")/shared/${segment}
+        declare -gx ${prefix}SEGMENT_SHARED_BUILDS_DIR=$(getGen3Env     "PRODUCT_BUILDS_DIR"     "${prefix}")/shared/${segment}
         declare -gx ${prefix}SEGMENT_SHARED_SOLUTIONS_DIR=$(getGen3Env  "PRODUCT_SOLUTIONS_DIR"  "${prefix}")/shared/${segment}
         declare -gx ${prefix}SEGMENT_SHARED_OPERATIONS_DIR=$(getGen3Env "PRODUCT_OPERATIONS_DIR" "${prefix}")/shared/${segment}
 
