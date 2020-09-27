@@ -209,7 +209,13 @@ SNAPSHOT_OPERATION="${SNAPSHOT_OPERATION:-${SNAPSHOT_OPERATION_DEFAULT}}"
 SNAPSHOT_PRODUCT="${SNAPSHOT_PRODUCT:-${PRODUCT}}"
 
 # Handle registry scope values
+REGISTRY_SUBTYPE=""
 case "${REGISTRY_SCOPE}" in
+    account)
+        if [[ -n "${ACCOUNT}" ]]; then
+            SNAPSHOT_PRODUCT="account"
+        fi
+        ;;
     segment)
         if [[ -n "${SEGMENT}" ]]; then
             REGISTRY_SUBTYPE="-${SEGMENT}"
@@ -218,7 +224,7 @@ case "${REGISTRY_SCOPE}" in
         fi
         ;;
     *)
-        REGISTRY_SUBTYPE=""
+        [[ "${REGISTRY_SCOPE:-unset}" != "unset" ]] && REGISTRY_SUBTYPE="-${REGISTRY_SCOPE}"
         ;;
 esac
 
