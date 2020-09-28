@@ -68,6 +68,7 @@ EOF
 # $2 = build commit (? = no commit)
 # $3 = build tag (? = no tag)
 # $4 = image formats (? = not provided)
+# $5 = build scope (? = not provided)
 function updateDetail() {
     local UD_DEPLOYMENT_UNIT="${1,,}"
     local UD_COMMIT="${2,,:-?}"
@@ -126,7 +127,7 @@ function getBuildReferenceParts() {
             declare -g "BUILD_REFERENCE_${ATTRIBUTE^^}"="${ATTRIBUTE_VALUE:-?}"
         done
         if [[ "${BUILD_REFERENCE_FORMATS}" == "?" ]]; then
-            BUILD_REFERENCE_FORMATS="${BUILD_REFERENCE_FORMAT}"
+            BUILD_REFERENCE_FORMATS="${BUILD_REFERENCE_FORMAT:-?}"
         fi
     else
         BUILD_REFERENCE_ARRAY=(${GBRP_REFERENCE})
@@ -139,7 +140,8 @@ function getBuildReferenceParts() {
 # Format a JSON based build reference
 # $1 = build commit
 # $2 = build tag (? = no tag)
-# $3 = formats (default is docker)
+# $3 = formats (? = format defined separately e.g. via shared_build)
+# $4 = scope (? = scope defined separately e.g. via shared_build)
 function formatBuildReference() {
     local FBR_COMMIT="${1,,}"
     local FBR_TAG="${2:-?}"
@@ -153,15 +155,17 @@ function formatBuildReference() {
     if [[ "${FBR_SCOPE}" != "?" ]]; then
         BUILD_REFERENCE="${BUILD_REFERENCE}, \"Scope\": \"${FBR_SCOPE}\""
     fi
-    if [[ "${FBR_FORMATS}" == "?" ]]; then
-        FBR_FORMATS="docker"
+    # Format can be missing from unit build reference if provided by a shared build
+    # This allows format to be defined once and applied across all environments
+    if [[ "${FBR_FORMATS}" != "?" ]]; then
+        IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra FBR_FORMATS_ARRAY <<< "${FBR_FORMATS}"
+        BUILD_REFERENCE="${BUILD_REFERENCE}, \"Formats\": [\"${FBR_FORMATS_ARRAY[0]}\""
+        for ((FORMAT_INDEX=1; FORMAT_INDEX<${#FBR_FORMATS_ARRAY[@]}; FORMAT_INDEX++)); do
+            BUILD_REFERENCE="${BUILD_REFERENCE},\"${FBR_FORMATS_ARRAY[$FORMAT_INDEX]}\""
+        done
+        BUILD_REFERENCE="${BUILD_REFERENCE}]"
     fi
-    IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra FBR_FORMATS_ARRAY <<< "${FBR_FORMATS}"
-    BUILD_REFERENCE="${BUILD_REFERENCE}, \"Formats\": [\"${FBR_FORMATS_ARRAY[0]}\""
-    for ((FORMAT_INDEX=1; FORMAT_INDEX<${#FBR_FORMATS_ARRAY[@]}; FORMAT_INDEX++)); do
-        BUILD_REFERENCE="${BUILD_REFERENCE},\"${FBR_FORMATS_ARRAY[$FORMAT_INDEX]}\""
-    done
-    BUILD_REFERENCE="${BUILD_REFERENCE} ]}"
+    BUILD_REFERENCE="${BUILD_REFERENCE}}"
 }
 
 # Define git provider attributes
@@ -321,6 +325,18 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
         REGISTRY_DEPLOYMENT_UNIT="${CURRENT_DEPLOYMENT_UNIT}"
     fi
 
+    # Determine any shared formats/scope
+    SHARED_IMAGE_FORMATS="?"
+    SHARED_REGISTRY_SCOPE="?"
+    if [[ -n "${SEGMENT_SHARED_BUILDS_DIR}" ]]; then
+        SHARED_BUILDS_DIR_FILE="${SEGMENT_SHARED_BUILDS_DIR}/${REGISTRY_DEPLOYMENT_UNIT}/shared_build.json"
+        if [[ -f "${SHARED_BUILDS_DIR_FILE}" ]]; then
+            getBuildReferenceParts "$(cat ${SHARED_BUILDS_DIR_FILE})"
+            SHARED_IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+            SHARED_REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+        fi
+    fi
+
     # Ensure appsettings directories exist
     if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
         mkdir -p "${CURRENT_DEPLOYMENT_UNIT}"
@@ -377,7 +393,12 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
 
         ${REFERENCE_OPERATION_LIST})
             # Add build info to DETAIL_MESSAGE
-            updateDetail "${CURRENT_DEPLOYMENT_UNIT}" "${CODE_COMMIT}" "${CODE_TAG}" "${IMAGE_FORMATS}" "${REGISTRY_SCOPE}"
+            updateDetail \
+                "${CURRENT_DEPLOYMENT_UNIT}" \
+                "${CODE_COMMIT}" \
+                "${CODE_TAG}" \
+                "${IMAGE_FORMATS:-${SHARED_IMAGE_FORMATS}}" \
+                "${REGISTRY_SCOPE:-${SHARED_REGISTRY_SCOPE}}"
             ;;
 
         ${REFERENCE_OPERATION_LISTFULL})
@@ -389,8 +410,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     CODE_TAG_ARRAY["${INDEX}"]="${BUILD_REFERENCE_TAG}"
                     IMAGE_FORMATS_ARRAY["${INDEX}"]="${BUILD_REFERENCE_FORMATS}"
                     REGISTRY_SCOPE_ARRAY["${INDEX}"]="${BUILD_REFERENCE_SCOPE}"
+                fi
             fi
-                 fi
            ;;
 
         ${REFERENCE_OPERATION_UPDATE})
@@ -402,6 +423,13 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
                 IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+            fi
+
+            # Formats must be known
+            if [[ ("${IMAGE_FORMATS}" == "?") && ("${SHARED_IMAGE_FORMATS}" == "?") ]]; then
+                fatal "Unable to determine image formats for unit ${CURRENT_DEPLOYMENT_UNIT}"
+                RESULT=1
+                exit
             fi
 
             # Preserve the scope if none provided
@@ -461,6 +489,8 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
                 IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+                # Format may be shared
+                [[ "${IMAGE_FORMATS}" == "?" ]] && IMAGE_FORMATS="${SHARED_IMAGE_FORMATS}"
                 IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
             fi
 
@@ -468,7 +498,9 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
             if [[ ("${REGISTRY_SCOPE}" == "?") &&
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                # Scope may be shared
                 REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+                [[ "${REGISTRY_SCOPE}" == "?" ]] && REGISTRY_SCOPE="${SHARED_REGISTRY_SCOPE}"
             fi
 
             # If we don't know the image type, then there is a problem
