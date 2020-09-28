@@ -317,7 +317,7 @@ case "${REGISTRY_SCOPE}" in
         fi
         ;;
     *)
-        [[ "${REGISTRY_SCOPE:-unset}" != "unset" ]] && REGISTRY_SUBTYPE="/${REGISTRY_SCOPE}"
+        [[ "${REGISTRY_SCOPE:-unset}" != "unset" && "${REGISTRY_SCOPE}" != "?" ]] && REGISTRY_SUBTYPE="/${REGISTRY_SCOPE}"
         ;;
 esac
 
