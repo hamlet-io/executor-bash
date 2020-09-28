@@ -302,7 +302,13 @@ REGISTRY_PRODUCT="${REGISTRY_PRODUCT:-${PRODUCT}}"
 REGISTRY_REMOVE_SOURCE="${REGISTRY_REMOVE_SOURCE:-${REGISTRY_REMOVE_SOURCE_DEFAULT}}"
 
 # Handle registry scope values
+REGISTRY_SUBTYPE=""
 case "${REGISTRY_SCOPE}" in
+    account)
+        if [[ -n "${ACCOUNT}" ]]; then
+            REGISTRY_PRODUCT="account"
+        fi
+        ;;
     segment)
         if [[ -n "${SEGMENT}" ]]; then
             REGISTRY_SUBTYPE="/${SEGMENT}"
@@ -311,7 +317,7 @@ case "${REGISTRY_SCOPE}" in
         fi
         ;;
     *)
-        REGISTRY_SUBTYPE=""
+        [[ "${REGISTRY_SCOPE:-unset}" != "unset" ]] && REGISTRY_SUBTYPE="/${REGISTRY_SCOPE}"
         ;;
 esac
 
