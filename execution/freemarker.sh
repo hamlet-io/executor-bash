@@ -127,6 +127,6 @@ java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.12.jar" \
     "${RAW_VARIABLES[@]}" \
     "${CMDB_MAPPINGS[@]}" \
     ${BASE_CMDB:+-b "${BASE_CMDB}"} \
-    ${LOGLEVEL:+--${LOGLEVEL}}
+    ${LOGLEVEL:+--${LOGLEVEL}} \
     "${CMDBS[@]}"
 RESULT=$?
