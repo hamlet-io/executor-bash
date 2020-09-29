@@ -329,12 +329,15 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
     SHARED_IMAGE_FORMATS="?"
     SHARED_REGISTRY_SCOPE="?"
     if [[ -n "${SEGMENT_SHARED_BUILDS_DIR}" ]]; then
-        SHARED_BUILDS_DIR_FILE="${SEGMENT_SHARED_BUILDS_DIR}/${REGISTRY_DEPLOYMENT_UNIT}/shared_build.json"
-        if [[ -f "${SHARED_BUILDS_DIR_FILE}" ]]; then
-            getBuildReferenceParts "$(cat ${SHARED_BUILDS_DIR_FILE})"
-            SHARED_IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
-            SHARED_REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
-        fi
+        # Support build.json and shared_build.json - build.json is preferred
+        for f in shared_build.json build.json; do
+            SHARED_BUILDS_DIR_FILE="${SEGMENT_SHARED_BUILDS_DIR}/${REGISTRY_DEPLOYMENT_UNIT}/$f"
+            if [[ -f "${SHARED_BUILDS_DIR_FILE}" ]]; then
+                getBuildReferenceParts "$(cat ${SHARED_BUILDS_DIR_FILE})"
+                [[ "${BUILD_REFERENCE_FORMATS}" != "?" ]] && SHARED_IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+                [[ "${BUILD_REFERENCE_SCOPE}" != "?" ]] && SHARED_REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+            fi
+        done
     fi
 
     # Ensure appsettings directories exist
