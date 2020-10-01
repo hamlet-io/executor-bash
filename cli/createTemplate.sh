@@ -12,6 +12,7 @@ GENERATION_PROVIDERS_DEFAULT="aws"
 GENERATION_FRAMEWORK_DEFAULT="cf"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
 DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
+DOCUMENT_SET_DEFAULT="deployment"
 
 arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
 
@@ -32,6 +33,7 @@ where
 (o) -o OUTPUT_DIR              is the directory where the outputs will be saved - defaults to the PRODUCT_STATE_DIR
 (o) -q REQUEST_REFERENCE       is an opaque value to link this template to a triggering request management system
 (o) -r REGION                  is the AWS region identifier
+(o) -s DOCUMENT_SET            is the document set you wish to generate
 (m) -u DEPLOYMENT_UNIT         is the deployment unit to be included in the template
 (o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
 (o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
@@ -50,6 +52,7 @@ GENERATION_PROVIDERS    = "${GENERATION_PROVIDERS_DEFAULT}"
 GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
 GENERATION_INPUT_SOURCE = "${GENRATION_INPUT_SOURCE_DEFAULT}"
 DISABLE_OUTPUT_CLEANUP  = "${DISABLE_OUTPUT_CLEANUP_DEFAULT}"
+DOCUMENT_SET            = "${DOCUMENT_SET_DEFAULT}"
 
 NOTES:
 
@@ -64,7 +67,7 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":c:d:f:g:hi:l:o:p:q:r:u:xz:" option; do
+  while getopts ":c:d:f:g:hi:l:o:p:q:r:s:u:xz:" option; do
       case "${option}" in
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
@@ -80,6 +83,7 @@ function options() {
           p) GENERATION_PROVIDERS+=("${OPTARG}") ;;
           q) REQUEST_REFERENCE="${OPTARG}" ;;
           r) REGION="${OPTARG}" ;;
+          s) DOCUMENT_SET="${OPTARG}" ;;
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
           x) DISABLE_OUTPUT_CLEANUP="true" ;;
           z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
@@ -95,14 +99,12 @@ function options() {
   GENERATION_FRAMEWORK="${GENERATION_FRAMEWORK:-${GENERATION_FRAMEWORK_DEFAULT}}"
   GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-${GENERATION_INPUT_SOURCE_DEFAULT}}"
   DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
+  DOCUMENT_SET="${DOCUMENT_SET:-${DOCUMENT_SET_DEFAULT}}"
 
   if [[ "${#GENERATION_PROVIDERS[@]}" == "0" ]]; then
     GENERATION_PROVIDERS+=("${GENERATION_PROVIDERS_DEFAULT}")
   fi
   GENERATION_PROVIDERS=$(listFromArray "GENERATION_PROVIDERS" ",")
-
-  # Check level and deployment unit
-  ! isValidUnit "${LEVEL}" "${DEPLOYMENT_UNIT}" && fatal "Deployment unit/level not valid" &&  return 1
 
   # Ensure other mandatory arguments have been provided
   if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
@@ -285,6 +287,7 @@ function get_openapi_definition_file() {
 
 
 function process_template_pass() {
+  local document_set="${1,,}"; shift
   local providers="${1,,}"; shift
   local deployment_framework="${1,,}"; shift
   local output_type="${1,,}"; shift
@@ -346,11 +349,12 @@ function process_template_pass() {
   pass_deployment_unit_subset_prefix["template"]="${deployment_unit_subset:+${deployment_unit_subset}-}"
   pass_description["template"]="cloud formation"
 
-  case "${level}" in
+  template="createDocumentSet.ftl"
 
+  template_composites+=("FRAGMENT" )
+
+  case "${document_set}" in
     unitlist)
-      local template="createUnitlist.ftl"
-      template_composites+=("FRAGMENT")
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
@@ -363,9 +367,6 @@ function process_template_pass() {
       ;;
 
     blueprint)
-      local template="createBlueprint.ftl"
-      template_composites+=("FRAGMENT" )
-
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
@@ -378,9 +379,6 @@ function process_template_pass() {
       ;;
 
     buildblueprint)
-      local template="createBuildblueprint.ftl"
-      template_composites+=("FRAGMENT" )
-
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
@@ -392,7 +390,6 @@ function process_template_pass() {
       ;;
 
     schema)
-      local template="createSchema.ftl"
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
@@ -402,75 +399,75 @@ function process_template_pass() {
       pass_description["schema"]="schema"
       ;;
 
-    account)
-      local template="createDeployment.ftl"
-      for p in "${pass_list[@]}"; do pass_region_prefix["${p}"]="${account_region}-"; done
-      template_composites+=("ACCOUNT")
+    deployment)
+        case "${level}" in
+          account)
+            for p in "${pass_list[@]}"; do pass_region_prefix["${p}"]="${account_region}-"; done
+            template_composites+=("ACCOUNT")
 
-      # LEGACY: Support stacks created before deployment units added to account level
-      [[ ("${DEPLOYMENT_UNIT}" =~ s3) &&
-        (-f "${cf_dir}/${level_prefix}${region_prefix}template.json") ]] && \
-          for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]=""; done
+            # LEGACY: Support stacks created before deployment units added to account level
+            [[ ("${DEPLOYMENT_UNIT}" =~ s3) &&
+              (-f "${cf_dir}/${level_prefix}${region_prefix}template.json") ]] && \
+                for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]=""; done
+            ;;
+
+          solution)
+            if [[ -f "${cf_dir}/solution-${region}-template.json" ]]; then
+              for p in "${pass_list[@]}"; do
+                pass_deployment_unit_prefix["${p}"]=""
+              done
+            else
+              for p in "${pass_list[@]}"; do
+                pass_level_prefix["${p}"]="soln-"
+              done
+            fi
+            ;;
+
+          segment)
+            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="seg-"; done
+
+            # LEGACY: Support old formats for existing stacks so they can be updated
+            if [[ !("${DEPLOYMENT_UNIT}" =~ cmk|cert|dns ) ]]; then
+              if [[ -f "${cf_dir}/cont-${deployment_unit_prefix}${region_prefix}template.json" ]]; then
+                for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="cont-"; done
+              fi
+              if [[ -f "${cf_dir}/container-${region}-template.json" ]]; then
+                for p in "${pass_list[@]}"; do
+                  pass_level_prefix["${p}"]="container-"
+                  pass_deployment_unit_prefix["${p}"]=""
+                done
+              fi
+              if [[ -f "${cf_dir}/${SEGMENT}-container-template.json" ]]; then
+                for p in "${pass_list[@]}"; do
+                  pass_level_prefix["${p}"]="${SEGMENT}-container-"
+                  pass_deployment_unit_prefix["${p}"]=""
+                  pass_region_prefix["${p}"]=""
+                done
+              fi
+            fi
+            # "cmk" now used instead of "key"
+            [[ ("${DEPLOYMENT_UNIT}" == "cmk") &&
+              (-f "${cf_dir}/${level_prefix}key-${region_prefix}template.json") ]] && \
+                for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]="key-"; done
+            ;;
+
+          application)
+            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="app-"; done
+            ;;
+
+          *)
+            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="${level}-"; done
+            ;;
+        esac
+
       ;;
 
-    solution)
-      local template="createDeployment.ftl"
-      template_composites+=("FRAGMENT")
-      if [[ -f "${cf_dir}/solution-${region}-template.json" ]]; then
-        for p in "${pass_list[@]}"; do
-          pass_deployment_unit_prefix["${p}"]=""
-        done
-      else
-        for p in "${pass_list[@]}"; do
-          pass_level_prefix["${p}"]="soln-"
-        done
-      fi
-      ;;
-
-    segment)
-      local template="createDeployment.ftl"
-      for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="seg-"; done
-      template_composites+=("FRAGMENT" )
-
-      # LEGACY: Support old formats for existing stacks so they can be updated
-      if [[ !("${DEPLOYMENT_UNIT}" =~ cmk|cert|dns ) ]]; then
-        if [[ -f "${cf_dir}/cont-${deployment_unit_prefix}${region_prefix}template.json" ]]; then
-          for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="cont-"; done
-        fi
-        if [[ -f "${cf_dir}/container-${region}-template.json" ]]; then
-          for p in "${pass_list[@]}"; do
-            pass_level_prefix["${p}"]="container-"
-            pass_deployment_unit_prefix["${p}"]=""
-          done
-        fi
-        if [[ -f "${cf_dir}/${SEGMENT}-container-template.json" ]]; then
-          for p in "${pass_list[@]}"; do
-            pass_level_prefix["${p}"]="${SEGMENT}-container-"
-            pass_deployment_unit_prefix["${p}"]=""
-            pass_region_prefix["${p}"]=""
-          done
-        fi
-      fi
-      # "cmk" now used instead of "key"
-      [[ ("${DEPLOYMENT_UNIT}" == "cmk") &&
-        (-f "${cf_dir}/${level_prefix}key-${region_prefix}template.json") ]] && \
-          for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]="key-"; done
-      ;;
-
-    application)
-      local template="createDeployment.ftl"
-      for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="app-"; done
-      template_composites+=("FRAGMENT" )
-      ;;
-
-    *)
-      fatalCantProceed "\"${LEVEL}\" is not one of the known stack levels." && return 1
-      ;;
   esac
 
   # Args common across all passes
   local args=()
   [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
+  [[ -n "${document_set}" ]]              && args+=("-v" "documentSet=${document_set}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
   [[ -n "${GENERATION_MODEL}" ]]          && args+=("-v" "deploymentFrameworkModel=${GENERATION_MODEL}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
@@ -697,6 +694,7 @@ function process_template_pass() {
 }
 
 function process_template() {
+  local document_set="${1,,}"; shift
   local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
@@ -714,7 +712,7 @@ function process_template() {
   local template_alternatives=("primary")
   local cleanup_level="${level}"
 
-  case "${level}" in
+  case "${document_set}" in
 
     unitlist|blueprint|buildblueprint)
       local cf_dir_default="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
@@ -724,31 +722,40 @@ function process_template() {
       local cf_dir_default="${PRODUCT_STATE_DIR}/cot"
       ;;
 
-    account)
-      local cf_dir_default="${ACCOUNT_STATE_DIR}/cf/shared"
-      ;;
+    deployment)
+      case "${level}" in
+        account)
+          local cf_dir_default="${ACCOUNT_STATE_DIR}/cf/shared"
+          ;;
 
-    product)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/shared"
-      ;;
+        product)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/shared"
+          ;;
 
-    application)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
-      cleanup_level="app"
-      ;;
+        application)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="app"
+          ;;
 
-    solution)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
-      cleanup_level="soln"
-      ;;
+        solution)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="soln"
+          ;;
 
-    segment)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
-      cleanup_level="seg"
+        segment)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="seg"
+          ;;
+
+        *)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="${level}"
+          ;;
+      esac
       ;;
 
     *)
-      fatalCantProceed "\"${LEVEL}\" is not one of the known stack levels." && return 1
+      fatalCantProceed "\"${document_set}\" is not one of the known document sets." && return 1
       ;;
   esac
 
@@ -808,6 +815,7 @@ function process_template() {
 
   # First see if a generation contract can be generated
   process_template_pass \
+      "${document_set}" \
       "${GENERATION_PROVIDERS}" \
       "${GENERATION_FRAMEWORK}" \
       "contract" \
@@ -872,6 +880,7 @@ function process_template() {
     arrayFromList task_parameters "${task_parameter_string}" ";"
 
     process_template_pass \
+      "${document_set}" \
       "${task_parameters[@]}" \
       "${level}" \
       "${deployment_unit}" \
@@ -956,6 +965,7 @@ function main() {
   case "${LEVEL}" in
     blueprint-disabled)
       process_template \
+        "${DOCUMENT_SET}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "" "${ACCOUNT_REGION}" \
@@ -967,6 +977,7 @@ function main() {
 
     *)
       process_template \
+        "${DOCUMENT_SET}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "${ACCOUNT}" "${ACCOUNT_REGION}" \
