@@ -703,59 +703,6 @@ function fatalProductOrSegmentDirectory() {
 
 # -- Deployment Units --
 
-function isValidUnit() {
-  local level="${1,,}"; shift
-  local unit="${1,,}"; shift
-
-  local result=0
-
-  # Known levels
-  declare -gA unit_required=( \
-    ["unitlist"]="false" \
-    ["blueprint"]="false" \
-    ["buildblueprint"]="true" \
-    ["account"]="true" \
-    ["product"]="true" \
-    ["application"]="true" \
-    ["solution"]="true" \
-    ["segment"]="true" \
-    ["multiple"]="true" \
-    ["schema"]="true")
-
-  # Ensure arguments have been provided
-  [[ (-z "${unit_required[${level}]}") || ((-z "${unit}") && ("${unit_required[${level}]}" == "true")) ]] && return 1
-
-  # Check unit if required
-  if [[ "${unit_required[${level}]}" == "true" ]]; then
-    # Default deployment units for each level
-    declare -ga ACCOUNT_UNITS_ARRAY=("cmk" "iam" "lg" "audit" "s3" "cert" "roles" "apigateway" "waf" "sms" "console" "volumeencrypt" "ecs")
-    declare -ga PRODUCT_UNITS_ARRAY=("s3" "sns" "cert" "cmk")
-    declare -ga BUILDBLUEPRINT_UNITS_ARRAY=(${unit})
-    declare -ga APPLICATION_UNITS_ARRAY=(${unit})
-    declare -ga SOLUTION_UNITS_ARRAY=(${unit})
-    declare -ga SEGMENT_UNITS_ARRAY=(${unit})
-    declare -ga MULTIPLE_UNITS_ARRAY=("iam" "dashboard")
-    declare -ga SCHEMA_UNITS_ARRAY=(${unit})
-
-    # Apply explicit unit lists and check for presence of unit
-    # Allow them to be separated by commas or spaces in line with the separator
-    # definitions in setContext.sh for the automation framework
-    if namedef_supported; then
-      declare -n UNITS_SOURCE="${level^^}_UNITS"
-      declare -n UNITS_ARRAY="${level^^}_UNITS_ARRAY"
-    else
-      eval "declare UNITS_SOURCE=(\"\${${level^^}_UNITS}\")"
-      eval "declare UNITS_ARRAY=(\"\${${level^^}_UNITS_ARRAY[@]}\")"
-    fi
-    [[ -n "${UNITS_SOURCE}" ]] && IFS=", " read -ra UNITS_ARRAY <<< "${UNITS_SOURCE}"
-
-    # Return result
-    grep -iw "${unit}" <<< "${UNITS_ARRAY[*]}" >/dev/null 2>&1
-    result=$?
-  fi
-  return ${result}
-}
-
 function formatUnitCFDir() {
   local base_dir="${1}"; shift
   local level="${1,,}"; shift
