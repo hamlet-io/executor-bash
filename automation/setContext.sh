@@ -507,17 +507,27 @@ function main() {
       COMMIT_PART="?"
       if [[ ("${#DEPLOYMENT_UNIT_ARRAY[@]}" -eq 0) ||
               ("${APPLY_TO_ALL_DEPLOYMENT_UNITS}" == "true") ]]; then
-          # Processing the first deployment unit
+          # Processing the first deployment unit or all units if forced
+
+          # Capture any provided git commit
+          case ${AUTOMATION_PROVIDER} in
+              jenkins | azurepipelines)
+                    [[ -n "${GIT_COMMIT}" ]] && COMMIT_PART="${GIT_COMMIT}"
+                    ;;
+          esac
+
           if [[ -n "${CODE_TAG}" ]]; then
               # Permit separate variable for tag/commit value - easier if only one repo involved
               TAG_PART="${CODE_TAG}"
           fi
+
           if [[ (-n "${IMAGE_FORMATS}") || (-n "${IMAGE_FORMAT}") ]]; then
               # Permit separate variable for formats value - easier if only one repo involved
               # Allow comma and space since its a dedicated parameter - normally they are not format separators
               IFS="${IMAGE_FORMAT_SEPARATORS}, " read -ra FORMATS <<< "${IMAGE_FORMATS:-${IMAGE_FORMAT}}"
               FORMATS_PART=$(IFS="${IMAGE_FORMAT_SEPARATORS}"; echo "${FORMATS[*]}")
           fi
+
           if [[ -n "${REGISTRY_SCOPE}" ]]; then
               # Permit separate variable for registry scope value - easier if
               # all units are segment specific
@@ -546,13 +556,6 @@ function main() {
       # Remaining code works off this array so easy to change in the future
       CODE_PROVIDER_ARRAY+=("${PRODUCT_CODE_GIT_PROVIDER}")
   done
-
-  # Capture any provided git commit
-  case ${AUTOMATION_PROVIDER} in
-      jenkins | azurepipelines)
-          [[ -n "${GIT_COMMIT}" ]] && CODE_COMMIT_ARRAY[0]="${GIT_COMMIT}"
-          ;;
-  esac
 
   # Regenerate the deployment unit list in case the first code commit/tag or format was overriden
   UPDATED_UNITS_ARRAY=()
