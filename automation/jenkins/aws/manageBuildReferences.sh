@@ -492,19 +492,19 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
                 IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
-                # Format may be shared
-                [[ "${IMAGE_FORMATS}" == "?" ]] && IMAGE_FORMATS="${SHARED_IMAGE_FORMATS}"
-                IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
             fi
+            # Format may be shared
+            [[ "${IMAGE_FORMATS}" == "?" ]] && IMAGE_FORMATS="${SHARED_IMAGE_FORMATS}"
+            IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
 
             # If no scope explicitly defined, use the scope in the build reference if defined
             if [[ ("${REGISTRY_SCOPE}" == "?") &&
                     (-f ${BUILD_FILE}) ]]; then
                 getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                # Scope may be shared
                 REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
-                [[ "${REGISTRY_SCOPE}" == "?" ]] && REGISTRY_SCOPE="${SHARED_REGISTRY_SCOPE}"
             fi
+            # Scope may be shared
+            [[ "${REGISTRY_SCOPE}" == "?" ]] && REGISTRY_SCOPE="${SHARED_REGISTRY_SCOPE}"
 
             # If we don't know the image type, then there is a problem
             # Most likely it is the first time this unit has been mentioned and no format was
