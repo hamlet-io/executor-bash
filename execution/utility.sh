@@ -2186,7 +2186,7 @@ function push_git_repo() {
   local commit_message="$1"; shift
   local git_user="$1"; shift
   local git_email="$1"; shift
-  local tries="$1:-6";
+  local tries="${1:-6}";
 
   [[ (-z "${repo_url}") ||
       (-z "${repo_branch}") ||
