@@ -963,10 +963,9 @@ function copy_contentnode_file() {
         esac
 
         # Commit Repo
-        cd "${contenthubdir}"
-        push_git_repo "${host}/${path}" "${branch}" "origin" \
+        (cd "${contenthubdir}"; push_git_repo "${host}/${path}" "${branch}" "origin" \
             "ContentNodeDeployment-${PRODUCT}-${SEGMENT}-${DEPLOYMENT_UNIT}" \
-            "${GIT_USER}" "${GIT_EMAIL}" || return $?
+            "${GIT_USER}" "${GIT_EMAIL}") || return $?
 
       ;;
     esac
@@ -2186,41 +2185,56 @@ function push_git_repo() {
   local repo_remote="$1"; shift
   local commit_message="$1"; shift
   local git_user="$1"; shift
-  local git_email="$1";
+  local git_email="$1"; shift
+  local tries="$1:-6";
 
-    [[ (-z "${repo_url}") ||
-        (-z "${repo_branch}") ||
-        (-z "${repo_remote}") ||
-        (-z "${commit_message}") ||
-        (-z "${git_user}") ||
-        (-z "${git_email}") ]] && fatalMandatory && return 1
+  [[ (-z "${repo_url}") ||
+      (-z "${repo_branch}") ||
+      (-z "${repo_remote}") ||
+      (-z "${commit_message}") ||
+      (-z "${git_user}") ||
+      (-z "${git_email}") ]] && fatalMandatory && return 1
 
-    git remote show "${repo_remote}" >/dev/null 2>&1
-    RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
+  git remote show "${repo_remote}" >/dev/null 2>&1
+  RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
 
-    # Ensure git knows who we are
-    git config user.name  "${git_user}"
-    git config user.email "${git_email}"
+  # Ensure git knows who we are
+  git config user.name  "${git_user}"
+  git config user.email "${git_email}"
 
-    # Add anything that has been added/modified/deleted
-    git add -A
+  # Add anything that has been added/modified/deleted
+  git add -A
 
-    if [[ -n "$(git status --porcelain)" ]]; then
-        # Commit changes
-        debug "Committing to the ${repo_url} repo..."
-        git commit -m "${commit_message}"
-        RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${repo_url} repo" && return 1
-
-        REPO_PUSH_REQUIRED="true"
-    fi
+  if [[ -n "$(git status --porcelain)" ]]; then
+    # Commit changes
+    debug "Committing to the ${repo_url} repo..."
+    git commit -m "${commit_message}" ||
+      (fatal "Can't commit to the ${repo_url} repo"; return 1; )
 
     # Update upstream repo
-    if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
-        debug "Pushing the ${repo_url} repo upstream..."
-        git push ${repo_remote} ${repo_branch}
-        RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-            fatal "Can't push the ${repo_url} repo changes to upstream repo ${repo_remote}" && return 1
-    fi
+    for try in $( seq 1 ${tries} ); do
+      # Check if remote branch exists
+      local existing_branch=$(git ls-remote --heads 2>/dev/null | grep "refs/heads/${repo_branch}$")
+      if [[ -n "${existing_branch}" ]]; then
+        debug "Rebasing from ${repo_url} in case of changes..."
+        git pull --rebase ${repo_remote} ${repo_branch} ||
+          (fatal "Can't rebase the ${repo_url} repo from upstream ${repo_remote}"; return 1; )
+      fi
+
+      debug "Pushing the ${repo_url} repo upstream..."
+      if git push ${repo_remote} ${repo_branch}; then
+        # Push succeeded
+        return 0
+      else
+        # Take a breather
+        info "Waiting to retry push to ${repo_url} repo ..."
+        sleep 5
+      fi
+    done
+
+    fatal "Can't push the ${repo_url} repo changes to upstream repo ${repo_remote}"
+    return 1
+  fi
 
   return 0
 }
