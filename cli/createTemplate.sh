@@ -12,7 +12,7 @@ GENERATION_PROVIDERS_DEFAULT="aws"
 GENERATION_FRAMEWORK_DEFAULT="cf"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
 DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
-DOCUMENT_SET_DEFAULT="deployment"
+ENTRANCE_DEFAULT="deployment"
 
 arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
 
@@ -26,6 +26,7 @@ Usage: $(basename $0) -l LEVEL -u DEPLOYMENT_UNIT -c CONFIGURATION_REFERENCE -q 
 where
 
 (o) -c CONFIGURATION_REFERENCE is the identifier of the configuration used to generate this template
+(o) -e ENTRANCE                is the hamlet entrance to start processing with
 (o) -g RESOURCE_GROUP          is the deployment unit resource group
 (o) -i GENERATION_INPUT_SOURCE is the source of input data to use when generating the template - "composite", "mock"
     -h                         shows this text
@@ -33,7 +34,6 @@ where
 (o) -o OUTPUT_DIR              is the directory where the outputs will be saved - defaults to the PRODUCT_STATE_DIR
 (o) -q REQUEST_REFERENCE       is an opaque value to link this template to a triggering request management system
 (o) -r REGION                  is the AWS region identifier
-(o) -s DOCUMENT_SET            is the document set you wish to generate
 (m) -u DEPLOYMENT_UNIT         is the deployment unit to be included in the template
 (o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
 (o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
@@ -52,7 +52,7 @@ GENERATION_PROVIDERS    = "${GENERATION_PROVIDERS_DEFAULT}"
 GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
 GENERATION_INPUT_SOURCE = "${GENRATION_INPUT_SOURCE_DEFAULT}"
 DISABLE_OUTPUT_CLEANUP  = "${DISABLE_OUTPUT_CLEANUP_DEFAULT}"
-DOCUMENT_SET            = "${DOCUMENT_SET_DEFAULT}"
+ENTRANCE                = "${ENTRANCE_DEFAULT}"
 
 NOTES:
 
@@ -67,10 +67,11 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":c:d:f:g:hi:l:o:p:q:r:s:u:xz:" option; do
+  while getopts ":c:d:e:f:g:hi:l:o:p:q:r:s:u:xz:" option; do
       case "${option}" in
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
+          e) ENTRANCE="${OPTARG}" ;;
           f) GENERATION_FRAMEWORK="${OPTARG}" ;;
           g) RESOURCE_GROUP="${OPTARG}" ;;
           h) usage; return 1 ;;
@@ -83,7 +84,6 @@ function options() {
           p) GENERATION_PROVIDERS+=("${OPTARG}") ;;
           q) REQUEST_REFERENCE="${OPTARG}" ;;
           r) REGION="${OPTARG}" ;;
-          s) DOCUMENT_SET="${OPTARG}" ;;
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
           x) DISABLE_OUTPUT_CLEANUP="true" ;;
           z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
@@ -99,7 +99,7 @@ function options() {
   GENERATION_FRAMEWORK="${GENERATION_FRAMEWORK:-${GENERATION_FRAMEWORK_DEFAULT}}"
   GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-${GENERATION_INPUT_SOURCE_DEFAULT}}"
   DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
-  DOCUMENT_SET="${DOCUMENT_SET:-${DOCUMENT_SET_DEFAULT}}"
+  ENTRANCE="${ENTRANCE:-${ENTRANCE_DEFAULT}}"
 
   if [[ "${#GENERATION_PROVIDERS[@]}" == "0" ]]; then
     GENERATION_PROVIDERS+=("${GENERATION_PROVIDERS_DEFAULT}")
@@ -287,7 +287,7 @@ function get_openapi_definition_file() {
 
 
 function process_template_pass() {
-  local document_set="${1,,}"; shift
+  local entrance="${1,,}"; shift
   local providers="${1,,}"; shift
   local deployment_framework="${1,,}"; shift
   local output_type="${1,,}"; shift
@@ -311,7 +311,8 @@ function process_template_pass() {
   local deployment_unit_state_subdirectories="${1,,}"; shift
 
   # Filename parts
-  local level_prefix="${level}-"
+  local entrance_prefix="${entrance:+${entrance}-}"
+  local level_prefix="${level:+${level}-}"
   local deployment_unit_prefix="${deployment_unit:+${deployment_unit}-}"
   local account_prefix="${account:+${account}-}"
   local region_prefix="${region:+${region}-}"
@@ -324,6 +325,7 @@ function process_template_pass() {
   local pass_list=("managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
 
   # Initialise the components of the pass filenames
+  declare -A pass_entrance_prefix
   declare -A pass_level_prefix
   declare -A pass_deployment_unit_prefix
   declare -A pass_deployment_unit_subset
@@ -334,6 +336,7 @@ function process_template_pass() {
 
   # Defaults
   for p in "${pass_list[@]}"; do
+    pass_entrance_prefix["${p}"]="${entrance_prefix}"
     pass_level_prefix["${p}"]="${level_prefix}"
     pass_deployment_unit_prefix["${p}"]="${deployment_unit_prefix}"
     pass_deployment_unit_subset["${p}"]="${p}"
@@ -347,23 +350,18 @@ function process_template_pass() {
   # Template pass specifics
   pass_deployment_unit_subset["template"]="${deployment_unit_subset}"
   pass_deployment_unit_subset_prefix["template"]="${deployment_unit_subset:+${deployment_unit_subset}-}"
-  pass_description["template"]="cloud formation"
 
-  template="createDocumentSet.ftl"
+  template="invokeEntrance.ftl"
 
   template_composites+=("FRAGMENT" )
 
-  case "${document_set}" in
+  case "${entrance}" in
     unitlist)
       # Blueprint applies across accounts and regions
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
       done
-
-      pass_level_prefix["config"]="unitlist"
-      pass_description["config"]="unitlist"
-      pass_suffix["config"]=".json"
       ;;
 
     blueprint)
@@ -372,10 +370,6 @@ function process_template_pass() {
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
       done
-
-      pass_level_prefix["config"]="blueprint"
-      pass_description["config"]="blueprint"
-      [[ ${pass} == "config" ]] && output_suffix=".json"
       ;;
 
     buildblueprint)
@@ -384,9 +378,6 @@ function process_template_pass() {
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
       done
-
-      pass_level_prefix["config"]="build_blueprint-"
-      pass_description["config"]="buildblueprint"
       ;;
 
     schema)
@@ -394,14 +385,12 @@ function process_template_pass() {
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
       done
-
-      pass_level_prefix["schema"]=""
-      pass_description["schema"]="schema"
       ;;
 
-    deployment)
+    deployment|deploymenttest)
         case "${level}" in
           account)
+            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
             for p in "${pass_list[@]}"; do pass_region_prefix["${p}"]="${account_region}-"; done
             template_composites+=("ACCOUNT")
 
@@ -412,6 +401,7 @@ function process_template_pass() {
             ;;
 
           solution)
+            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
             if [[ -f "${cf_dir}/solution-${region}-template.json" ]]; then
               for p in "${pass_list[@]}"; do
                 pass_deployment_unit_prefix["${p}"]=""
@@ -424,6 +414,7 @@ function process_template_pass() {
             ;;
 
           segment)
+            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
             for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="seg-"; done
 
             # LEGACY: Support old formats for existing stacks so they can be updated
@@ -452,11 +443,8 @@ function process_template_pass() {
             ;;
 
           application)
+            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
             for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="app-"; done
-            ;;
-
-          *)
-            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="${level}-"; done
             ;;
         esac
 
@@ -467,7 +455,7 @@ function process_template_pass() {
   # Args common across all passes
   local args=()
   [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
-  [[ -n "${document_set}" ]]              && args+=("-v" "documentSet=${document_set}")
+  [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
   [[ -n "${GENERATION_MODEL}" ]]          && args+=("-v" "deploymentFrameworkModel=${GENERATION_MODEL}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
@@ -512,8 +500,8 @@ function process_template_pass() {
   local differences_detected="false"
 
   # Determine output file
-  local output_prefix="${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_region_prefix[${pass}]}"
-  local output_prefix_with_account="${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_account_prefix[${pass}]}${pass_region_prefix[${pass}]}"
+  local output_prefix="${pass_entrance_prefix[${pass}]}${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_region_prefix[${pass}]}"
+  local output_prefix_with_account="${pass_entrance_prefix[${pass}]}${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_account_prefix[${pass}]}${pass_region_prefix[${pass}]}"
 
   [[ -n "${pass_deployment_unit_subset[${pass}]}" ]] && args+=("-v" "deploymentUnitSubset=${pass_deployment_unit_subset[${pass}]}")
 
@@ -694,7 +682,7 @@ function process_template_pass() {
 }
 
 function process_template() {
-  local document_set="${1,,}"; shift
+  local entrance="${1,,}"; shift
   local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
@@ -712,11 +700,7 @@ function process_template() {
   local template_alternatives=("primary")
   local cleanup_level="${level}"
 
-  case "${document_set}" in
-
-    unitlist|blueprint|buildblueprint)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
-      ;;
+  case "${entrance}" in
 
     schema)
       local cf_dir_default="${PRODUCT_STATE_DIR}/cot"
@@ -755,7 +739,7 @@ function process_template() {
       ;;
 
     *)
-      fatalCantProceed "\"${document_set}\" is not one of the known document sets." && return 1
+      local cf_dir_default="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
       ;;
   esac
 
@@ -815,7 +799,7 @@ function process_template() {
 
   # First see if a generation contract can be generated
   process_template_pass \
-      "${document_set}" \
+      "${entrance}" \
       "${GENERATION_PROVIDERS}" \
       "${GENERATION_FRAMEWORK}" \
       "contract" \
@@ -880,7 +864,7 @@ function process_template() {
     arrayFromList task_parameters "${task_parameter_string}" ";"
 
     process_template_pass \
-      "${document_set}" \
+      "${entrance}" \
       "${task_parameters[@]}" \
       "${level}" \
       "${deployment_unit}" \
@@ -965,7 +949,7 @@ function main() {
   case "${LEVEL}" in
     blueprint-disabled)
       process_template \
-        "${DOCUMENT_SET}" \
+        "${ENTRANCE}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "" "${ACCOUNT_REGION}" \
@@ -977,7 +961,7 @@ function main() {
 
     *)
       process_template \
-        "${DOCUMENT_SET}" \
+        "${ENTRANCE}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "${ACCOUNT}" "${ACCOUNT_REGION}" \
