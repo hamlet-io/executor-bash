@@ -72,7 +72,7 @@ function main() {
 
     options "$@" || return $?
 
-    ${GENERATION_DIR}/createTemplate.sh -l blueprint ${TEMPLATE_ARGS}
+    ${GENERATION_DIR}/createTemplate.sh -e blueprint ${TEMPLATE_ARGS}
     RESULT=$?
     return "${RESULT}"
 }
