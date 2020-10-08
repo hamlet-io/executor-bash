@@ -467,7 +467,6 @@ function process_template_pass() {
   [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-v" "flows=${flows}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
-  [[ -n "${GENERATION_MODEL}" ]]          && args+=("-v" "deploymentFrameworkModel=${GENERATION_MODEL}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
   [[ -n "${output_format}" ]]             && args+=("-v" "outputFormat=${output_format}")
   [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
