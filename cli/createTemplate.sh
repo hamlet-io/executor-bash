@@ -13,8 +13,10 @@ GENERATION_FRAMEWORK_DEFAULT="cf"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
 DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
 ENTRANCE_DEFAULT="deployment"
+FLOWS_DEFAULT="components"
 
 arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
+arrayFromList FLOWS "${FLOWS}" ","
 
 function usage() {
   cat <<EOF
@@ -25,6 +27,7 @@ Usage: $(basename $0) -l LEVEL -u DEPLOYMENT_UNIT -c CONFIGURATION_REFERENCE -q 
 
 where
 
+(o) -b FLOW                    is a flow through hamlet you want to invoke to perform your task
 (o) -c CONFIGURATION_REFERENCE is the identifier of the configuration used to generate this template
 (o) -e ENTRANCE                is the hamlet entrance to start processing with
 (o) -g RESOURCE_GROUP          is the deployment unit resource group
@@ -53,13 +56,11 @@ GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
 GENERATION_INPUT_SOURCE = "${GENRATION_INPUT_SOURCE_DEFAULT}"
 DISABLE_OUTPUT_CLEANUP  = "${DISABLE_OUTPUT_CLEANUP_DEFAULT}"
 ENTRANCE                = "${ENTRANCE_DEFAULT}"
+FLOWS                   = "${FLOWS_DEFAULT}"
 
 NOTES:
 
 1. You must be in the directory specific to the level
-2. DEPLOYMENT_UNIT must be one of "s3", "cert", "roles", "apigateway" or "waf" for the "account" level
-3. For the "segment" level the "baseline" unit must be deployed before any other unit
-4. When deploying network level components in the "segment" level you must deploy vpc before igw, nat, or vpcendpoint
 
 EOF
 }
@@ -67,8 +68,9 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":c:d:e:f:g:hi:l:o:p:q:r:u:xz:" option; do
+  while getopts ":b:c:d:e:f:g:hi:l:o:p:q:r:u:xz:" option; do
       case "${option}" in
+          b) FLOWS+=("${OPTARG}") ;;
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
           e) ENTRANCE="${OPTARG}" ;;
@@ -100,11 +102,17 @@ function options() {
   GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-${GENERATION_INPUT_SOURCE_DEFAULT}}"
   DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
   ENTRANCE="${ENTRANCE:-${ENTRANCE_DEFAULT}}"
+  FLOWS="${FLOWS:-${FLOWS_DEFAULT}}"
 
   if [[ "${#GENERATION_PROVIDERS[@]}" == "0" ]]; then
     GENERATION_PROVIDERS+=("${GENERATION_PROVIDERS_DEFAULT}")
   fi
   GENERATION_PROVIDERS=$(listFromArray "GENERATION_PROVIDERS" ",")
+
+  if [[ "${#FLOWS[@]}" == "0" ]]; then
+    FLOWS+=("${FLOWS_DEFAULT}")
+  fi
+  FLOWS=$(listFromArray "FLOWS" ",")
 
   # Ensure other mandatory arguments have been provided
   if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
@@ -288,6 +296,7 @@ function get_openapi_definition_file() {
 
 function process_template_pass() {
   local entrance="${1,,}"; shift
+  local flows="${1,,}"; shift
   local providers="${1,,}"; shift
   local deployment_framework="${1,,}"; shift
   local output_type="${1,,}"; shift
@@ -456,6 +465,7 @@ function process_template_pass() {
   local args=()
   [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
   [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
+  [[ -n "${flows}" ]]                     && args+=("-v" "flows=${flows}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
   [[ -n "${GENERATION_MODEL}" ]]          && args+=("-v" "deploymentFrameworkModel=${GENERATION_MODEL}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
@@ -683,6 +693,7 @@ function process_template_pass() {
 
 function process_template() {
   local entrance="${1,,}"; shift
+  local flows="${1,,}"; shift
   local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
@@ -800,6 +811,7 @@ function process_template() {
   # First see if a generation contract can be generated
   process_template_pass \
       "${entrance}" \
+      "${flows}" \
       "${GENERATION_PROVIDERS}" \
       "${GENERATION_FRAMEWORK}" \
       "contract" \
@@ -865,6 +877,7 @@ function process_template() {
 
     process_template_pass \
       "${entrance}" \
+      "${flows}" \
       "${task_parameters[@]}" \
       "${level}" \
       "${deployment_unit}" \
@@ -950,6 +963,7 @@ function main() {
     blueprint-disabled)
       process_template \
         "${ENTRANCE}" \
+        "${FLOWS}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "" "${ACCOUNT_REGION}" \
@@ -962,6 +976,7 @@ function main() {
     *)
       process_template \
         "${ENTRANCE}" \
+        "${FLOWS}" \
         "${LEVEL}" \
         "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
         "${ACCOUNT}" "${ACCOUNT_REGION}" \
