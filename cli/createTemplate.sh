@@ -564,6 +564,7 @@ function process_template_pass() {
 
   # Check for fatal strings in the output
   grep "COTFatal:" < "${template_result_file}" > "${template_result_file}-exceptionstrings"
+  grep "HamletFatal:" < "${template_result_file}" >> "${template_result_file}-exceptionstrings"
   if [[ -s "${template_result_file}-exceptionstrings"  ]]; then
     fatal "Exceptions occurred during template generation. Details follow...\n"
     case "$(fileExtension "${template_result_file}")" in
@@ -603,14 +604,20 @@ function process_template_pass() {
 
         existing_request_reference="$( grep "#--COT-RequestReference=" "${output_file}" )"
         [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--COT-RequestReference="}//g")
+        existing_request_reference="$( grep "#--Hamlet-RequestReference=" "${output_file}" )"
+        [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--Hamlet-RequestReference="}//g")
 
         existing_configuration_reference="$( grep "#--COT-ConfigurationReference=" "${output_file}" )"
         [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--COT-ConfigurationReference="}//g")
+        existing_configuration_reference="$( grep "#--Hamlet-ConfigurationReference=" "${output_file}" )"
+        [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--Hamlet-ConfigurationReference="}//g")
 
         if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
           sed_patterns+=("-e" "s/${run_id}//g")
           existing_run_id="$( grep "#--COT-RunId=" "${output_file}" )"
           [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--COT-RunId="}//g")
+          existing_run_id="$( grep "#--Hamlet-RunId=" "${output_file}" )"
+          [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--Hamlet-RunId="}//g")
         fi
 
         cat "${template_result_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
@@ -635,6 +642,8 @@ function process_template_pass() {
       # Detect any exceptions during generation
       jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
         < "${template_result_file}" > "${template_result_file}-exceptions"
+      jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+        < "${template_result_file}" >> "${template_result_file}-exceptions"
       if [[ -s "${template_result_file}-exceptions" ]]; then
         fatal "Exceptions occurred during template generation. Details follow...\n"
         cat "${template_result_file}-exceptions" >&2
@@ -713,7 +722,7 @@ function process_template() {
   case "${entrance}" in
 
     schema)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cot"
+      local cf_dir_default="${PRODUCT_STATE_DIR}/hamlet"
       ;;
 
     deployment)
@@ -749,7 +758,7 @@ function process_template() {
       ;;
 
     *)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
+      local cf_dir_default="${PRODUCT_STATE_DIR}/hamlet/${ENVIRONMENT}/${SEGMENT}"
       ;;
   esac
 
