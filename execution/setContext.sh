@@ -48,10 +48,6 @@ if [[ "${GENERATION_NO_CMDB_CHECK}" != "true" ]]; then
         { fatal "CMDB cleanup failed."; exit 1; }
 fi
 
-# Ensure the cache directory exists
-export CACHE_DIR="${GENERATION_DATA_DIR}/cache"
-mkdir -p "${CACHE_DIR}"
-
 # Check if the current directory gives any clue to the context
 # Accommodate both pre cmdb v2.0.0 where segment/environment in the config tree
 # and post v2.0.0 where they are in the infrastructure tree
@@ -141,7 +137,7 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     "${SEGMENT_SHARED_SOLUTIONS_DIR}" \
     "${PRODUCT_SHARED_SOLUTIONS_DIR}" )
 
-    export COMPOSITE_BLUEPRINT="${CACHE_DIR}/composite_blueprint.json"
+    export COMPOSITE_BLUEPRINT="${GENERATION_CACHE_DIR}/composite_blueprint.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
             ("${GENERATION_USE_BLUEPRINT_CACHE}" != "true")) ||
         (! -f "${COMPOSITE_BLUEPRINT}") ]]; then
@@ -211,7 +207,7 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
 
     # Perform a few consistency checks
     [[ ! -s "${COMPOSITE_BLUEPRINT}" ]] && fatalCantProceed "The composite blueprint is empty. The likely cause of this is malformed JSON object in the Solution." && exit 1
-    
+
     [[ -z "${REGION}" ]] && fatalCantProceed "The region must be defined in the Product blueprint section." && exit 1
 
     BLUEPRINT_ACCOUNT=$(runJQ -r '.Account.Name | select(.!=null)' < ${COMPOSITE_BLUEPRINT})

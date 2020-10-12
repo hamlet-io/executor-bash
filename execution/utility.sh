@@ -588,6 +588,25 @@ function getTempFile() {
     mktemp -t "${template}"
 }
 
+#-- Cache management
+
+function getCacheDir() {
+  local cache_root="$1"; shift
+  local cache_name="$1"; shift
+
+  if [[ -n "${cache_root}" ]]; then
+    mkdir -p "${cache_root}"
+  fi
+
+  if [[ -n "${cache_name}" ]]; then
+    cache_dir="${cache_root}/${cache_name}"
+    mkdir -p "${cache_dir}"
+    echo "${cache_dir}"
+  else
+    getTempDir "hamlet_cache_XXXXXX" "${cache_root}"
+  fi
+}
+
 # -- Cli file generation --
 function split_cli_file() {
   local cli_file="$1"; shift
