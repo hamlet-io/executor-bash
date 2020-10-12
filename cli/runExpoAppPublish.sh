@@ -329,7 +329,11 @@ function main() {
 
   # Create build blueprint
   info "Generating build blueprint..."
+  pushd "$(pwd)"
+  cd "${SEGMENT_SOLUTIONS_DIR}"
   "${GENERATION_DIR}/createBuildblueprint.sh" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
+  popd
+
   BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
   # Make sure we are in the build source directory
