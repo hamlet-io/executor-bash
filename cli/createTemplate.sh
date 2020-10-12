@@ -120,15 +120,15 @@ function options() {
     return 1
   fi
 
+  # Cache for asssembled components
+  CACHE_PATH="${ROOT_DIR//"/"/"_"}"
+  export GENERATION_CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" "${CACHE_PATH}" )"
+
   # Input control for composite/CMDB input
   if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
 
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
-
-    # Cache for asssembled components
-    CACHE_PATH="${ROOT_DIR//"/"/"_"}"
-    export GENERATION_CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" "${CACHE_PATH}" )"
 
     # Ensure we are in the right place
     case "${LEVEL}" in
@@ -172,15 +172,11 @@ function options() {
 
   # Specific input control for mock input
   if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
-
-    # Cache for asssembled components
-    export GENERATION_CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" "" )"
-
     if [[ -z "${OUTPUT_DIR}" ]]; then
+      fatal "OUTPUT_DIR required for mock input source"
       fatalMandatory
       return 1
     fi
-
   fi
 
   # Add default composite fragments including end fragment
