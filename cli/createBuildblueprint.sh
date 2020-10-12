@@ -7,9 +7,9 @@ trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 function options() {
 
   # Parse options
-  while getopts ":f:hi:o:p:u:" option; do
+  while getopts ":f:hi:l:o:p:u:" option; do
       case "${option}" in
-          f|i|o|p|u) TEMPLATE_ARGS="${TEMPLATE_ARGS} -${option} ${OPTARG}" ;;
+          f|i|l|o|p|u) TEMPLATE_ARGS="${TEMPLATE_ARGS} -${option} ${OPTARG}" ;;
           h) usage; return 1 ;;
           \?) fatalOption; return 1 ;;
       esac
@@ -36,6 +36,7 @@ PARAMETERS:
 (o) -o OUTPUT_DIR              is the directory where the outputs will be saved - defaults to the PRODUCT_STATE_DIR
 (o) -p GENERATION_PROVIDER     is a provider to load for template generation - multiple providers can be added with extra arguments
 (m) -u DEPLOYMENT_UNIT         is the deployment unit to be included in the template
+(m) -l DEPLOYMENT_GROUP        is the deployment group/level the unit belongs to
 
   (m) mandatory, (o) optional, (d) deprecated
 
