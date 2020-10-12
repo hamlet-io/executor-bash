@@ -16,6 +16,9 @@ for dir in "${PLUGINDIRS[@]}"; do
     fi
 done
 
+# Set global default cache
+GENERATION_CACHE_DIR="${GENERATION_CACHE_DIR:-"${HOME}/.hamlet/cache"}"
+
 function getLogLevel() {
   checkLogLevel "${GENERATION_LOG_LEVEL}"
 }
