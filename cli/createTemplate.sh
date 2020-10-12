@@ -128,8 +128,6 @@ function options() {
 
     # Ensure we are in the right place
     case "${ENTRANCE}" in
-      buildblueprint)
-        ;;
       deployment)
         case "${LEVEL}" in
           account)
