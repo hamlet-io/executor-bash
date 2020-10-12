@@ -310,7 +310,7 @@ function assemble_composite_definitions() {
   jqMerge "${definitions_array[@]}" > "${tmp_file}"
 
   # Escape any freemarker markup
-  export COMPOSITE_DEFINITIONS="${GENERATION_CACHE_DIR}/composite_definitions.json"
+  export COMPOSITE_DEFINITIONS="${CACHE_DIR}/composite_definitions.json"
   sed 's/${/$\\{/g' < "${tmp_file}" > "${COMPOSITE_DEFINITIONS}"
 }
 
@@ -336,7 +336,7 @@ function assemble_composite_stack_outputs() {
 
   debug "STACK_OUTPUTS=${stack_array[*]}"
 
-  export COMPOSITE_STACK_OUTPUTS="${GENERATION_CACHE_DIR}/composite_stack_outputs.json"
+  export COMPOSITE_STACK_OUTPUTS="${CACHE_DIR}/composite_stack_outputs.json"
 
   getFilesAsJSON "${COMPOSITE_STACK_OUTPUTS}" "${stack_array[@]}"; return_status=$?
 

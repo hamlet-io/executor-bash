@@ -592,14 +592,15 @@ function getTempFile() {
 
 function getCacheDir() {
   local cache_root="$1"; shift
-  local cache_name="$1"; shift
 
   if [[ -n "${cache_root}" ]]; then
     mkdir -p "${cache_root}"
   fi
 
-  if [[ -n "${cache_name}" ]]; then
-    cache_dir="${cache_root}/${cache_name}"
+  cache_path="${ROOT_DIR//"/"/"_"}"
+
+  if [[ -n "${cache_path}" ]]; then
+    cache_dir="${cache_root}/${cache_path}"
     mkdir -p "${cache_dir}"
     echo "${cache_dir}"
   else

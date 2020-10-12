@@ -140,7 +140,7 @@ function options() {
     esac
 
     # Assemble settings
-    export COMPOSITE_SETTINGS="${GENERATION_CACHE_DIR}/composite_settings.json"
+    export COMPOSITE_SETTINGS="${CACHE_DIR}/composite_settings.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
             ("${GENERATION_USE_SETTINGS_CACHE}" != "true")) ||
         (! -f "${COMPOSITE_SETTINGS}") ]]; then
@@ -149,7 +149,7 @@ function options() {
     fi
 
     # Create the composite definitions
-    export COMPOSITE_DEFINITIONS="${GENERATION_CACHE_DIR}/composite_definitions.json"
+    export COMPOSITE_DEFINITIONS="${CACHE_DIR}/composite_definitions.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
             ("${GENERATION_USE_DEFINITIONS_CACHE}" != "true")) ||
         (! -f "${COMPOSITE_DEFINITIONS}") ]]; then
@@ -157,7 +157,7 @@ function options() {
     fi
 
     # Create the composite stack outputs
-    export COMPOSITE_STACK_OUTPUTS="${GENERATION_CACHE_DIR}/composite_stack_outputs.json"
+    export COMPOSITE_STACK_OUTPUTS="${CACHE_DIR}/composite_stack_outputs.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
             ("${GENERATION_USE_STACK_OUTPUTS_CACHE}" != "true")) ||
         (! -f "${COMPOSITE_STACK_OUTPUTS}") ]]; then
@@ -168,7 +168,10 @@ function options() {
 
   # Specific input control for mock input
   if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
-    export GENERATION_CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" "" )"
+
+    # Cache for asssembled components
+    export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
+
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "OUTPUT_DIR required for mock input source"
       fatalMandatory
@@ -179,7 +182,7 @@ function options() {
   # Add default composite fragments including end fragment
   if [[ (("${GENERATION_USE_CACHE}" != "true")  &&
       ("${GENERATION_USE_FRAGMENTS_CACHE}" != "true")) ||
-      (! -f "${GENERATION_CACHE_DIR}/composite_account.ftl") ]]; then
+      (! -f "${CACHE_DIR}/composite_account.ftl") ]]; then
 
       TEMPLATE_COMPOSITES=("account" "fragment")
       for composite in "${TEMPLATE_COMPOSITES[@]}"; do
@@ -225,11 +228,11 @@ function options() {
           declare -n composite_array="${composite}_array" ||
           eval "declare composite_array=(\"\${${composite}_array[@]}\")"
           debug "${composite^^}=${composite_array[*]}"
-          cat "${composite_array[@]}" > "${GENERATION_CACHE_DIR}/composite_${composite}.ftl"
+          cat "${composite_array[@]}" > "${CACHE_DIR}/composite_${composite}.ftl"
       done
 
       for composite in "segment" "solution" "application" "id" "name" "policy" "resource"; do
-          rm -rf "${GENERATION_CACHE_DIR}/composite_${composite}.ftl"
+          rm -rf "${CACHE_DIR}/composite_${composite}.ftl"
       done
   fi
 
@@ -477,7 +480,7 @@ function process_template_pass() {
   # Removal of drive letter (/?/) is specifically for MINGW
   # It shouldn't affect other platforms as it won't be matched
   for composite in "${template_composites[@]}"; do
-    composite_var="${GENERATION_CACHE_DIR}/composite_${composite,,}.ftl"
+    composite_var="${CACHE_DIR}/composite_${composite,,}.ftl"
     args+=("-r" "${composite,,}List=${composite_var#/?/}")
   done
 
