@@ -329,12 +329,7 @@ function main() {
 
   # Create build blueprint
   info "Generating build blueprint..."
-  pushd "$(pwd)"
-  echo "Seg Dir: ${SEGMENT_SOLUTIONS_DIR}"
-  cd "${SEGMENT_SOLUTIONS_DIR}"
   "${GENERATION_DIR}/createBuildblueprint.sh" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
-  popd
-
   BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
   # Make sure we are in the build source directory
@@ -591,6 +586,8 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
 
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
+
+            echo "Turtle params ${TURTLE_EXTRA_BUILD_ARGS}"
             ;;
         "*")
             echo "Unkown build format" && return 128
