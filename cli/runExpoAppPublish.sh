@@ -508,46 +508,6 @@ function main() {
   info "Copying OTA to CDN"
   aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}" || return $?
 
-  # Multi-manifest is only supported or required by the Expo Client based apps
-  # Not required for bare or native expo worflows
-  if [[ "${BINARY_BUILD_PROCESS}" == "turtle" ]]; then
-
-    EXPO_MULTI_PUBLIC_URL="${PUBLIC_URL}/multi"
-
-    # Get all of the base OTA updates
-    aws --region "${AWS_REGION}" s3 cp --only-show-errors --recursive --exclude "${EXPO_SDK_VERSION}/*" --exclude "${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}/*" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/" "${SRC_PATH}/app/dist/packages/"
-    EXPO_EXPORT_MERGE_ARGUMENTS=""
-    for dir in ${SRC_PATH}/app/dist/packages/*/ ; do
-        EXPO_EXPORT_MERGE_ARGUMENTS="${EXPO_EXPORT_MERGE_ARGUMENTS} --merge-src-dir "${dir}""
-    done
-
-    # Create master export
-    info "Creating master OTA artefact with Extra Dirs: ${EXPO_EXPORT_MERGE_ARGUMENTS}"
-    expo export --public-url "${EXPO_MULTI_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/multi/" ${EXPO_EXPORT_MERGE_ARGUMENTS}  || return $?
-
-    if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
-
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/mulit/ios-index.json" > "${tmpdir}/ios-multi-expo-override.json"
-        mv "${tmpdir}/ios-multi-expo-override.json" "${SRC_PATH}/app/dist/multi/ios-index.json"
-
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" 'if type=="array" then [ .[] | .id=$EXPO_ID_OVERRIDE ] else .id=$EXPO_ID_OVERRIDE end' < "${SRC_PATH}/app/dist/multi/android-index.json" > "${tmpdir}/android-mulit-expo-override.json"
-        mv "${tmpdir}/android-multi-expo-override.json" "${SRC_PATH}/app/dist/multi/android-index.json"
-
-    fi
-
-    if [[ -n "${BUILD_REFERENCE}" ]]; then
-      info "Override revisionId in multi export to match the build reference ${BUILD_REFERENCE}"
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/multi/ios-index.json" > "${tmpdir}/ios-multi-ref-expo-override.json"
-      mv "${tmpdir}/ios-multi-ref-override.json" "${SRC_PATH}/app/dist/multi/ios-index.json"
-
-      jq -c --arg REVISION_ID "${BUILD_REFERENCE}" 'if type=="array" then [ .[] | .revisionId=$REVISION_ID ] else .revisionId=$REVISION_ID end' < "${SRC_PATH}/app/dist/multi/android-index.json" > "${tmpdir}/android-multi-ref-expo-override.json"
-      mv "${tmpdir}/android-multi-ref-expo-override.json" "${SRC_PATH}/app/dist/multi/android-index.json"
-
-    fi
-
-    aws --region "${AWS_REGION}" s3 sync --only-show-errors "${SRC_PATH}/app/dist/multi/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/multi" || return $?
-  fi
-
    DETAILED_HTML_BINARY_MESSAGE="<h4>Expo Binary Builds</h4>"
    if [[ "${BUILD_BINARY}" == "false" ]]; then
      DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE} <p> No binary builds were generated for this publish </p>"
@@ -556,6 +516,8 @@ function main() {
   for build_format in "${BUILD_FORMATS[@]}"; do
 
       BINARY_FILE_PREFIX="${build_format}"
+      EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
+
       case "${build_format}" in
         "android")
             BINARY_FILE_EXTENSION="apk"
@@ -604,7 +566,6 @@ function main() {
 
         case "${BINARY_BUILD_PROCESS}" in
             "turtle")
-                EXPO_MANIFEST_URL="${EXPO_MULTI_PUBLIC_URL}/${build_format}-index.json"
                 echo "Using turtle to build the binary image"
 
                 # Setup Turtle
@@ -618,7 +579,6 @@ function main() {
                 ;;
 
             "fastlane")
-                EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
                 echo "Using fastlane to build the binary image"
 
                 if [[ "${build_format}" == "ios" ]]; then
@@ -832,13 +792,13 @@ function main() {
         EXPO_QR_FILE_NAME="${EXPO_QR_FILE_PREFIX}-qr.png"
         EXPO_QR_FILE_PATH="${REPORTS_PATH}/${EXPO_QR_FILE_NAME}"
 
-        qr "exp://${EXPO_MULTI_PUBLIC_URL#*//}/${qr_build_format}-index.json?release-channel=${RELEASE_CHANNEL}" > "${EXPO_QR_FILE_PATH}" || return $?
+        qr "exp://${EXPO_VERSION_PUBLIC_URL#*//}/${qr_build_format}-index.json?release-channel=${RELEASE_CHANNEL}" > "${EXPO_QR_FILE_PATH}" || return $?
 
         DETAILED_HTML_QR_MESSAGE="${DETAILED_HTML_QR_MESSAGE}<p><strong>${qr_build_format}</strong> <br> <img src=\"./${EXPO_QR_FILE_NAME}\" alt=\"EXPO QR Code\" width=\"200px\" /></p>"
 
     done
 
-     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_MULTI_PUBLIC_URL}</li>"
+     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"
   fi
 
   if [[ "${BINARY_BUILD_PROCESS}" == "fastlane" ]]; then
