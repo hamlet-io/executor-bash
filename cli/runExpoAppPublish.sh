@@ -200,7 +200,7 @@ where
 
     -h                        shows this text
 (m) -u DEPLOYMENT_UNIT        is the mobile app deployment unit
-(o) -g DEPLOYMENTG_GROUP      is the group the deployment unit belongs to
+(o) -g DEPLOYMENT_GROUP      is the group the deployment unit belongs to
 (o) -s RUN_SETUP              run setup installation to prepare
 (o) -t BINARY_EXPIRATION      how long presigned urls are active for once created ( seconds )
 (o) -f FORCE_BINARY_BUILD     force the build of binary images
@@ -245,7 +245,7 @@ function options() {
                 FORCE_BINARY_BUILD="true"
                 ;;
             g)
-                DEPLOYMENTG_GROUP="${OPTARG}"
+                DEPLOYMENT_GROUP="${OPTARG}"
                 ;;
             h)
                 usage
