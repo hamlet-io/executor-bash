@@ -330,6 +330,7 @@ function main() {
   # Create build blueprint
   info "Generating build blueprint..."
   pushd "$(pwd)"
+  echo "Seg Dir: ${SEGMENT_SOLUTIONS_DIR}"
   cd "${SEGMENT_SOLUTIONS_DIR}"
   "${GENERATION_DIR}/createBuildblueprint.sh" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
   popd
