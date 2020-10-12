@@ -585,9 +585,9 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
 
+            # Turtle Specific overrides
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
-
-            echo "Turtle params ${TURTLE_EXTRA_BUILD_ARGS}"
+            export EXPO_IOS_DIST_P12_PASSWORD="${IOS_DIST_P12_PASSWORD}"
             ;;
         "*")
             echo "Unkown build format" && return 128
