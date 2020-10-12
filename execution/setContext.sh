@@ -127,6 +127,10 @@ popd >/dev/null
 # Analyse directory structure
 findGen3Dirs "${GENERATION_DATA_DIR}" || exit
 
+# Cache for asssembled components
+CACHE_PATH="${ROOT_DIR//"/"/"_"}"
+export GENERATION_CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" "${CACHE_PATH}" )"
+
 # Build the composite solution ( aka blueprint)
 export GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-"composite"}"
 
