@@ -77,6 +77,8 @@ DEFAULT_APP_VERSION_SOURCE="manifest"
 DEFAULT_BUILD_LOGS="false"
 DEFAULT_KMS_PREFIX="base64:"
 
+DEFAULT_DEPLOYMENT_GROUP="application"
+
 export FASTLANE_SKIP_UPDATE_CHECK="true"
 export FASTLANE_HIDE_CHANGELOG="true"
 export FASTLANE_DISABLE_COLORS=1
@@ -198,6 +200,7 @@ where
 
     -h                        shows this text
 (m) -u DEPLOYMENT_UNIT        is the mobile app deployment unit
+(o) -g DEPLOYMENTG_GROUP      is the group the deployment unit belongs to
 (o) -s RUN_SETUP              run setup installation to prepare
 (o) -t BINARY_EXPIRATION      how long presigned urls are active for once created ( seconds )
 (o) -f FORCE_BINARY_BUILD     force the build of binary images
@@ -221,6 +224,7 @@ BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
 BUILD_LOGS = ${DEFAULT_BUILD_LOGS}
+DEPLOYMENT_GROUP = ${DEFAULT_DEPLOYMENT_GROUP}
 
 NOTES:
 RELEASE_CHANNEL default is environment
@@ -232,13 +236,16 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":bfhmsq:t:u:v:" opt; do
+    while getopts ":b:fg:hk:lmn:sq:t:u:v:" opt; do
         case $opt in
             b)
                 BINARY_BUILD_PROCESS="${OPTARG}"
                 ;;
             f)
                 FORCE_BINARY_BUILD="true"
+                ;;
+            g)
+                DEPLOYMENTG_GROUP="${OPTARG}"
                 ;;
             h)
                 usage
@@ -291,6 +298,7 @@ function options() {
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
     KMS_PREFIX="${KMS_PREFIX:-${DEFAULT_KMS_PREFIX}}"
+    DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
 }
 
 
@@ -321,9 +329,8 @@ function main() {
 
   # Create build blueprint
   info "Generating build blueprint..."
-  "${GENERATION_DIR}/createBuildblueprint.sh" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
-
-  BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
+  "${GENERATION_DIR}/createBuildblueprint.sh" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
+  BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
   # Make sure we are in the build source directory
   BINARY_PATH="${AUTOMATION_DATA_DIR}/binary"
