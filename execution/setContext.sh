@@ -131,13 +131,17 @@ findGen3Dirs "${GENERATION_DATA_DIR}" || exit
 export GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-"composite"}"
 
 if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
+
+    # Cache for asssembled components
+    export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
+
     blueprint_alternate_dirs=( \
     "${SEGMENT_SOLUTIONS_DIR}" \
     "${ENVIRONMENT_SHARED_SOLUTIONS_DIR}" \
     "${SEGMENT_SHARED_SOLUTIONS_DIR}" \
     "${PRODUCT_SHARED_SOLUTIONS_DIR}" )
 
-    export COMPOSITE_BLUEPRINT="${GENERATION_CACHE_DIR}/composite_blueprint.json"
+    export COMPOSITE_BLUEPRINT="${CACHE_DIR}/composite_blueprint.json"
     if [[ (("${GENERATION_USE_CACHE}" != "true") &&
             ("${GENERATION_USE_BLUEPRINT_CACHE}" != "true")) ||
         (! -f "${COMPOSITE_BLUEPRINT}") ]]; then
