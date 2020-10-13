@@ -175,9 +175,8 @@ function main() {
             encrypt|reencrypt|listcmk)
 
                 info "Finding Segment CMK..."
-                ${GENERATION_DIR}/createBuildblueprint.sh -u baseline -o "${tmp_dir}/" >/dev/null || return $?
-
-                BUILD_BLUEPRINT="${tmp_dir}/build_blueprint-baseline-config.json"
+                ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -l "segment" -u "baseline" -o "${tmp_dir}/" >/dev/null || return $?
+                BUILD_BLUEPRINT="${tmp_dir}/buildblueprint-segment-baseline-config.json"
 
                 case "${LOCATION}" in
                     "segment")
