@@ -8,7 +8,7 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' E
 #Defaults
 INCLUDE_LOG_TAIL_DEFAULT="true"
 
-tmpdir="$(getTempDir "cote_inf_XXX")"
+tmpdir="$(getTempDir "hamlete_inf_XXX")"
 
 function usage() {
     cat <<EOF
@@ -90,8 +90,8 @@ function main() {
     # Create build blueprint
     ${GENERATION_DIR}/createBuildblueprint.sh -u "${DEPLOYMENT_UNIT}" >/dev/null || return $?
 
-    COT_TEMPLATE_DIR="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}"
-    BUILD_BLUEPRINT="${COT_TEMPLATE_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
+    HAMLET_TEMPLATE_DIR="${PRODUCT_STATE_DIR}/hamlet/${ENVIRONMENT}/${SEGMENT}"
+    BUILD_BLUEPRINT="${HAMLET_TEMPLATE_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
 
     DEPLOYMENT_UNIT_TYPE="$(jq -r '.Type' < "${BUILD_BLUEPRINT}" )"
 

@@ -64,9 +64,13 @@ done
 JOB_PATH=($(tr "/" " " <<< "${JOB_NAME}"))
 PARTS=()
 COT_PREFIX="cot-"
+HAMLET_PREFIX="hamlet-"
 for PART in ${JOB_PATH[@]}; do
     if [[ "${PART}" =~ ^${COT_PREFIX}* ]]; then
         PARTS+=("${PART#${COT_PREFIX}}")
+    fi
+    if [[ "${PART}" =~ ^${HAMLET_PREFIX}* ]]; then
+        PARTS+=("${PART#${HAMLET_PREFIX}}")
     fi
 done
 PARTS_COUNT="${#PARTS[@]}"
