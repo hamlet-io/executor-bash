@@ -64,7 +64,7 @@ case $LEVEL in
         ;;
 esac
 
-# Check for "legacy" files i.e. deployment files that are still in the segment directory 
+# Check for "legacy" files i.e. deployment files that are still in the segment directory
 legacy_files=()
 if [[ -d "${CF_DIR}" ]]; then
     readarray -t legacy_files < <(find "${CF_DIR}" -mindepth 1 -maxdepth 1 -name "*${DEPLOYMENT_UNIT}*" )
@@ -212,6 +212,6 @@ fi
 
 CLI="${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}cli.json"
 
-DEFINITION="${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}definition.json"
+DEFINITION="defn-${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}definition.json"
 
 PARAMETERS="${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}parameters.json"
