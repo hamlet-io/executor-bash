@@ -126,24 +126,15 @@ function options() {
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-    # Ensure we are in the right place
-    case "${ENTRANCE}" in
-      deployment)
-        case "${LEVEL}" in
-          account)
-            [[ ! ("${LEVEL}" =~ ${LOCATION}) ]] &&
-              fatalLocation "Current directory doesn't match requested level \"${LEVEL}\"." && return 1
-            ;;
-
-          solution|segment|application)
-            [[ ! ("segment" =~ ${LOCATION}) ]] &&
-              fatalLocation "Current directory doesn't match requested level \"${LEVEL}\"." && return 1
-            ;;
-        esac
+    case "${LEVEL}" in
+      account)
+        [[ -z "${ACCOUNT_DIR}" ]] &&
+          fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
         ;;
-      blueprint|unitlist)
-        [[ ! ("segment" =~ ${LOCATION}) ]] &&
-          fatalLocation "Current directory doesn't match requested entrance \"${ENTRANCE}\"." && return 1
+
+      *)
+        [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
+          fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
         ;;
     esac
 
