@@ -174,9 +174,18 @@ function main() {
         case ${CRYPTO_OPERATION} in
             encrypt|reencrypt|listcmk)
 
-                info "Finding Segment CMK..."
-                ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -l "segment" -u "baseline" -o "${tmp_dir}/" >/dev/null || return $?
-                BUILD_BLUEPRINT="${tmp_dir}/buildblueprint-segment-baseline-config.json"
+                # Generate a build blueprint so that we can find out the source S3 bucket
+                DEPLOYMENT_GROUP="segment"
+                DEPLOYMENT_UNIT="baseline"
+
+                info "Generating blueprint to find details..."
+                ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmp_dir}" > /dev/null
+                BUILD_BLUEPRINT="${tmp_dir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
+
+                if [[ ! -f "${BUILD_BLUEPRINT}" || -z "$(cat ${BUILD_BLUEPRINT} )" ]]; then
+                    fatal "Could not generate blueprint for task details"
+                    return 255
+                fi
 
                 case "${LOCATION}" in
                     "segment")

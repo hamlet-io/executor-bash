@@ -327,10 +327,15 @@ function main() {
   cleanup_bundler ||
   { fatal "Can't shut down previous instance of the bundler"; return 1; }
 
-  # Create build blueprint
-  info "Generating build blueprint..."
-  "${GENERATION_DIR}/createBuildblueprint.sh" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
-  BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
+  # Generate a build blueprint so that we can find out the source S3 bucket
+  info "Generating blueprint to find details..."
+  ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" > /dev/null
+  BUILD_BLUEPRINT="${tmpdir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
+
+  if [[ ! -f "${BUILD_BLUEPRINT}" || -z "$(cat ${BUILD_BLUEPRINT} )" ]]; then
+      fatal "Could not generate blueprint for task details"
+      return 255
+  fi
 
   # Make sure we are in the build source directory
   BINARY_PATH="${AUTOMATION_DATA_DIR}/binary"
