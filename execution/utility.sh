@@ -2508,3 +2508,13 @@ function release_enis() {
       done
     fi
 }
+
+# -- Formatting of openapi definition file  --
+function get_openapi_definition_filename() {
+  local name="$1"; shift
+  local accountId="$1"; shift
+  local region="$1"; shift
+
+  echo -n "defn-${name}-${accountId}-${region}-definition.json"
+}
+
