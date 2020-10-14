@@ -53,7 +53,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":hm:p:r:su:" opt; do
+    while getopts ":hg:m:p:r:su:" opt; do
         case $opt in
             g)
                 DEPLOYMENT_GROUP="${OPTARG}"

@@ -44,7 +44,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":f:hi:lu:" opt; do
+    while getopts ":f:g:hi:lu:" opt; do
         case $opt in
             h)
                 usage
