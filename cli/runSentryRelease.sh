@@ -8,9 +8,7 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 DEFAULT_SENTRY_CLI_VERSION="1.46.0"
 DEFAULT_RUN_SETUP="false"
 DEFAULT_SENTRY_URL_PREFIX="~/"
-
-# Get the generation context so we can run template generation
-. "${GENERATION_BASE_DIR}/execution/setContext.sh"
+DEFAULT_DEPLOYMENT_GROUP="application"
 
 function env_setup() {
 
@@ -34,6 +32,7 @@ Usage: $(basename $0) -m SENTRY_SOURCE_MAP_S3_URL -r SENTRY_RELEASE -s -u DEPLOY
 where
 
 (m) -u DEPLOYMENT_UNIT              deployment unit for a build blueprint
+(o) -g DEPLOYMENT_GROUP             the deployment group the unit belongs to
     -h                              shows this text
 (o) -m SENTRY_SOURCE_MAP_S3_URL     s3 link to sourcemap files
 (o) -p SENTRY_URL_PREFIX            prefix for sourcemap files
@@ -43,6 +42,7 @@ where
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
+DEPLOYMENT_GROUP = ${DEFAULT_DEPLOYMENT_GROUP}
 
 NOTES:
 
@@ -55,6 +55,9 @@ function options() {
     # Parse options
     while getopts ":hm:p:r:su:" opt; do
         case $opt in
+            g)
+                DEPLOYMENT_GROUP="${OPTARG}"
+                ;;
             h)
                 usage
                 ;;
@@ -83,9 +86,10 @@ function options() {
     done
 
     #Defaults
-    RUN_SETUP="${RUN_SETUP:-DEFAULT_RUN_SETUP}"
-    SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION:-$DEFAULT_SENTRY_CLI_VERSION}"
-    SENTRY_URL_PREFIX="${SENTRY_URL_PREFIX:-$DEFAULT_SENTRY_URL_PREFIX}"
+    DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
+    RUN_SETUP="${RUN_SETUP:-${DEFAULT_RUN_SETUP}}"
+    SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION:-${DEFAULT_SENTRY_CLI_VERSION}}"
+    SENTRY_URL_PREFIX="${SENTRY_URL_PREFIX:-${DEFAULT_SENTRY_URL_PREFIX}}"
 
 }
 
@@ -101,11 +105,18 @@ function main() {
   # Ensure mandatory arguments have been provided
   [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory
 
-  # Create build blueprint
-  info "Generating build blueprint..."
-  "${GENERATION_DIR}/createBuildblueprint.sh" -u "${DEPLOYMENT_UNIT}" -o "${AUTOMATION_DATA_DIR}" >/dev/null || return $?
+  # Get the generation context so we can run template generation
+  . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-  BUILD_BLUEPRINT="${AUTOMATION_DATA_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
+  # Generate a build blueprint so that we can find out the source S3 bucket
+  info "Generating blueprint to find details..."
+  ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" > /dev/null
+  BUILD_BLUEPRINT="${tmpdir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
+
+  if [[ ! -f "${BUILD_BLUEPRINT}" || -z "$(cat ${BUILD_BLUEPRINT} )" ]]; then
+      fatal "Could not generate blueprint for task details"
+      return 255
+  fi
 
   SOURCE_MAP_PATH="${AUTOMATION_DATA_DIR}/source_map"
   OPS_PATH="${AUTOMATION_DATA_DIR}/ops"

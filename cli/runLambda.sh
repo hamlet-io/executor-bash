@@ -7,8 +7,10 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' E
 
 #Defaults
 INCLUDE_LOG_TAIL_DEFAULT="true"
+DEPLOYMENT_GROUP_DEFAULT="application"
 
 tmpdir="$(getTempDir "hamlete_inf_XXX")"
+
 
 function usage() {
     cat <<EOF
@@ -21,6 +23,7 @@ where
 
     -h                  shows this text
 (m) -f FUNCTION_ID      is the id of the function in the lambda deployment to run
+(o) -g DEPLOYMENT_GROUP is the deployment group the unit belongs to
 (m) -u DEPLOYMENT_UNIT  is the lambda deployment unit you want to execute
 (o) -i INPUT_PAYLOAD    is the json based payload you want to run the lambda with
 (o) -l INCLUDE_LOG_TAIL include the last 4kb of the execution log
@@ -28,7 +31,7 @@ where
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
-
+DEPLOYMENT_GROUP = "${DEPLOYMENT_GROUP_DEFAULT}"
 
 NOTES:
 
@@ -52,6 +55,9 @@ function options() {
             l)
                 INCLUDE_LOG_TAIL="true"
                 ;;
+            g)
+                DEPLOYMENT_GROUP="${OPTARG}"
+                ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
                 ;;
@@ -68,7 +74,8 @@ function options() {
     done
 
     #Defaults
-    INCLUDE_LOG_TAIL="${INCLUDE_LOG_TAIL:-$INCLUDE_LOG_TAIL_DEFAULT}"
+    INCLUDE_LOG_TAIL="${INCLUDE_LOG_TAIL:-${INCLUDE_LOG_TAIL_DEFAULT}}"
+    DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEPLOYMENT_GROUP_DEFAULT}}"
 }
 
 function main() {
@@ -84,17 +91,17 @@ function main() {
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-    # Ensure we are in the right place
-    checkInSegmentDirectory
+    # Generate a build blueprint so that we can find out the source S3 bucket
+    info "Generating blueprint to find details..."
+    ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" > /dev/null
+    BUILD_BLUEPRINT="${tmpdir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
-    # Create build blueprint
-    ${GENERATION_DIR}/createBuildblueprint.sh -u "${DEPLOYMENT_UNIT}" >/dev/null || return $?
-
-    HAMLET_TEMPLATE_DIR="${PRODUCT_STATE_DIR}/hamlet/${ENVIRONMENT}/${SEGMENT}"
-    BUILD_BLUEPRINT="${HAMLET_TEMPLATE_DIR}/build_blueprint-${DEPLOYMENT_UNIT}-config.json"
+    if [[ ! -f "${BUILD_BLUEPRINT}" || -z "$(cat ${BUILD_BLUEPRINT} )" ]]; then
+        fatal "Could not generate blueprint for task details"
+        return 255
+    fi
 
     DEPLOYMENT_UNIT_TYPE="$(jq -r '.Type' < "${BUILD_BLUEPRINT}" )"
-
     LAMBDA_OUTPUT_FILE="${tmpdir}/${DEPLOYMENT_UNIT}_output.txt"
 
     if [[ "${DEPLOYMENT_UNIT_TYPE}" -ne "lambda" ]]; then

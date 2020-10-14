@@ -10,6 +10,8 @@ RETRY_COUNT_DEFAULT=120
 ENV_NAMES=()
 ENV_VALUES=()
 
+tmpdir="$(getTempDir "hamlet_runTask_XXX")"
+
 function usage() {
     cat <<EOF
 
@@ -117,16 +119,18 @@ fi
 
 status_file="$(getTopTempDir)/run_task_status.txt"
 
-# Ensure we are in the right place
-checkInSegmentDirectory
-
 # Generate a blueprint that we can use to find hosting details
 info "Generating blueprint to find details..."
-${GENERATION_DIR}/createBlueprint.sh >/dev/null || exit $?
-ENV_BLUEPRINT="${PRODUCT_STATE_DIR}/cot/${ENVIRONMENT}/${SEGMENT}/blueprint.json"
+${GENERATION_DIR}/createTemplate.sh -e "blueprint" -p "aws" -o "${tmpdir}" > /dev/null
+SEGMENT_BLUEPRINT="${tmpdir}/blueprint-config.json"
+
+if [[ ! -f "${SEGMENT_BLUEPRINT}" || -z "$(cat ${SEGMENT_BLUEPRINT} )" ]]; then
+    fatal "Could not generate blueprint for task details"
+    exit 255
+fi
 
 # Search through the blueprint to find the cluster and the task
-CLUSTER_BLUEPRINT="$(getJSONValue "${ENV_BLUEPRINT}" \
+CLUSTER_BLUEPRINT="$(getJSONValue "${SEGMENT_BLUEPRINT}" \
                                     " .Tenants[0]       | objects \
                                     | .Products[0]      | objects \
                                     | .Environments[0]  | objects \
