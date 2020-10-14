@@ -238,14 +238,6 @@ function options() {
   return 0
 }
 
-function get_openapi_definition_filename() {
-  local name="$1"; shift
-  local accountId="$1"; shift
-  local region="$1"; shift
-
-  echo -n "${cf_dir}/defn-${name}-${accountId}-${region}-definition.json"
-}
-
 function get_openapi_definition_file() {
   local registry="$1"; shift
   local openapi_zip="$1"; shift
@@ -259,7 +251,7 @@ function get_openapi_definition_file() {
   local openapi_file_dir="$(getTopTempDir)"
 
   # Name definitions based on the component
-  local definition_file=$( get_openapi_definition_filename "${name}" "${accountId}" "${region}" )
+  local definition_file="${cf_dir}/$( get_openapi_definition_filename "${name}" "${accountId}" "${region}" )"
 
   local openapi_file="${openapi_file_dir}/${registry}-extended-base.json"
   local legacy_openapi_file="${openapi_file_dir}/${registry}-${region}-${accountNumber}.json"
