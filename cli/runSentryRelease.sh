@@ -110,6 +110,7 @@ function main() {
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
+  tmpdir="$(getTempDir "cote_inf_XXX")"
   ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" > /dev/null
   BUILD_BLUEPRINT="${tmpdir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
