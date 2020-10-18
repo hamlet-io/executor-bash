@@ -5,58 +5,60 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 # Defaults
+ENTRANCE_DEFAULT="deployment"
+FLOWS_DEFAULT="components"
+GENERATION_PROVIDERS_DEFAULT="aws"
+GENERATION_FRAMEWORK_DEFAULT="cf"
 CONFIGURATION_REFERENCE_DEFAULT="unassigned"
 REQUEST_REFERENCE_DEFAULT="unassigned"
 DEPLOYMENT_MODE_DEFAULT="update"
-GENERATION_PROVIDERS_DEFAULT="aws"
-GENERATION_FRAMEWORK_DEFAULT="cf"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
 DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
-ENTRANCE_DEFAULT="deployment"
-FLOWS_DEFAULT="components"
 
 arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
 arrayFromList FLOWS "${FLOWS}" ","
+arrayFromList ENTRANCE_PARAMETERS "${ENTRANCE_PARAMETERS}" ","
 
 function usage() {
   cat <<EOF
 
 Create a CloudFormation (CF) template
 
-Usage: $(basename $0) -l LEVEL -u DEPLOYMENT_UNIT -c CONFIGURATION_REFERENCE -q REQUEST_REFERENCE -r REGION
+Usage: $(basename $0) -e ENTRANCE -p GENERATION_PROVIDER -f GENERATION_FRAMEWORK -l LEVEL -u DEPLOYMENT_UNIT -c CONFIGURATION_REFERENCE -q REQUEST_REFERENCE -r REGION
 
 where
 
 (o) -b FLOW                    is a flow through hamlet you want to invoke to perform your task
 (o) -c CONFIGURATION_REFERENCE is the identifier of the configuration used to generate this template
+(o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
 (o) -e ENTRANCE                is the hamlet entrance to start processing with
+(o) -f GENERATION_FRAMEWORK    is the output framework to use for template generation
 (o) -g RESOURCE_GROUP          is the deployment unit resource group
 (o) -i GENERATION_INPUT_SOURCE is the source of input data to use when generating the template - "composite", "mock"
     -h                         shows this text
 (m) -l LEVEL                   is the template level - "unitlist", "blueprint", "account", "segment", "solution" or "application"
 (o) -o OUTPUT_DIR              is the directory where the outputs will be saved - defaults to the PRODUCT_STATE_DIR
+(o) -p GENERATION_PROVIDER     is a provider to load for template generation - multiple providers can be added with extra arguments
 (o) -q REQUEST_REFERENCE       is an opaque value to link this template to a triggering request management system
 (o) -r REGION                  is the AWS region identifier
 (m) -u DEPLOYMENT_UNIT         is the deployment unit to be included in the template
-(o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
-(o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
-(o) -p GENERATION_PROVIDER     is a provider to load for template generation - multiple providers can be added with extra arguments
-(o) -f GENERATION_FRAMEWORK    is the output framework to use for template generation
 (o) -x DISABLE_OUTPUT_CLEANUP  disable removing existing outputs before adding new outputs
+(o) -y PARAM=VALUE             is an entrance specific parameter and its corresponding value
+(o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
 
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
 
+ENTRANCE                = "${ENTRANCE_DEFAULT}"
+FLOWS                   = "${FLOWS_DEFAULT}"
+GENERATION_PROVIDERS    = "${GENERATION_PROVIDERS_DEFAULT}"
+GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
 CONFIGURATION_REFERENCE = "${CONFIGURATION_REFERENCE_DEFAULT}"
 REQUEST_REFERENCE       = "${REQUEST_REFERENCE_DEFAULT}"
 DEPLOYMENT_MODE         = "${DEPLOYMENT_MODE_DEFAULT}"
-GENERATION_PROVIDERS    = "${GENERATION_PROVIDERS_DEFAULT}"
-GENERATION_FRAMEWORK    = "${GENERATION_FRAMEWORK_DEFAULT}"
-GENERATION_INPUT_SOURCE = "${GENRATION_INPUT_SOURCE_DEFAULT}"
+GENERATION_INPUT_SOURCE = "${GENERATION_INPUT_SOURCE_DEFAULT}"
 DISABLE_OUTPUT_CLEANUP  = "${DISABLE_OUTPUT_CLEANUP_DEFAULT}"
-ENTRANCE                = "${ENTRANCE_DEFAULT}"
-FLOWS                   = "${FLOWS_DEFAULT}"
 
 NOTES:
 
@@ -68,7 +70,7 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":b:c:d:e:f:g:hi:l:o:p:q:r:u:xz:" option; do
+  while getopts ":b:c:d:e:f:g:hi:l:o:p:q:r:u:xy:z:" option; do
       case "${option}" in
           b) FLOWS+=("${OPTARG}") ;;
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
@@ -88,6 +90,7 @@ function options() {
           r) REGION="${OPTARG}" ;;
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
           x) DISABLE_OUTPUT_CLEANUP="true" ;;
+          y) ENTRANCE_PARAMETERS+=("${OPTARG}") ;;
           z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
           \?) fatalOption; return 1 ;;
           :) fatalOptionArgument; return 1 ;;
@@ -113,6 +116,7 @@ function options() {
     FLOWS+=("${FLOWS_DEFAULT}")
   fi
   FLOWS=$(listFromArray "FLOWS" ",")
+  ENTRANCE_PARAMETERS=$(listFromArray "ENTRANCE_PARAMETERS" ",")
 
   # Ensure other mandatory arguments have been provided
   if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
@@ -317,6 +321,7 @@ function process_template_pass() {
   local cf_dir="${1}"; shift
   local run_id="${1,,}"; shift
   local deployment_unit_state_subdirectories="${1,,}"; shift
+  local entrance_parameters="${1}"; shift
 
   # Filename parts
   local entrance_prefix="${entrance:+${entrance}-}"
@@ -462,9 +467,9 @@ function process_template_pass() {
 
   # Args common across all passes
   local args=()
-  [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
   [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-v" "flows=${flows}")
+  [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
   [[ -n "${output_format}" ]]             && args+=("-v" "outputFormat=${output_format}")
@@ -494,6 +499,12 @@ function process_template_pass() {
   args+=("-v" "configurationReference=${configuration_reference}")
   args+=("-v" "deploymentMode=${DEPLOYMENT_MODE}")
   args+=("-v" "runId=${run_id}")
+
+  # Entrance parameters
+  arrayFromList entranceParameters "${entrance_parameters}" ","
+  for entranceParameter in "${entranceParameters[@]}"; do
+    args+=("-v" "${entranceParameter}")
+  done
 
   # Directory for temporary files
   local tmp_dir="$(getTopTempDir)"
@@ -712,6 +723,7 @@ function process_template() {
   local request_reference="${1}"; shift
   local configuration_reference="${1}"; shift
   local deployment_mode="${1}"; shift
+  local entranceParameters="${1}"; shift
 
   # Defaults
   local passes=("template")
@@ -839,7 +851,8 @@ function process_template() {
       "${deployment_mode}" \
       "${cf_dir}" \
       "${run_id}" \
-      "${deployment_unit_state_subdirectories}"
+      "${deployment_unit_state_subdirectories}" \
+      "${entrance_parameters}"
   local result=$?
 
   # Include contract in difference checking
@@ -899,7 +912,8 @@ function process_template() {
       "${deployment_mode}" \
       "${cf_dir}" \
       "${run_id}" \
-      "${deployment_unit_state_subdirectories}"
+      "${deployment_unit_state_subdirectories}" \
+      "${entrance_parameters}"
 
     local result=$?
     case ${result} in
@@ -977,7 +991,8 @@ function main() {
         "" \
         "${REQUEST_REFERENCE}" \
         "${CONFIGURATION_REFERENCE}" \
-        "${DEPLOYMENT_MODE}"
+        "${DEPLOYMENT_MODE}" \
+        "${ENTRANCE_PARAMETERS}"
       ;;
 
     *)
@@ -990,7 +1005,8 @@ function main() {
         "${REGION}" \
         "${REQUEST_REFERENCE}" \
         "${CONFIGURATION_REFERENCE}" \
-        "${DEPLOYMENT_MODE}"
+        "${DEPLOYMENT_MODE}"  \
+        "${ENTRANCE_PARAMETERS}"
       ;;
   esac
 }
