@@ -954,8 +954,8 @@ function copy_contentnode_file() {
         done
 
         # Clone the Repo
-        local host="github.com"
-        clone_git_repo "${engine}" "${host}" "${path}" "${branch}" "${contenthubdir}" || return $?
+        local git_url="$( format_git_url "${engine} "github.com" "${path}" )"
+        clone_git_repo "${git_url}" "${branch}" "${contenthubdir}" || return $?
 
         case ${STACK_OPERATION} in
 
@@ -983,9 +983,10 @@ function copy_contentnode_file() {
         esac
 
         # Commit Repo
-        (cd "${contenthubdir}"; push_git_repo "${host}/${path}" "${branch}" "origin" \
-            "ContentNodeDeployment-${PRODUCT}-${SEGMENT}-${DEPLOYMENT_UNIT}" \
-            "${GIT_USER}" "${GIT_EMAIL}") || return $?
+        push_git_repo "${git_url}" "${branch}" "origin" \
+          "ContentNodeDeployment-${PRODUCT}-${SEGMENT}-${DEPLOYMENT_UNIT}" \
+          "${GIT_USER}" "${GIT_EMAIL}" \
+          "${contenthubdir}" || return $?
 
       ;;
     esac
@@ -2171,25 +2172,45 @@ function manage_waf_logging() {
 
 # -- Git Repo Management --
 
-function in_git_repo() {
-  git status >/dev/null 2>&1
+function is_git_repo() {
+  local local_dir="$1";
+
+  git -C "${local_dir}" status >/dev/null 2>&1
 }
 
-function clone_git_repo() {
+function init_git_repo() {
+  local local_dir="$1";
+
+  is_git_repo "${local_dir}" || git init "${local_dir}"
+}
+
+function in_git_repo() {
+  is_git_repo
+}
+
+function format_git_url() {
   local repo_provider="$1"; shift
   local repo_host="$1"; shift
   local repo_path="$1"; shift
+
+  if [[  (-n "${repo_provider}") &&
+      (-n "${repo_host}") &&
+      (-n "${repo_path}") ]]; then
+    local credentials_var="${repo_provider^^}_CREDENTIALS"
+    printf "https://%s@%s/%s" "${!credentials_var}" "${repo_host}" "${repo_path}"
+  else
+    printf ""
+  fi
+}
+
+function clone_git_repo() {
+  local repo_url="$1"; shift
   local repo_branch="$1"; shift
   local local_dir="$1";
 
-  [[  (-z "${repo_provider}") ||
-      (-z "${repo_host}") ||
-      (-z "${repo_path}") ||
+  [[  (-z "${repo_url}") ||
       (-z "${repo_branch}") ||
       (-z "${local_dir}") ]] && fatalMandatory && return 1
-
-  local credentials_var="${repo_provider^^}_CREDENTIALS"
-  local repo_url="https://${!credentials_var}@${repo_host}/${repo_path}"
 
   debug "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
 
@@ -2206,6 +2227,7 @@ function push_git_repo() {
   local commit_message="$1"; shift
   local git_user="$1"; shift
   local git_email="$1"; shift
+  local local_dir="$1"; shift
   local tries="${1:-6}";
 
   [[ (-z "${repo_url}") ||
@@ -2215,34 +2237,34 @@ function push_git_repo() {
       (-z "${git_user}") ||
       (-z "${git_email}") ]] && fatalMandatory && return 1
 
-  git remote show "${repo_remote}" >/dev/null 2>&1
+  git  -C "${local_dir}" remote show "${repo_remote}" >/dev/null 2>&1
   RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
 
   # Ensure git knows who we are
-  git config user.name  "${git_user}"
-  git config user.email "${git_email}"
+  git -C "${local_dir}" config user.name  "${git_user}"
+  git -C "${local_dir}" config user.email "${git_email}"
 
   # Add anything that has been added/modified/deleted
-  git add -A
+  git  -C "${local_dir}" add -A
 
   if [[ -n "$(git status --porcelain)" ]]; then
     # Commit changes
     debug "Committing to the ${repo_url} repo..."
-    git commit -m "${commit_message}" ||
+    git  -C "${local_dir}" commit -m "${commit_message}" ||
       (fatal "Can't commit to the ${repo_url} repo"; return 1; )
 
     # Update upstream repo
     for try in $( seq 1 ${tries} ); do
       # Check if remote branch exists
-      local existing_branch=$(git ls-remote --heads 2>/dev/null | grep "refs/heads/${repo_branch}$")
+      local existing_branch=$(git  -C "${local_dir}" ls-remote --heads 2>/dev/null | grep "refs/heads/${repo_branch}$")
       if [[ -n "${existing_branch}" ]]; then
         debug "Rebasing from ${repo_url} in case of changes..."
-        git pull --rebase ${repo_remote} ${repo_branch} ||
+        git  -C "${local_dir}" pull --rebase ${repo_remote} ${repo_branch} ||
           (fatal "Can't rebase the ${repo_url} repo from upstream ${repo_remote}"; return 1; )
       fi
 
       debug "Pushing the ${repo_url} repo upstream..."
-      if git push ${repo_remote} ${repo_branch}; then
+      if git  -C "${local_dir}" push ${repo_remote} ${repo_branch}; then
         # Push succeeded
         return 0
       else
@@ -2265,6 +2287,49 @@ function git_mv() {
 
 function git_rm() {
   in_git_repo && git rm "$@" || rm "$@"
+}
+
+# -- conventional commits --
+# https://www.conventionalcommits.org/
+
+# Basic structure of conventional commit
+# For a breaking commit with no footer, use "!" for the breaking comment
+function format_conventional_commit() {
+  local type="${1,,}"; shift
+  local scope="${1,,}"; shift
+  local description="${1}"; shift
+  local body="${1}"; shift
+  local footer="${1}"; shift
+  local breaking="${1}"; shift
+
+  local result=""
+  printf -v result "%s%s%s: %s\n" "${type}" "${scope:+(${scope})}" "${breaking:+!}" "${description}"
+
+  [[ -n "${body}" ]] && printf -v result "%s\n%s\n" "${result}" "${body}"
+  [[ -n "${footer}" || -n "${breaking}" ]] && printf -v result "%s\n" "${result}"
+  [[ -n "${footer}" ]] && printf -v result "%s%s\n" "${result}" "${footer}"
+  [[ -n "${breaking}" && "${breaking}" != "!" ]] && printf -v result "%sBREAKING CHANGE: %s\n" "${result}" "${breaking}"
+
+  echo -n "${result}"
+}
+
+# Name=value pairs converted to name: value on separate lines
+# Multiple comma separated pairs can be included in one parameter or as individual parameters
+function format_conventional_commit_body() {
+  local pairsList=("$@")
+
+  local result=""
+  local pairArray=()
+
+  for pairsItem in "${pairsList[@]}"; do
+    arrayFromList pairArray "${pairsItem}" ","
+
+    for pair in "${pairArray[@]}"; do
+      printf -v result "%s%s\n" "${result}" "${pair//=/: }"
+    done
+  done
+
+  echo -n "${result}"
 }
 
 # -- semver handling --
