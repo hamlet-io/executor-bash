@@ -246,30 +246,27 @@ case ${REFERENCE_OPERATION} in
     ${REFERENCE_OPERATION_ACCEPT})
         # Add the acceptance tag on provided deployment unit list
         # Normally this would be called after list full
-        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory && RESULT=1 && exit
+        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "ACCEPTANCE_TAG"
         ;;
 
     ${REFERENCE_OPERATION_LIST})
         # Format the build details based on provided deployment unit list
-        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ]] && fatalMandatory && RESULT=1 && exit
+        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST"
         ;;
 
     ${REFERENCE_OPERATION_LISTFULL})
         # Populate DEPLOYMENT_UNIT_LIST based on current appsettings
-        [[ -z "${SEGMENT_BUILDS_DIR}" ]] && fatalMandatory && RESULT=1 && exit
+        exit_on_invalid_environment_variables "SEGMENT_BUILDS_DIR"
         ;;
 
     ${REFERENCE_OPERATION_UPDATE})
         # Update builds based on provided deployment unit list
-        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${SEGMENT_BUILDS_DIR}") ]] && fatalMandatory && RESULT=1 && exit
+        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "SEGMENT_BUILDS_DIR"
         ;;
 
     ${REFERENCE_OPERATION_VERIFY})
         # Verify builds based on provided deployment unit list
-        [[ (-z "${DEPLOYMENT_UNIT_LIST}") ||
-            (-z "${VERIFICATION_TAG}") ]] && fatalMandatory && RESULT=1 && exit
+        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "VERIFICATION_TAG"
         ;;
 
     *)

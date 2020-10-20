@@ -68,11 +68,11 @@ function init() {
         git init .
     fi
 
-    [[ (-z "${REPO_REMOTE}") ]] && fatalMandatory && return 1
+    return_on_invalid_environment_variables 1 "REPO_REMOTE"
 
     git remote show "${REPO_REMOTE}" >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
-        [[ -z "${REPO_URL}" ]] && fatalMandatory && return 1
+        return_on_invalid_environment_variables 1 "REPO_URL"
 
         git remote add "${REPO_REMOTE}" "${REPO_URL}"
         RESULT=$?
@@ -94,18 +94,14 @@ function init() {
 
 function clone() {
     debug "Cloning the ${REPO_LOG_NAME} repo and checking out the ${REPO_BRANCH} branch ..."
-    [[ (-z "${REPO_URL}") ||
-        (-z "${REPO_BRANCH}") ]] && fatalMandatory && return 1
+    return_on_invalid_environment_variables 1 "REPO_URL" "REPO_BRANCH"
 
     git clone -b "${REPO_BRANCH}" "${REPO_URL}" .
     RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't clone ${REPO_LOG_NAME} repo" && return 1
 }
 
 function push() {
-    [[ (-z "${GIT_USER}") ||
-        (-z "${GIT_EMAIL}") ||
-        (-z "${REPO_MESSAGE}") ||
-        (-z "${REPO_REMOTE}") ]] && fatalMandatory && return 1
+    return_on_invalid_environment_variables 1 "GIT_USER" "GIT_EMAIL" "REPO_MESSAGE" "REPO_REMOTE"
 
     git remote show "${REPO_REMOTE}" >/dev/null 2>&1
     RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${REPO_REMOTE} is not initialised" && return 1
@@ -235,7 +231,7 @@ function set_context() {
   fi
 
   # Ensure mandatory arguments have been provided
-  [[ (-z "${REPO_DIR}") || (-z "${REPO_LOG_NAME}") ]] && fatalMandatory && return 1
+  return_on_invalid_environment_variables 1 "REPO_DIR" "REPO_LOG_NAME"
 
   # Ensure we are inside the repo directory
   if [[ ! -d "${REPO_DIR}" ]]; then
