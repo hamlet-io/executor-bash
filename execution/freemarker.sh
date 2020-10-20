@@ -96,9 +96,8 @@ done
 
 
 # Ensure mandatory arguments have been provided
-[[ (-z "${TEMPLATE}") ||
-    ("${#TEMPLATEDIRS[@]}" -eq 0) ||
-    (-z "${OUTPUT}") ]] && fatalMandatory && exit 1
+exit_on_invalid_environment_variables "TEMPLATE" "OUTPUT"
+[[ ("${#TEMPLATEDIRS[@]}" -eq 0) ]] && fatalMandatory && exit 1
 
 if [[ "${#TEMPLATEDIRS[@]}" -gt 0 ]]; then
   TEMPLATEDIRS=("-d" "${TEMPLATEDIRS[@]}")

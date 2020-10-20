@@ -20,6 +20,10 @@ export LOG_LEVEL_WARNING="warn"
 export LOG_LEVEL_ERROR="error"
 export LOG_LEVEL_FATAL="fatal"
 
+# -- Error tracing --
+# -- Output an errors source, line and function name --
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
 declare -A LOG_LEVEL_ORDER
 LOG_LEVEL_ORDER=(
   ["${LOG_LEVEL_TRACE}"]="0"
@@ -151,7 +155,9 @@ function fatalDirectory() {
 }
 
 function fatalMandatory() {
-  fatal "Mandatory arguments missing. Check usage via -h option."
+  local name="$1"; shift
+  local status="$1"; shift
+  fatal "Mandatory argument missing: ${name}. Check usage via -h option." && return $status
 }
 
 # -- String manipulation --
@@ -2208,9 +2214,7 @@ function clone_git_repo() {
   local repo_branch="$1"; shift
   local local_dir="$1";
 
-  [[  (-z "${repo_url}") ||
-      (-z "${repo_branch}") ||
-      (-z "${local_dir}") ]] && fatalMandatory && return 1
+  return_on_invalid_environment_variables 1 "repo_provider" "repo_host" "repo_path" "repo_branch" "local_dir"
 
   debug "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
 
@@ -2230,12 +2234,7 @@ function push_git_repo() {
   local local_dir="$1"; shift
   local tries="${1:-6}";
 
-  [[ (-z "${repo_url}") ||
-      (-z "${repo_branch}") ||
-      (-z "${repo_remote}") ||
-      (-z "${commit_message}") ||
-      (-z "${git_user}") ||
-      (-z "${git_email}") ]] && fatalMandatory && return 1
+  return_on_invalid_environment_variables 1 "repo_url" "repo_branch" "repo_remote" "commit_message" "git_user" "git_email"
 
   git  -C "${local_dir}" remote show "${repo_remote}" >/dev/null 2>&1
   RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
@@ -2590,3 +2589,32 @@ function get_openapi_definition_filename() {
   echo -n "defn-${name}-${accountId}-${region}-definition.json"
 }
 
+# -- Evaluate Mandatory Environment Variables --
+function validate_environment_variables(){
+  local on_fail="$1"; shift
+  local status="$1"; shift
+  local parts=("$@")
+
+  for i in "${parts[@]}"; do
+    case "${on_fail}" in
+      exit)
+        # Test the Env Var exists, and terminate immediately if its missing.
+        printf "%s\n" "${!i:?Undefined mandatory environment variable: ${i}}"
+        ;;
+      return)
+        # Log a fatal message and return on the status value
+        fatalMandatory "${i}" $status
+    esac
+  done
+}
+
+function exit_on_invalid_environment_variables(){
+  local parts=("$@")
+  validate_environment_variables "exit" 1 "${parts[@]}"
+}
+
+function return_on_invalid_environment_variables(){
+  local status="$1"; shift
+  local parts=("$@")
+  validate_environment_variables "return" $status "${parts[@]}"
+}

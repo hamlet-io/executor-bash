@@ -321,7 +321,7 @@ function main() {
   export PATH=$PATH:$ANDROID_HOME/platform-tools
 
   # Ensure mandatory arguments have been provided
-  [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory && return 1
+  return_on_invalid_environment_variables 1 "DEPLOYMENT_UNIT"
 
   # Make sure the previous bundler has been stopped
   cleanup_bundler ||

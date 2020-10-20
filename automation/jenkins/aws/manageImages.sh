@@ -77,9 +77,7 @@ IMAGE_FORMATS="${IMAGE_FORMATS:-${IMAGE_FORMATS_ARRAY[0]}}"
 REGISTRY_SCOPE="${REGISTRY_SCOPE:-${REGISTRY_SCOPE_ARRAY[0]}}"
 
 # Ensure mandatory arguments have been provided
-[[ (-z "${DEPLOYMENT_UNIT}") ||
-    (-z "${CODE_COMMIT}") ||
-    (-z "${IMAGE_FORMATS}") ]] && fatalMandatory && exit
+exit_on_invalid_environment_variables "DEPLOYMENT_UNIT" "CODE_COMMIT" "IMAGE_FORMATS"
 
 IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra FORMATS <<< "${IMAGE_FORMATS}"
 

@@ -86,8 +86,7 @@ done
 CREDENTIAL_TYPE="${CREDENTIAL_TYPE:-${CREDENTIAL_TYPE_DEFAULT}}"
 
 # Ensure mandatory arguments have been provided
-[[ (-z "${CREDENTIAL_PATH}") ||
-    (-z "${CREDENTIAL_TYPE}") ]] && fatalMandatory && exit 1
+exit_on_invalid_environment_variables "CREDENTIAL_PATH" "CREDENTIAL_TYPE"
 
 # Define JSON paths
 PATH_BASE="${CREDENTIAL_PATH}"
