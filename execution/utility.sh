@@ -156,8 +156,7 @@ function fatalDirectory() {
 
 function fatalMandatory() {
   local name="$1"; shift
-  local status="$1"; shift
-  fatal "Mandatory argument missing: ${name}. Check usage via -h option." && return $status
+  fatal "Mandatory argument missing: \"${name}\". Check usage via -h option."
 }
 
 # -- String manipulation --
@@ -2214,7 +2213,7 @@ function clone_git_repo() {
   local repo_branch="$1"; shift
   local local_dir="$1";
 
-  return_on_invalid_environment_variables 1 "repo_provider" "repo_host" "repo_path" "repo_branch" "local_dir"
+  check_for_invalid_environment_variables "repo_provider" "repo_host" "repo_path" "repo_branch" "local_dir" || return $?
 
   debug "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
 
@@ -2234,7 +2233,7 @@ function push_git_repo() {
   local local_dir="$1"; shift
   local tries="${1:-6}";
 
-  return_on_invalid_environment_variables 1 "repo_url" "repo_branch" "repo_remote" "commit_message" "git_user" "git_email"
+  check_for_invalid_environment_variables "repo_url" "repo_branch" "repo_remote" "commit_message" "git_user" "git_email" || return $?
 
   git  -C "${local_dir}" remote show "${repo_remote}" >/dev/null 2>&1
   RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
@@ -2591,30 +2590,36 @@ function get_openapi_definition_filename() {
 
 # -- Evaluate Mandatory Environment Variables --
 function validate_environment_variables(){
-  local on_fail="$1"; shift
-  local status="$1"; shift
+  local exit_on_fail="$1"; shift
   local parts=("$@")
 
-  for i in "${parts[@]}"; do
-    case "${on_fail}" in
-      exit)
-        # Test the Env Var exists, and terminate immediately if its missing.
-        printf "%s\n" "${!i:?Undefined mandatory environment variable: ${i}}"
-        ;;
-      return)
-        # Log a fatal message and return on the status value
-        fatalMandatory "${i}" $status
-    esac
-  done
+  if [[ "${exit_on_fail}" == "true" ]]; then
+    # Fail on the very first error.
+    for i in "${parts[@]}"; do
+      : "${!i:?Undefined mandatory environment variable: $i}"
+    done
+  else
+    # Report missing variables from provided args.
+    # Expected to be ||'d to its desired error handling
+    return_status=0
+    for i in ${exit_on_fail} "${parts[@]}"; do
+      # assign a default value, so it doesn't halt 
+      # immediately on the indirection if missing
+      if [[ ${!i:="MISSING_VAR"} == "MISSING_VAR" ]]; then
+        fatalMandatory "$i"
+        return_status=$(($return_status + 1))
+      fi
+    done
+    return $return_status
+  fi
 }
 
 function exit_on_invalid_environment_variables(){
   local parts=("$@")
-  validate_environment_variables "exit" 1 "${parts[@]}"
+  validate_environment_variables true "${parts[@]}"
 }
 
-function return_on_invalid_environment_variables(){
-  local status="$1"; shift
+function check_for_invalid_environment_variables(){
   local parts=("$@")
-  validate_environment_variables "return" $status "${parts[@]}"
+  validate_environment_variables "${parts[@]}"
 }

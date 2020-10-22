@@ -78,7 +78,7 @@ JSON_ARRAY+=("$@")
 
 # Ensure mandatory arguments have been provided
 validate_environment_variables "exit" 255 "JSON_OUTPUT"
-[[ ("${#JSON_ARRAY[@]}" -eq 0) ]] && fatalMandatory && exit 255
+[[ ("${#JSON_ARRAY[@]}" -eq 0) ]] && fatalMandatory "JSON_LIST" && exit 255
 
 # Merge the files
 if [[ -z "${JSON_FILTER}" ]]; then
