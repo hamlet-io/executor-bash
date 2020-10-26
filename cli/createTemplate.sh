@@ -15,9 +15,9 @@ DEPLOYMENT_MODE_DEFAULT="update"
 GENERATION_INPUT_SOURCE_DEFAULT="composite"
 DISABLE_OUTPUT_CLEANUP_DEFAULT="false"
 
-arrayFromList GENERATION_PROVIDERS "${GENERATION_PROVIDERS}" ","
-arrayFromList FLOWS "${FLOWS}" ","
-arrayFromList ENTRANCE_PARAMETERS "${ENTRANCE_PARAMETERS}" ","
+arrayFromList GENERATION_PROVIDERS_ARRAY "${GENERATION_PROVIDERS}" ","
+arrayFromList FLOWS_ARRAY "${FLOWS}" ","
+arrayFromList ENTRANCE_PARAMETERS_ARRAY "${ENTRANCE_PARAMETERS}" ","
 
 function usage() {
   cat <<EOF
@@ -72,7 +72,7 @@ function options() {
   # Parse options
   while getopts ":b:c:d:e:f:g:hi:l:o:p:q:r:u:xy:z:" option; do
       case "${option}" in
-          b) FLOWS+=("${OPTARG}") ;;
+          b) FLOWS_ARRAY+=("${OPTARG}") ;;
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
           e) ENTRANCE="${OPTARG}" ;;
@@ -85,12 +85,12 @@ function options() {
             DEPLOYMENT_GROUP="${OPTARG}"
             ;;
           o) OUTPUT_DIR="${OPTARG}" ;;
-          p) GENERATION_PROVIDERS+=("${OPTARG}") ;;
+          p) GENERATION_PROVIDERS_ARRAY+=("${OPTARG}") ;;
           q) REQUEST_REFERENCE="${OPTARG}" ;;
           r) REGION="${OPTARG}" ;;
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
           x) DISABLE_OUTPUT_CLEANUP="true" ;;
-          y) ENTRANCE_PARAMETERS+=("${OPTARG}") ;;
+          y) ENTRANCE_PARAMETERS_ARRAY+=("${OPTARG}") ;;
           z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
           \?) fatalOption; return 1 ;;
           :) fatalOptionArgument; return 1 ;;
@@ -105,18 +105,18 @@ function options() {
   GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-${GENERATION_INPUT_SOURCE_DEFAULT}}"
   DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
   ENTRANCE="${ENTRANCE:-${ENTRANCE_DEFAULT}}"
-  FLOWS="${FLOWS:-${FLOWS_DEFAULT}}"
 
-  if [[ "${#GENERATION_PROVIDERS[@]}" == "0" ]]; then
-    GENERATION_PROVIDERS+=("${GENERATION_PROVIDERS_DEFAULT}")
+  if [[ "${#GENERATION_PROVIDERS_ARRAY[@]}" == "0" ]]; then
+    GENERATION_PROVIDERS_ARRAY+=("${GENERATION_PROVIDERS_DEFAULT}")
   fi
-  GENERATION_PROVIDERS=$(listFromArray "GENERATION_PROVIDERS" ",")
+  GENERATION_PROVIDERS="$(listFromArray "GENERATION_PROVIDERS_ARRAY" ",")"
 
-  if [[ "${#FLOWS[@]}" == "0" ]]; then
-    FLOWS+=("${FLOWS_DEFAULT}")
+  if [[ "${#FLOWS_ARRAY[@]}" == "0" ]]; then
+    FLOWS_ARRAY+=("${FLOWS_DEFAULT}")
   fi
-  FLOWS=$(listFromArray "FLOWS" ",")
-  ENTRANCE_PARAMETERS=$(listFromArray "ENTRANCE_PARAMETERS" ",")
+  FLOWS="$(listFromArray "FLOWS_ARRAY" ",")"
+
+  ENTRANCE_PARAMETERS="$(listFromArray "ENTRANCE_PARAMETERS_ARRAY" ",")"
 
   # Ensure other mandatory arguments have been provided
   if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
@@ -501,8 +501,8 @@ function process_template_pass() {
   args+=("-v" "runId=${run_id}")
 
   # Entrance parameters
-  arrayFromList entranceParameters "${entrance_parameters}" ","
-  for entranceParameter in "${entranceParameters[@]}"; do
+  arrayFromList entranceParametersArray "${entrance_parameters}" ","
+  for entranceParameter in "${entranceParametersArray[@]}"; do
     args+=("-v" "${entranceParameter}")
   done
 
@@ -852,7 +852,7 @@ function process_template() {
       "${cf_dir}" \
       "${run_id}" \
       "${deployment_unit_state_subdirectories}" \
-      "${entrance_parameters}"
+      "${entranceParameters}"
   local result=$?
 
   # Include contract in difference checking
@@ -913,7 +913,7 @@ function process_template() {
       "${cf_dir}" \
       "${run_id}" \
       "${deployment_unit_state_subdirectories}" \
-      "${entrance_parameters}"
+      "${entranceParameters}"
 
     local result=$?
     case ${result} in
