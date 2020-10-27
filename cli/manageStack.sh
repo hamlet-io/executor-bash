@@ -26,6 +26,7 @@ where
 (m) -l LEVEL                    is the stack level - "account", "product", "segment", "solution", "application" or "multiple"
 (o) -m (STACK_INITIATE=false)   monitors but does not initiate the stack operation
 (o) -n STACK_NAME               to override standard stack naming
+(o) -o OUTPUT_DIR               is an override for the deployment output directory
 (o) -q (QUIET_MODE=true)        minimise output generated
 (o) -r REGION                   is the AWS region identifier for the region in which the stack should be managed
 (m) -u DEPLOYMENT_UNIT          is the deployment unit used to determine the stack template
@@ -58,7 +59,7 @@ EOF
 
 function options() {
   # Parse options
-  while getopts ":dhil:mn:qr:u:w:yz:" option; do
+  while getopts ":dhil:mn:qr:t:u:w:yz:" option; do
     case "${option}" in
       d) STACK_OPERATION=delete ;;
       h) usage; return 1 ;;
@@ -66,6 +67,7 @@ function options() {
       l) LEVEL="${OPTARG}" ;;
       m) STACK_INITIATE=false ;;
       n) STACK_NAME="${OPTARG}" ;;
+      o) OUTPUT_DIR="${OPTARG}" ;;
       q) QUIET_MODE=true ;;
       r) REGION="${OPTARG}" ;;
       u) DEPLOYMENT_UNIT="${OPTARG}" ;;

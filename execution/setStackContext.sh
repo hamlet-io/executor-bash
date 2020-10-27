@@ -44,37 +44,43 @@ if [[ -n "${DEPLOYMENT_UNIT_SUBSET}" ]]; then
     DEPLOYMENT_UNIT_SUBSET_SUFFIX="-${DEPLOYMENT_UNIT_SUBSET,,}"
 fi
 
-# First determine the CF_DIR so we can handle deployment unit subdirectories
-case $LEVEL in
-    account)
-        CF_DIR="${ACCOUNT_STATE_DIR}/cf/shared"
-        REGION="${ACCOUNT_REGION}"
-        REGION_PREFIX="${ACCOUNT_REGION}-"
-        ;;
-
-    product)
-        CF_DIR="${PRODUCT_STATE_DIR}/cf/shared"
-        ;;
-
-    solution|segment|application|multiple)
-        CF_DIR="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
-        ;;
-    *)
-        fatalCantProceed "\"$LEVEL\" is not one of the known stack levels."
-        ;;
-esac
-
-# Check for "legacy" files i.e. deployment files that are still in the segment directory
-legacy_files=()
-if [[ -d "${CF_DIR}" ]]; then
-    readarray -t legacy_files < <(find "${CF_DIR}" -mindepth 1 -maxdepth 1 -name "*${DEPLOYMENT_UNIT}*" )
+# Allow for overriding the output dir to align with create template configuration
+if [[ -n "${OUTPUT_DIR}" ]]; then
+    CF_DIR="${OUTPUT_DIR}"
 fi
 
-# Adjust for deployment unit subdirectories
-if [[ (-d "${CF_DIR}/${DEPLOYMENT_UNIT}") || "${#legacy_files[@]}" -eq 0 ]]; then
-    CF_DIR=$(getUnitCFDir "${CF_DIR}" "${LEVEL}" "${DEPLOYMENT_UNIT}" "" "${REGION}" )
-fi
+if [[ -z "${OUTPUT_DIR}" ]]; then
+    # First determine the CF_DIR so we can handle deployment unit subdirectories
+    case $LEVEL in
+        account)
+            CF_DIR="${ACCOUNT_STATE_DIR}/cf/shared"
+            REGION="${ACCOUNT_REGION}"
+            REGION_PREFIX="${ACCOUNT_REGION}-"
+            ;;
 
+        product)
+            CF_DIR="${PRODUCT_STATE_DIR}/cf/shared"
+            ;;
+
+        solution|segment|application|multiple)
+            CF_DIR="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+            ;;
+        *)
+            fatalCantProceed "\"$LEVEL\" is not one of the known stack levels."
+            ;;
+    esac
+
+    # Check for "legacy" files i.e. deployment files that are still in the segment directory
+    legacy_files=()
+    if [[ -d "${CF_DIR}" ]]; then
+        readarray -t legacy_files < <(find "${CF_DIR}" -mindepth 1 -maxdepth 1 -name "*${DEPLOYMENT_UNIT}*" )
+    fi
+
+    # Adjust for deployment unit subdirectories
+    if [[ (-d "${CF_DIR}/${DEPLOYMENT_UNIT}") || "${#legacy_files[@]}" -eq 0 ]]; then
+        CF_DIR=$(getUnitCFDir "${CF_DIR}" "${LEVEL}" "${DEPLOYMENT_UNIT}" "" "${REGION}" )
+    fi
+fi
 
 case $LEVEL in
     account)
