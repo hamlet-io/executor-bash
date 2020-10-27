@@ -29,6 +29,7 @@ function usage() {
   (o) -i (DEPLOYMENT_MONITOR=false)     initiates but does not monitor the deployment operation.
   (m) -l LEVEL                          is the deployment level - "account", "product", "segment", "solution", "application" or "multiple"
   (o) -m (DEPLOYMENT_INITIATE=false)    monitors but does not initiate the deployment operation.
+  (o) -o OUTPUT_DIR               is an override for the deployment output directory
   (o) -r REGION                         is the Azure location/region code for this deployment.
   (o) -s DEPLOYMENT_SCOPE               the deployment scope - "subscription" or "resourceGroup"
   (m) -u DEPLOYMENT_UNIT                is the deployment unit used to determine the deployment template.
@@ -52,7 +53,7 @@ EOF
 
 function options() {
   # Parse options
-  while getopts ":dg:hil:mqr:s:u:w::yz:" option; do
+  while getopts ":dg:hil:mo:qr:s:u:w::yz:" option; do
     case "${option}" in
       d) DEPLOYMENT_OPERATION=delete ;;
       g) RESOURCE_GROUP="${OPTARG}" ;;
@@ -60,6 +61,7 @@ function options() {
       i) DEPLOYMENT_MONITOR=false ;;
       l) LEVEL="${OPTARG}" ;;
       m) DEPLOYMENT_INITIATE=false ;;
+      o) OUTPUT_DIR="${OPTARG}" ;;
       q) QUIET_MODE="true" ;;
       r) REGION="${OPTARG}" ;;
       s) DEPLOYMENT_SCOPE="${OPTARG}" ;;
@@ -366,7 +368,7 @@ function main() {
   # by the epilogue script
   if [[ -s "${EPILOGUE}" ]]; then
     info "Processing epilogue script ..."
-    if [[ -z "${DRYRUN}" ]]; then 
+    if [[ -z "${DRYRUN}" ]]; then
       . "${EPILOGUE}" || return $?
     fi
   fi
