@@ -954,7 +954,7 @@ function copy_contentnode_file() {
         done
 
         # Clone the Repo
-        local git_url="$( format_git_url "${engine} "github.com" "${path}" )"
+        local git_url="$( format_git_url "${engine}" "github.com" "${path}" )"
         clone_git_repo "${git_url}" "${branch}" "${contenthubdir}" || return $?
 
         case ${STACK_OPERATION} in
@@ -2197,7 +2197,7 @@ function format_git_url() {
       (-n "${repo_host}") &&
       (-n "${repo_path}") ]]; then
     local credentials_var="${repo_provider^^}_CREDENTIALS"
-    printf "https://%s@%s/%s" "${!credentials_var}" "${repo_host}" "${repo_path}"
+    printf "https://%s%s/%s" "${!credentials_var:+${!credentials_var}@}" "${repo_host}" "${repo_path}"
   else
     printf ""
   fi
@@ -2294,6 +2294,9 @@ function git_rm() {
 
 # Basic structure of conventional commit
 # For a breaking commit with no footer, use "!" for the breaking comment
+# Description is limited to 50 chars in alignment with git best practices
+# Any description longer than that is split across the description and the
+# first line of the body
 function format_conventional_commit() {
   local type="${1,,}"; shift
   local scope="${1,,}"; shift
@@ -2305,6 +2308,10 @@ function format_conventional_commit() {
   local result=""
   printf -v result "%s%s%s: %s\n" "${type}" "${scope:+(${scope})}" "${breaking:+!}" "${description}"
 
+  # Need to allow for the LF at the end in deciding when to split
+  if [[ "${#result}" -gt 51 ]]; then
+    printf -v result "%s\n" "${result:0:50}"
+  fi
   [[ -n "${body}" ]] && printf -v result "%s\n%s\n" "${result}" "${body}"
   [[ -n "${footer}" || -n "${breaking}" ]] && printf -v result "%s\n" "${result}"
   [[ -n "${footer}" ]] && printf -v result "%s%s\n" "${result}" "${footer}"
