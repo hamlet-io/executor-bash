@@ -77,7 +77,7 @@ JSON_ARRAY=(${JSON_LIST})
 JSON_ARRAY+=("$@")
 
 # Ensure mandatory arguments have been provided
-validate_environment_variables "exit" 255 "JSON_OUTPUT"
+exit_on_invalid_environment_variables "JSON_OUTPUT"
 [[ ("${#JSON_ARRAY[@]}" -eq 0) ]] && fatalMandatory "JSON_LIST" && exit 255
 
 # Merge the files
