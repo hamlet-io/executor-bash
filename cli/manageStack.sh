@@ -59,7 +59,7 @@ EOF
 
 function options() {
   # Parse options
-  while getopts ":dhil:mn:qr:t:u:w:yz:" option; do
+  while getopts ":dhil:mn:o:qr:t:u:w:yz:" option; do
     case "${option}" in
       d) STACK_OPERATION=delete ;;
       h) usage; return 1 ;;
