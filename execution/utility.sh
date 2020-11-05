@@ -2145,7 +2145,7 @@ function manage_waf_logging() {
   local wafACLId="$1"; shift
   local wafType="$1"; shift
   local action="$1"; shift
-  local loggingConfigFile="$1"; shift
+  local loggingDestinationIds="$1"; shift
 
   if [[ "${wafType}" == "regional" ]]; then
     wafCommand="waf-regional"
@@ -2153,14 +2153,22 @@ function manage_waf_logging() {
     wafCommand="waf"
   fi
 
+  arrayFromList loggingDestinationArns ""
+  arrayFromList loggingDestinationIds "${loggingDestinationIds}"
+
+  for id in "${loggingDestinationIds[@]}"; do
+      addToArray loggingDestinationArns "$(get_cloudformation_stack_output "${region}" "${STACK_NAME}" "${id}" "arn" || return $?)"
+  done
+  loggingDestinationArns="$(listFromArray loggingDestinationArns )"
+
   wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" || return $?)"
   wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
 
   if [[ "${action}" == "enable" ]]; then
     info "Enabling WAF Logging - WAF Arn: ${wafACLArn}"
 
-    wafLoggingConfig="$(cat "${loggingConfigFile}" | jq --arg wafArn "${wafACLArn}" '. * { "LoggingConfiguration" : { "ResourceArn" : $wafArn }}')"
-    aws --region "${region}" $wafCommand put-logging-configuration --cli-input-json "${wafLoggingConfig}" || return $?
+    loggingConfiguration="ResourceArn=${wafACLArn},LogDestinationConfigs=${loggingDestinationArns}"
+    aws --region "${region}" $wafCommand put-logging-configuration --logging-configuration "${loggingConfiguration}" || return $?
   fi
 
   if [[ "${action}" == "disable" ]]; then
@@ -2603,7 +2611,7 @@ function validate_environment_variables(){
     # Expected to be ||'d to its desired error handling
     return_status=0
     for i in ${exit_on_fail} "${parts[@]}"; do
-      # assign a default value, so it doesn't halt 
+      # assign a default value, so it doesn't halt
       # immediately on the indirection if missing
       if [[ ${!i:="MISSING_VAR"} == "MISSING_VAR" ]]; then
         fatalMandatory "$i"
