@@ -2631,3 +2631,71 @@ function check_for_invalid_environment_variables(){
   local parts=("$@")
   validate_environment_variables "${parts[@]}"
 }
+
+#-- Image sourcing
+function get_image_from_url() {
+  local url="$1"; shift
+  local local_dir="$1"; shift
+  local registry_file_name="$1"; shift
+
+  local local_file="${local_dir}/${registry_file_name}"
+
+  info "Pulling image from Url Source - Url: ${url}"
+
+  curl --fail --show-error -L -o "${local_file}" "${url}" || return $?
+  sha1sum "${local_file}" | cut -d " " -f 1  > "${local_file}.sha1"
+
+  info "Image pulled - local file: ${registry_file_name} - sha1: $(cat ${local_file}.sha1 )"
+  return 0
+}
+
+function get_url_image_to_registry() {
+  local source_url="$1"; shift
+  local expected_hash="$1"; shift
+  local image_format="$1"; shift
+  local registry_region="$1"; shift
+  local registry_bucket="$1"; shift
+  local registry_path="$1"; shift
+  local registry_file_name="$1"; shift
+  local product="$1"; shift
+  local environment="$1"; shift
+  local segment="$1"; shift
+  local build_unit="$1"; shift
+
+  pushTempDir "hamlet_imageUrl_XXXXXX"
+  local local_dir="$(getTopTempDir)"
+
+  get_image_from_url "${source_url}" "${local_dir}" "${registry_file_name}"
+  local build_reference="$(cat ${local_dir}/${registry_file_name}.sha1 )"
+
+  if [[ -n "${expected_hash}" && -n "${build_reference}" ]]; then
+    if [[ "${build_reference}" != "${expected_hash}" ]]; then
+      fatal "Image from url: ${source_url} sha1: ${build_reference} does not match expected sha1 hash: ${expected_hash}"
+      return 255
+    fi
+  fi
+
+  popTempDir
+
+  info "Updating build reference..."
+  local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${product}" )"
+  local build_dir="$(findGen3ProductBuildsDir "${root_dir}" "${product}" )"
+
+  [[ "${build_dir}" == "${settings_dir}" ]] && build_dir="${settings_dir}"
+  local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
+  mkdir -p "${build_unit_path}"
+
+  echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source_url}\", \"Formats\" : [ \"${image_format}\" ]}" | jq --indent 2 "." > "${build_unit_path}/build.json"
+
+  # refresh settings to include new build file
+  info "Refreshing settings..."
+  assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}"
+
+  info "Uploading image to registry..."
+  if [[ -n "${build_reference}" && -f "${local_dir}/${registry_file_name}" ]]; then
+    aws --region "${registry_region}" s3 sync --no-progress --delete "${local_dir}" "s3://${registry_bucket}/${registry_path}/${build_reference}/"
+  else
+    fatal "Could not get image from ${source_url}"
+  fi
+  return 0
+}
