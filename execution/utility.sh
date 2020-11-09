@@ -2221,7 +2221,7 @@ function clone_git_repo() {
   local repo_branch="$1"; shift
   local local_dir="$1";
 
-  check_for_invalid_environment_variables "repo_provider" "repo_host" "repo_path" "repo_branch" "local_dir" || return $?
+  check_for_invalid_environment_variables "repo_url" "repo_branch" "local_dir" || return $?
 
   debug "Cloning the ${repo_url} repo and checking out the ${repo_branch} branch ..."
 
@@ -2241,7 +2241,7 @@ function push_git_repo() {
   local local_dir="$1"; shift
   local tries="${1:-6}";
 
-  check_for_invalid_environment_variables "repo_url" "repo_branch" "repo_remote" "commit_message" "git_user" "git_email" || return $?
+  check_for_invalid_environment_variables "repo_url" "repo_branch" "repo_remote" "commit_message" "git_user" "git_email" "local_dir" || return $?
 
   git  -C "${local_dir}" remote show "${repo_remote}" >/dev/null 2>&1
   RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${repo_remote} is not initialised" && return 1
