@@ -192,8 +192,8 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export TID=${TID:-$(runJQ -r '.Tenant.Id | select(.!="Tenant") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export TENANT=${TENANT:-$(runJQ -r '.Tenant.Name | select(.!="Tenant") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export AID=${AID:-$(runJQ -r '.Account.Id | select(.!="Account") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-    export AWSID=${AWSID:-$(runJQ -r '.Account.AWSId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-    export AZID=${AZID:-$(runJQ -r '.Account.AzureId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export AWSID=${AWSID:-$(runJQ -r '.Account.ProviderId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export AZID=${AZID:-$(runJQ -r '.Account.ProviderId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export ACCOUNT_REGION=${ACCOUNT_REGION:-$(runJQ -r '.Account.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PID=${PID:-$(runJQ -r '.Product.Id | select(.!="Product") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PRODUCT_REGION=${PRODUCT_REGION:-$(runJQ -r '.Product.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
