@@ -199,15 +199,9 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export PRODUCT_REGION=${PRODUCT_REGION:-$(runJQ -r '.Product.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export DEPLOYMENTUNIT_REGION=${DEPLOYMENTUNIT_REGION:-$(runJQ --arg du ${DEPLOYMENT_UNIT} -r '.Product[$du].Region | select(.!=null)' <${COMPOSITE_BLUEPRINT} )}
     export SID=${SID:-$(runJQ -r '.Segment.Id | select(.!="Segment") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-
+    export ACCOUNT_PROVIDER=${ACCOUNT_PROVIDER:-$(runJQ -r '.Account.Provider | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export COMPONENT_REGION="${DEPLOYMENTUNIT_REGION:-$PRODUCT_REGION}"
     export REGION="${REGION:-$COMPONENT_REGION}"
-
-    if [[ -n "${AZID}" ]]; then
-        ACCOUNT_PROVIDER="azure"
-    else
-        ACCOUNT_PROVIDER="aws"
-    fi
 
     # Perform a few consistency checks
     [[ ! -s "${COMPOSITE_BLUEPRINT}" ]] && fatalCantProceed "The composite blueprint is empty. The likely cause of this is malformed JSON object in the Solution." && exit 1
