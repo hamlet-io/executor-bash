@@ -2328,21 +2328,88 @@ function format_conventional_commit() {
 
 # Name=value pairs converted to name: value on separate lines
 # Multiple comma separated pairs can be included in one parameter or as individual parameters
+# Any resulting leading or trailing spaces are removed
 function format_conventional_commit_body() {
   local pairsList=("$@")
 
   local result=""
   local pairArray=()
+  local trimRegex='^[[:blank:]]*(.+)[[:blank:]]*$'
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
 
   for pairsItem in "${pairsList[@]}"; do
     arrayFromList pairArray "${pairsItem}" ","
 
     for pair in "${pairArray[@]}"; do
-      printf -v result "%s%s\n" "${result}" "${pair//=/: }"
+      if [[ "${pair//=/: }" =~ $trimRegex ]]; then
+        local trimmedPair="${BASH_REMATCH[1]}"
+        if [[ "${trimmedPair}" =~ $pairRegex ]]; then
+          printf -v result "%s%-15s: %s\n" "${result}" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        else
+          printf -v result "%s%s\n" "${result}" "${trimmedPair}"
+        fi
+      fi
     done
   done
 
   echo -n "${result}"
+}
+
+# Extract a subset of summary values
+# If match=first, then the first match terminates the extract
+format_conventional_commit_body_summary() {
+  local body="$1"; shift
+  local subset=($1); shift
+  local match="${1:-all}"; shift
+
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
+
+  declare -A valueArray
+
+  # Collect the name/value pairs
+  readarray -t pairArray <<< "${body}"
+  for pair in "${pairArray[@]}"; do
+    if [[ "${pair}" =~ $pairRegex ]]; then
+      valueArray["${BASH_REMATCH[1]}"]="${BASH_REMATCH[2]}"
+    fi
+  done
+
+  local summary=
+  # Construct the summary
+  for part in "${subset[@]}"; do
+    if [[ -n "${valueArray[${part}]}" ]]; then
+      if [[ "${match}" == "first" ]]; then
+        local summary="${valueArray[${part}]}"
+        break
+      else
+        local summary="${summary}${summary:+-}${valueArray[${part}]}"
+      fi
+    fi
+  done
+
+  echo -n "${summary}"
+}
+
+# Exclude pairs from the body
+format_conventional_commit_body_subset() {
+  local body="$1"; shift
+  local exclusions=($1); shift
+
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
+
+  local subset=
+  readarray -t pairArray <<< "${body}"
+  for pair in "${pairArray[@]}"; do
+    if [[ "${pair}" =~ $pairRegex ]]; then
+      local pairName="${BASH_REMATCH[1]}"
+      local pairValue="${BASH_REMATCH[2]}"
+      if ! inArray "exclusions" "${pairName}"; then
+        printf -v subset "%s%s\n" "${subset}" "${pair}"
+      fi
+    fi
+  done
+
+  echo -n "${subset}"
 }
 
 # -- semver handling --

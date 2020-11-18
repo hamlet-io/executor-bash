@@ -116,7 +116,21 @@ function push() {
     if [[ -n "$(git status --porcelain)" ]]; then
         # Commit changes
         debug "Committing to the ${REPO_LOG_NAME} repo..."
-        git commit -m "${REPO_MESSAGE}"
+
+        # Break the message in name/value pairs
+        conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
+
+        # Separate the values based on the conventional commit format
+        conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
+        conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
+        conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
+        conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
+
+        git commit -m "$(format_conventional_commit \
+            "${conventional_commit_type:-hamlet}" \
+            "${conventional_commit_scope}" \
+            "${conventional_commit_description:-automation}" \
+            "${conventional_commit_body}" )"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
 
         REPO_PUSH_REQUIRED="true"
