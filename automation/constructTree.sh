@@ -289,6 +289,7 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
         fi
         mkdir -p $(filePath "${ACCOUNT_CONFIG_DIR}")
         mv "${BASE_DIR_TEMP}" "${ACCOUNT_CONFIG_DIR}"
+        save_context_property ACCOUNT_CONFIG_COMMIT "$(git -C "${ACCOUNT_CONFIG_DIR}" rev-parse HEAD)"
     fi
 
     ACCOUNT_INFRASTRUCTURE_DIR=$(findGen3AccountInfrastructureDir "${BASE_DIR}" "${ACCOUNT}")
