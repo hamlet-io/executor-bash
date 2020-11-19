@@ -12,7 +12,8 @@ function main() {
   # Update the stacks
   ${AUTOMATION_DIR}/manageUnits.sh -l "application" -a "${DEPLOYMENT_UNIT_LIST}" || return $?
 
-  # Commit the generated application templates
+  # Commit the generated application templates/stacks
+  # It is assumed no changes have been made to the config part of the cmdb
   save_product_infrastructure "${DETAIL_MESSAGE}" "${PRODUCT_INFRASTRUCTURE_REFERENCE}" || return $?
 }
 
