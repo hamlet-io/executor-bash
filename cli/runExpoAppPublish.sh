@@ -175,7 +175,7 @@ function env_setup() {
     yes |  /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses
 
     # Install required packages
-    /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} 'cmdline-tools;latest' 'platforms;android-30' 'platforms;android-10'
+    /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} 'cmdline-tools;latest' 'platforms;android-30' 'platforms;android-10' 'build-tools;30.0.2'
 
     # Make sure we have required software installed
     pip3 install \
