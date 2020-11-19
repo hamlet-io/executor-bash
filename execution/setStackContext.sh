@@ -188,14 +188,14 @@ if [[ ! -f "${CF_DIR}/${TEMPLATE}" ]]; then
 fi
 
 # Permit renaming of stack files without affecting existing stack status
-if [[ -f "${CF_DIR}/${STACK}" && -n "${AWSID}" ]]; then
-    STACK_NAME=$(jq -r ".Stacks[0].StackName" <  "${CF_DIR}/${STACK}")
-fi
-
-# Permit renaming of stack files without affecting existing stack status
-if [[ -f "${CF_DIR}/${STACK}" && -n "${AZID}" ]]; then
-    STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
-fi
+case ${ACCOUNT_PROVIDER} in
+    azure)
+        STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
+        ;;
+    *)
+        STACK_NAME=$(jq -r ".Stacks[0].StackName" <  "${CF_DIR}/${STACK}")
+        ;;
+esac
 
 ALTERNATIVE_TEMPLATES=$(findFiles \
     "${CF_DIR}/${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${REGION_PREFIX}*-template.json" \
