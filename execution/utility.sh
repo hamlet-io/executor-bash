@@ -713,6 +713,59 @@ function addJSONAncestorObjects() {
   runJQ "${pattern}" < "${file}"
 }
 
+# -- URL manipulation
+
+function get_url_component() {
+  local url="$1"; shift
+  local component="$1"; shift
+
+  proto="$(echo "$url" | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+  url="$(echo ${url/$proto/})"
+  userpass="$(echo $url | grep @ | cut -d@ -f1)"
+  pass="$(echo $userpass | grep : | cut -d: -f2)"
+  if [ -n "$pass" ]; then
+    user="$(echo $userpass | grep : | cut -d: -f1)"
+  else
+      user=$userpass
+  fi
+  host="$(echo ${url/$user@/} | cut -d/ -f1)"
+  port="$(echo $host | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+  path="$(echo $url | grep / | cut -d/ -f2-)"
+
+  case $component in
+    proto)
+      echo "${proto}"
+      ;;
+
+    userpass)
+      echo "${userpass}"
+      ;;
+
+    user)
+      echo "${user}"
+      ;;
+
+    pass)
+      echo "${pass}"
+      ;;
+
+    host)
+      echo "${host}"
+      ;;
+
+    port)
+      echo "${port}"
+      ;;
+
+    path)
+      echo "${path}"
+      ;;
+
+    *)
+      echo "${url}"
+  esac
+}
+
 # -- Contract manipulation --
 function getTasksFromContract() {
     local contractFile="$1"; shift
@@ -2214,6 +2267,37 @@ function format_git_url() {
   else
     printf ""
   fi
+}
+
+function find_auth_for_git_url() {
+  local repo_url="$1"; shift
+
+  repo_provider="$( git_provider_from_host "${repo_url}" )"
+  local credentials_var="${repo_provider^^}_CREDENTIALS"
+  if [[ -n "${!credentials_var}" ]]; then
+    echo "${repo_url/\/\////${!credentials_var}@}"
+  else
+    echo "${repo_url}"
+  fi
+}
+
+function git_provider_from_host() {
+  local repo_url="$1"; shift
+
+  host="$( get_url_component "${repo_url}" "host" )"
+  case $host in
+    github.com)
+      echo "github"
+      ;;
+
+    gitlab.com)
+      echo "gitlab"
+      ;;
+
+    *)
+      echo "git"
+      ;;
+  esac
 }
 
 function clone_git_repo() {

@@ -109,6 +109,21 @@ function options() {
   if [[ "${#GENERATION_PROVIDERS_ARRAY[@]}" == "0" ]]; then
     GENERATION_PROVIDERS_ARRAY+=("${GENERATION_PROVIDERS_DEFAULT}")
   fi
+
+  # Provider state from loader
+  PROVIDER_STATE=""
+  if [[ -f "${PROVIDER_CACHE_DIR}/provider-state.json" ]]; then
+    PROVIDER_STATE="${PROVIDER_CACHE_DIR}/provider-state.json"
+    plugin_dirs="$( cat "${PROVIDER_STATE}" | jq -r '[ .Providers | keys[] as $k | .[$k].plugin_dir ] | join(";")' )"
+    readarray -t providers  < <(cat "${PROVIDER_STATE}" | jq -r '.Providers | keys[] as $k | $k')
+    GENERATION_PROVIDERS_ARRAY=( "${providers[@]}" "${GENERATION_PROVIDERS_ARRAY[@]}" )
+
+    if [[ -n "${GENERATION_PLUGIN_DIRS}" ]]; then
+      GENERATION_PLUGIN_DIRS="${GENERATION_PLUGIN_DIRS};${plugin_dirs}"
+    else
+      GENERATION_PLUGIN_DIRS="${plugin_dirs}"
+    fi
+  fi
   GENERATION_PROVIDERS="$(listFromArray "GENERATION_PROVIDERS_ARRAY" ",")"
 
   if [[ "${#FLOWS_ARRAY[@]}" == "0" ]]; then
@@ -171,10 +186,6 @@ function options() {
 
   # Specific input control for mock input
   if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
-
-    # Cache for asssembled components
-    export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
-
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "OUTPUT_DIR required for mock input source"
       fatalMandatory
@@ -335,7 +346,7 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
+  local pass_list=("providercontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
 
   # Initialise the components of the pass filenames
   declare -A pass_entrance_prefix
@@ -394,6 +405,13 @@ function process_template_pass() {
       ;;
 
     schema)
+      for p in "${pass_list[@]}"; do
+        pass_account_prefix["${p}"]=""
+        pass_region_prefix["${p}"]=""
+      done
+      ;;
+
+    loader)
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
@@ -491,6 +509,7 @@ function process_template_pass() {
   args+=("-g" "${GENERATION_DATA_DIR}")
   args+=("-v" "region=${region}")
   args+=("-v" "accountRegion=${account_region}")
+  args+=("-v" "providerState=${PROVIDER_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
@@ -786,7 +805,7 @@ function process_template() {
   if [[ -z "${OUTPUT_DIR}" ]]; then
     local deployment_unit_state_subdirectories="false"
     case "${level}" in
-      unitlist|blueprint|buildblueprint)
+      loader|unitlist|blueprint|buildblueprint)
         # No subdirectories for deployment units
         ;;
       *)

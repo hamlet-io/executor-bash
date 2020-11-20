@@ -130,10 +130,10 @@ findGen3Dirs "${GENERATION_DATA_DIR}" || exit
 # Build the composite solution ( aka blueprint)
 export GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-"composite"}"
 
-if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
+# Cache for asssembled components
+export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
 
-    # Cache for asssembled components
-    export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
+if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
 
     blueprint_alternate_dirs=( \
     "${SEGMENT_SOLUTIONS_DIR}" \
