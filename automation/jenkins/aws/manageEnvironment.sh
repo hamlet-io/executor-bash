@@ -5,19 +5,18 @@ trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 function main() {
-  if [[ "${SEGMENT}" == "default" ]]; then
-    TAG="env${AUTOMATION_JOB_IDENTIFIER}-${PRODUCT}-${ENVIRONMENT}"
-  else
-    TAG="env${AUTOMATION_JOB_IDENTIFIER}-${PRODUCT}-${ENVIRONMENT}-${SEGMENT}"
-  fi
+  # Add conventional commit details
+  DETAIL_MESSAGE="${DETAIL_MESSAGE}, cctype=manenv, ccdesc=${AUTOMATION_JOB_IDENTIFIER}"
 
-  ${AUTOMATION_DIR}/manageUnits.sh -r "${TAG}" || return $?
+  ${AUTOMATION_DIR}/manageUnits.sh -r "${PRODUCT_CONFIG_COMMIT}" || return $?
 
-  # All ok so tag the config repo
-  save_product_config "${DETAIL_MESSAGE}" "${PRODUCT_CONFIG_REFERENCE}" "${TAG}" || return $?
-  
-  # Commit the generated application templates
-  save_product_infrastructure "${DETAIL_MESSAGE}" "${PRODUCT_INFRASTRUCTURE_REFERENCE}" "${TAG}" || return $?
+  # Commit the config repo
+  # Segment level units can result in updates the the operations tree which should be in the repo
+  # holding the state tree but just in case, check the repo holding the config as well
+  save_product_config "${DETAIL_MESSAGE}" "${PRODUCT_CONFIG_REFERENCE}" || return $?
+
+  # Commit the generated templates/stacks
+  save_product_infrastructure "${DETAIL_MESSAGE}" "${PRODUCT_INFRASTRUCTURE_REFERENCE}" || return $?
 }
 
 main "$@"
