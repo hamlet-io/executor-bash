@@ -202,7 +202,7 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export DEPLOYMENTUNIT_REGION=${DEPLOYMENTUNIT_REGION:-$(runJQ --arg du ${DEPLOYMENT_UNIT} -r '.Product[$du].Region | select(.!=null)' <${COMPOSITE_BLUEPRINT} )}
     export SID=${SID:-$(runJQ -r '.Segment.Id | select(.!="Segment") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export ACCOUNT_PROVIDER="${ACCOUNT_PROVIDER:-$(runJQ -r '.Account.Provider | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}"
-    export ACCOUNT_PROVIDER="${ACCOUNT_PROVIDER:-'aws'}"
+    export ACCOUNT_PROVIDER="${ACCOUNT_PROVIDER:-aws}"
     export COMPONENT_REGION="${DEPLOYMENTUNIT_REGION:-$PRODUCT_REGION}"
     export REGION="${REGION:-$COMPONENT_REGION}"
 
@@ -264,9 +264,9 @@ if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
             export AWS_DEFAULT_PROFILE="${AID}"
         fi
     fi
-    if [[ "${ACCOUNT_PROVIDER}" == "aws" ]]; then
+    if [[ $ACCOUNT_PROVIDER == 'aws' ]]; then
         aws configure list --profile "${PROVIDERID}" > $(getTempFile "awsid_profile_status_XXXXXX.txt") 2>&1
-        if [[ $? -eq 0 ]]; then
+        if [[ $? -eq 0 ]]; then 
             export AWS_DEFAULT_PROFILE="${PROVIDERID}"
         fi
     fi
