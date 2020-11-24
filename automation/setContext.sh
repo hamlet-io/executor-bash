@@ -557,6 +557,13 @@ function main() {
       CODE_PROVIDER_ARRAY+=("${PRODUCT_CODE_GIT_PROVIDER}")
   done
 
+  # For builds, need to capture any provided git commit even if no deployment units defined at this point
+  case ${AUTOMATION_PROVIDER} in
+      jenkins | azurepipelines)
+          [[ ( -n "${GIT_COMMIT}" ) && ( -z "${CODE_COMMIT_ARRAY[0]}" ) ]] && CODE_COMMIT_ARRAY[0]="${GIT_COMMIT}"
+          ;;
+  esac
+
   # Regenerate the deployment unit list in case the first code commit/tag or format was overriden
   UPDATED_UNITS_ARRAY=()
   for INDEX in $( seq 0 $((${#DEPLOYMENT_UNIT_ARRAY[@]}-1)) ); do
