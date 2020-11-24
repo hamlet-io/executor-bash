@@ -1220,8 +1220,8 @@ function upgrade_cmdb_repo_to_v1_3_0() {
   for account_file in "${account_files[@]}"; do
     provider_id="$( jq -r '.Account.ProviderId | select(.!=null)' < "${account_file}" )"
      # This to support legacy configuration
-    [[ ! -e "${provider_id}" ]] && provider_id="$( jq -r '.Account.AWSId | select(.!=null)' < "${account_file}" )"
-    [[ ! -e "${provider_id}" ]] && provider_id="$( jq -r '.Account.AzureId | select(.!=null)' < "${account_file}" )"
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AWSId | select(.!=null)' < "${account_file}" )"
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AzureId | select(.!=null)' < "${account_file}" )"
     account_id="$( jq -r '.Account.Id' < "${account_file}" )"
     account_mappings+=(["${provider_id}"]="${account_id}")
   done
