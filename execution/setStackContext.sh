@@ -188,14 +188,16 @@ if [[ ! -f "${CF_DIR}/${TEMPLATE}" ]]; then
 fi
 
 # Permit renaming of stack files without affecting existing stack status
-case ${ACCOUNT_PROVIDER} in
-    azure)
-        STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
-        ;;
-    *)
-        STACK_NAME=$(jq -r ".Stacks[0].StackName" <  "${CF_DIR}/${STACK}")
-        ;;
-esac
+if [[ -f “${CF_DIR}/${STACK}” ]]; then
+    case ${ACCOUNT_PROVIDER} in
+        azure)
+            STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
+            ;;
+        *)
+            STACK_NAME=$(jq -r ".Stacks[0].StackName" <  "${CF_DIR}/${STACK}")
+            ;;
+    esac
+fi
 
 ALTERNATIVE_TEMPLATES=$(findFiles \
     "${CF_DIR}/${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${REGION_PREFIX}*-template.json" \
