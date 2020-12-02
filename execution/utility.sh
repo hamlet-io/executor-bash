@@ -1256,6 +1256,17 @@ function update_ec2_autoscalegroup() {
   aws --region "${region}" autoscaling update-auto-scaling-group --auto-scaling-group-name "${groupName}" --cli-input-json "file://${configfile}" || return $?
 }
 
+function remove_ec2_scaleinprotection() {
+  local region="$1"; shift
+  local groupName="$1"; shift
+
+  protected_instances="$( aws --region "${region}" autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${groupName}" --query 'AutoScalingGroups[*].Instances[?ProtectedFromScaleIn].InstanceId' --output text || return $? )"
+  if [[ -n "${protected_instances}" ]]; then
+    info "Disabling scale in protection to allow for scaling events"
+    aws --region "${region}" autoscaling set-instance-protection --auto-scaling-group-name "${groupName}" --no-protected-from-scale-in --instance-ids ${protected_instances} || return $?
+  fi
+}
+
 function manage_ec2_volume_encryption() {
   local region="$1"; shift
   local encryptionEnabled="$1"; shift
