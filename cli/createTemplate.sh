@@ -106,25 +106,24 @@ function options() {
   DISABLE_OUTPUT_CLEANUP="${DISABLE_OUTPUT_CLEANUP:-${DISABLE_OUTPUT_CLEANUP_DEFAULT}}"
   ENTRANCE="${ENTRANCE:-${ENTRANCE_DEFAULT}}"
 
-  if [[ "${#GENERATION_PROVIDERS_ARRAY[@]}" == "0" ]]; then
+  if [[ ! -v "GENERATION_PROVIDERS" ]] && [[ "${#GENERATION_PROVIDERS_ARRAY[@]}" == "0" ]]; then
     GENERATION_PROVIDERS_ARRAY+=("${GENERATION_PROVIDERS_DEFAULT}")
   fi
 
-  # Provider state from loader
-  PROVIDER_STATE=""
-  if [[ -f "${PROVIDER_CACHE_DIR}/provider-state.json" ]]; then
-    PROVIDER_STATE="${PROVIDER_CACHE_DIR}/provider-state.json"
-    plugin_dirs="$( cat "${PROVIDER_STATE}" | jq -r '[ .Providers | keys[] as $k | .[$k].plugin_dir ] | join(";")' )"
-    readarray -t providers  < <(cat "${PROVIDER_STATE}" | jq -r '.Providers | keys[] as $k | $k')
-    GENERATION_PROVIDERS_ARRAY=( "${providers[@]}" "${GENERATION_PROVIDERS_ARRAY[@]}" )
+  # Only default provider if its not set
+  GENERATION_PROVIDERS="$(listFromArray "GENERATION_PROVIDERS_ARRAY" ",")"
+
+  # plugin state from loader
+  PLUGIN_STATE=""
+  if [[ -f "${PLUGIN_CACHE_DIR}/plugin-state.json" ]]; then
+    PLUGIN_STATE="${PLUGIN_CACHE_DIR}/plugin-state.json"
 
     if [[ -n "${GENERATION_PLUGIN_DIRS}" ]]; then
-      GENERATION_PLUGIN_DIRS="${GENERATION_PLUGIN_DIRS};${plugin_dirs}"
+      GENERATION_PLUGIN_DIRS="${GENERATION_PLUGIN_DIRS};${PLUGIN_CACHE_DIR}"
     else
-      GENERATION_PLUGIN_DIRS="${plugin_dirs}"
+      GENERATION_PLUGIN_DIRS="${PLUGIN_CACHE_DIR}"
     fi
   fi
-  GENERATION_PROVIDERS="$(listFromArray "GENERATION_PROVIDERS_ARRAY" ",")"
 
   if [[ "${#FLOWS_ARRAY[@]}" == "0" ]]; then
     FLOWS_ARRAY+=("${FLOWS_DEFAULT}")
@@ -191,6 +190,7 @@ function options() {
       fatalMandatory
       return 1
     fi
+    CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
   fi
 
   # Add default composite fragments including end fragment
@@ -346,7 +346,7 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("providercontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
+  local pass_list=("plugincontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
 
   # Initialise the components of the pass filenames
   declare -A pass_entrance_prefix
@@ -509,7 +509,7 @@ function process_template_pass() {
   args+=("-g" "${GENERATION_DATA_DIR}")
   args+=("-v" "region=${region}")
   args+=("-v" "accountRegion=${account_region}")
-  args+=("-v" "providerState=${PROVIDER_STATE}")
+  args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")

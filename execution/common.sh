@@ -18,7 +18,7 @@ done
 
 # Set global default cache
 GENERATION_CACHE_DIR="${GENERATION_CACHE_DIR:-"${HOME}/.hamlet/cache"}"
-PROVIDER_CACHE_DIR="${GENERATION_CACHE_DIR}/providers"
+PLUGIN_CACHE_DIR="${GENERATION_CACHE_DIR}/plugins"
 
 function getLogLevel() {
   checkLogLevel "${GENERATION_LOG_LEVEL}"
