@@ -1263,7 +1263,7 @@ function remove_ec2_scaleinprotection() {
   protected_instances="$( aws --region "${region}" autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${groupName}" --query 'AutoScalingGroups[*].Instances[?ProtectedFromScaleIn].InstanceId' --output text || return $? )"
   if [[ -n "${protected_instances}" ]]; then
     info "Disabling scale in protection to allow for scaling events"
-    aws --region "${region}" autoscaling set-instance-protection --auto-scaling-group-name "${groupName}" --no-protected-from-scale-in --instance-ids ${protected_instances} || return $?
+    aws --region "${region}" autoscaling set-instance-protection --auto-scaling-group-name "${groupName}" --no-protected-from-scale-in --instance-ids "${protected_instances}" || return $?
   fi
 }
 
