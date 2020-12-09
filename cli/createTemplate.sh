@@ -214,8 +214,10 @@ function options() {
 
         # Legacy fragments
         for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/${composite}_*.ftl; do
-            $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
-            addToArray "${composite}_array" "${fragment}"
+            if [[ -f "${fragment}" ]]; then
+              $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
+              addToArray "${composite}_array" "${fragment}"
+            fi
         done
 
         # Legacy end fragments
