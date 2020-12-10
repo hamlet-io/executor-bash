@@ -1205,7 +1205,7 @@ function upgrade_cmdb_repo_to_v1_2_0() {
 
   return ${return_status}
 }
-
+# Find accounts
 function upgrade_cmdb_repo_to_v1_3_0() {
   local root_dir="$1";shift
   local dry_run="$1";shift
@@ -1218,9 +1218,12 @@ function upgrade_cmdb_repo_to_v1_3_0() {
   local -A account_mappings
   readarray -t account_files < <(find "${GENERATION_DATA_DIR}" -type f -name "account.json" )
   for account_file in "${account_files[@]}"; do
-    aws_id="$( jq -r '.Account.AWSId' <"${account_file}" )"
+    provider_id="$( jq -r '.Account.ProviderId | select(.!=null)' < "${account_file}" )"
+     # This to support legacy configuration
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AWSId | select(.!=null)' < "${account_file}" )"
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AzureId | select(.!=null)' < "${account_file}" )"
     account_id="$( jq -r '.Account.Id' < "${account_file}" )"
-    account_mappings+=(["${aws_id}"]="${account_id}")
+    account_mappings+=(["${provider_id}"]="${account_id}")
   done
 
   readarray -t cf_dirs < <(find "${root_dir}" -type d -name "cf" )
@@ -1324,9 +1327,12 @@ function upgrade_cmdb_repo_to_v1_3_1() {
   local -A account_mappings
   readarray -t account_files < <(find "${GENERATION_DATA_DIR}" -type f -name "account.json" )
   for account_file in "${account_files[@]}"; do
-    aws_id="$( jq -r '.Account.AWSId' <"${account_file}" )"
+    provider_id="$( jq -r '.Account.ProviderId | select(.!=null)' < "${account_file}" )"
+     # This to support legacy configuration
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AWSId | select(.!=null)' < "${account_file}" )"
+    [[ -z "${provider_id}" ]] && provider_id="$( jq -r '.Account.AzureId | select(.!=null)' < "${account_file}" )"
     account_id="$( jq -r '.Account.Id' < "${account_file}" )"
-    account_mappings+=(["${aws_id}"]="${account_id}")
+    account_mappings+=(["${provider_id}"]="${account_id}")
   done
 
   readarray -t cf_dirs < <(find "${root_dir}" -type d -name "cf" )

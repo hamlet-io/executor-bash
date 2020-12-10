@@ -192,22 +192,19 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     export TID=${TID:-$(runJQ -r '.Tenant.Id | select(.!="Tenant") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export TENANT=${TENANT:-$(runJQ -r '.Tenant.Name | select(.!="Tenant") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export AID=${AID:-$(runJQ -r '.Account.Id | select(.!="Account") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-    export AWSID=${AWSID:-$(runJQ -r '.Account.AWSId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-    export AZID=${AZID:-$(runJQ -r '.Account.AzureId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export PROVIDERID=${PROVIDERID:-$(runJQ -r '.Account.ProviderId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    # This to support legacy configuration
+    export PROVIDERID=${PROVIDERID:-$(runJQ -r '.Account.AWSId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export PROVIDERID=${PROVIDERID:-$(runJQ -r '.Account.AzureId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export ACCOUNT_REGION=${ACCOUNT_REGION:-$(runJQ -r '.Account.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PID=${PID:-$(runJQ -r '.Product.Id | select(.!="Product") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PRODUCT_REGION=${PRODUCT_REGION:-$(runJQ -r '.Product.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export DEPLOYMENTUNIT_REGION=${DEPLOYMENTUNIT_REGION:-$(runJQ --arg du ${DEPLOYMENT_UNIT} -r '.Product[$du].Region | select(.!=null)' <${COMPOSITE_BLUEPRINT} )}
     export SID=${SID:-$(runJQ -r '.Segment.Id | select(.!="Segment") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
-
+    export ACCOUNT_PROVIDER="${ACCOUNT_PROVIDER:-$(runJQ -r '.Account.Provider | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}"
+    export ACCOUNT_PROVIDER="${ACCOUNT_PROVIDER:-aws}"
     export COMPONENT_REGION="${DEPLOYMENTUNIT_REGION:-$PRODUCT_REGION}"
     export REGION="${REGION:-$COMPONENT_REGION}"
-
-    if [[ -n "${AZID}" ]]; then
-        ACCOUNT_PROVIDER="azure"
-    else
-        ACCOUNT_PROVIDER="aws"
-    fi
 
     # Perform a few consistency checks
     [[ ! -s "${COMPOSITE_BLUEPRINT}" ]] && fatalCantProceed "The composite blueprint is empty. The likely cause of this is malformed JSON object in the Solution." && exit 1
@@ -267,16 +264,16 @@ if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
             export AWS_DEFAULT_PROFILE="${AID}"
         fi
     fi
-    if [[ -n "${AWSID}" ]]; then
-        aws configure list --profile "${AWSID}" > $(getTempFile "awsid_profile_status_XXXXXX.txt") 2>&1
-        if [[ $? -eq 0 ]]; then
-            export AWS_DEFAULT_PROFILE="${AWSID}"
+    if [[ $ACCOUNT_PROVIDER == 'aws' ]]; then
+        aws configure list --profile "${PROVIDERID}" > $(getTempFile "awsid_profile_status_XXXXXX.txt") 2>&1
+        if [[ $? -eq 0 ]]; then 
+            export AWS_DEFAULT_PROFILE="${PROVIDERID}"
         fi
     fi
 fi
 
 # Set the Azure subscription and login if we haven't already
-if [[ -n "${AZID}" ]]; then
+if [[ "${ACCOUNT_PROVIDER}" == "azure" ]]; then
     if [[ "${AZ_AUTH_METHOD}" == "none" ]]; then
         info "Skipping azure authentication - AZ_AUTH_METHOD=${AZ_AUTH_METHOD}"
     else
@@ -295,7 +292,7 @@ if [[ -n "${AZID}" ]]; then
                 az_cli_args+=("--output" "none" )
             fi
 
-            az account set --subscription "${AZID}" "${az_cli_args[@]}"
+            az account set --subscription "${PROVIDERID}" "${az_cli_args[@]}"
         fi
     fi
 fi
