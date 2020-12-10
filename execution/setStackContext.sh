@@ -188,12 +188,12 @@ if [[ ! -f "${CF_DIR}/${TEMPLATE}" ]]; then
 fi
 
 # Permit renaming of stack files without affecting existing stack status
-if [[ -f "${CF_DIR}/${STACK}" && -n "${AWSID}" ]]; then
+if [[ -f "${CF_DIR}/${STACK}" && -n "${PROVIDERID}" ]]; then
     STACK_NAME=$(jq -r ".Stacks[0].StackName" <  "${CF_DIR}/${STACK}")
 fi
 
 # Permit renaming of stack files without affecting existing stack status
-if [[ -f "${CF_DIR}/${STACK}" && -n "${AZID}" ]]; then
+if [[ -f "${CF_DIR}/${STACK}" && -n "${PROVIDERID}" ]]; then
     STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
 fi
 
