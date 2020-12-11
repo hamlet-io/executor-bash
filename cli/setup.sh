@@ -110,9 +110,9 @@ function main() {
 
       case "${source_type}" in
         git)
-          git_url="$( echo "${plugin_source}" | jq -c -r '.Parameters.git.Url | select (.!=null)' )"
-          git_ref="$( echo "${plugin_source}" | jq -c -r '.Parameters.git.Ref | select (.!=null)' )"
-          git_plugin_dir="$( echo "${plugin_source}" | jq -c -r '.Parameters.git.Path | select (.!=null)' )"
+          git_url="$( echo "${plugin_source}" | jq -c -r '.Parameters["Source:git"].Url | select (.!=null)' )"
+          git_ref="$( echo "${plugin_source}" | jq -c -r '.Parameters["Source:git"].Ref | select (.!=null)' )"
+          git_plugin_dir="$( echo "${plugin_source}" | jq -c -r '.Parameters["Source:git"].Path | select (.!=null)' )"
 
           if [[ -z "${git_url}" && -z "${git_ref}" ]]; then
             error "Git Source missing details  url:${git_url} - ref:${git_ref}"
@@ -166,28 +166,6 @@ function main() {
 
           short_hash="$(git -C "${plugin_instance_dir}" rev-parse --short "${remote_hash}" )"
           plugin_state="$( update_plugin_state "${plugin_state}" "${plugin_instance_id}" "${source_type}" "${git_url}:${short_hash}" "${plugin_instance_dir}" )"
-          ;;
-
-        local)
-          local_path="$( echo "${plugin_source}" | jq -c -r '.Parameters.local.Path | select (.!=null)' )"
-
-          if [[ -z "${local_path}" ]]; then
-            error "Local Source missing details  path:${local_path}"
-            continue
-          fi
-
-          if [[ -d "${local_path}" ]]; then
-            if [[ -L "${plugin_instance_dir}" ]]; then
-              ln -sfn "${local_path}" "${plugin_instance_dir}"
-            else
-              ln -s "${local_path}" "${plugin_instance_dir}"
-            fi
-
-            plugin_state="$( update_plugin_state "${plugin_state}" "${plugin_instance_id}" "${source_type}" "${local_path}" "${plugin_instance_dir}" )"
-          else
-            warning "id:${plugin_instance_id} - type:${source_type} - not found - skipped"
-            rm -rf "${plugin_instance_dir}"
-          fi
           ;;
 
       esac
