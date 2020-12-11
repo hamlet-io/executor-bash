@@ -78,10 +78,6 @@ DEFAULT_KMS_PREFIX="base64:"
 
 DEFAULT_DEPLOYMENT_GROUP="application"
 
-export FASTLANE_SKIP_UPDATE_CHECK="true"
-export FASTLANE_HIDE_CHANGELOG="true"
-export FASTLANE_DISABLE_COLORS=1
-
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
 # Get the generation context so we can run template generation
@@ -301,9 +297,12 @@ function main() {
     env_setup || return $?
   fi
 
-  # Fastlane requirements
+  # Fastlane Standard config
   export LC_ALL=en_US.UTF-8
   export LANG=en_US.UTF-8
+  export FASTLANE_SKIP_UPDATE_CHECK="true"
+  export FASTLANE_HIDE_CHANGELOG="true"
+  export FASTLANE_DISABLE_COLORS=1
 
   # Add android SDK tools to path
   export ANDROID_HOME=$HOME/Library/Android/sdk
