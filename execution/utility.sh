@@ -2710,7 +2710,70 @@ function check_for_invalid_environment_variables(){
   validate_environment_variables "${parts[@]}"
 }
 
+#-- Container registry handling
+function login_to_container_registry {
+  local registry="$1"; shift
+  local registry_provider="$1"; shift
+  local ecr_region="$1"; shift
+
+  case "${registry_provider}" in
+    ecr)
+      aws --region "${ecr_region}" ecr get-login-password \
+        | docker login \
+            --username AWS \
+            --password-stdin "${registry}" || return $?
+      ;;
+  esac
+
+  return 0
+}
+
+function create_containter_registry_repository {
+  local repository="$1"; shift
+  local registry="$1"; shift
+  local registry_provider="$1"; shift
+  local ecr_region="$1";
+
+  case "${registry_provider}" in
+    ecr)
+      aws --region "${ecr_region}" ecr describe-repositories --repository-names "${repository}" --query 'repositories[0].repositoryName' > /dev/null 2>&1
+      if [[ $? -ne 0 ]]; then
+          # Not there yet so create it
+          info "Creating repository - ${registry} ${repository}"
+          aws --region "${ecr_region}" ecr create-repository --repository-name "${repository}" > /dev/null || return $?
+      fi
+      ## Double check that the registry was created
+      info "Double checking repo"
+      aws --region "${ecr_region}" ecr describe-repositories --repository-names "${repository}" --output text --query 'repositories[0].repositoryUri'
+      ;;
+  esac
+}
+
+
 #-- Image sourcing
+function update_build_reference_from_image {
+  local product="$1"; shift
+  local environment="$1"; shift
+  local segment="$1"; shift
+  local build_unit="$1"; shift
+  local build_reference="$1"; shift
+  local image_format="$1"; shift
+  local source="$1"; shift
+
+  info "Updating build reference..."
+  local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${product}" )"
+  local build_dir="$(findGen3ProductBuildsDir "${root_dir}" "${product}" )"
+
+  [[ "${build_dir}" == "${settings_dir}" ]] && build_dir="${settings_dir}"
+  local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
+  mkdir -p "${build_unit_path}"
+
+  echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source}\", \"Formats\" : [ \"${image_format}\" ]}" | jq --indent 2 "." > "${build_unit_path}/build.json"
+
+  # refresh settings to include new build file
+  assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}"
+}
+
 function get_image_from_url() {
   local url="$1"; shift
   local local_dir="$1"; shift
@@ -2755,19 +2818,7 @@ function get_url_image_to_registry() {
 
   popTempDir
 
-  info "Updating build reference..."
-  local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${product}" )"
-  local build_dir="$(findGen3ProductBuildsDir "${root_dir}" "${product}" )"
-
-  [[ "${build_dir}" == "${settings_dir}" ]] && build_dir="${settings_dir}"
-  local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
-  mkdir -p "${build_unit_path}"
-
-  echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source_url}\", \"Formats\" : [ \"${image_format}\" ]}" | jq --indent 2 "." > "${build_unit_path}/build.json"
-
-  # refresh settings to include new build file
-  info "Refreshing settings..."
-  assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}"
+  update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source}"
 
   info "Uploading image to registry..."
   if [[ -n "${build_reference}" && -f "${local_dir}/${registry_file_name}" ]]; then
@@ -2776,4 +2827,48 @@ function get_url_image_to_registry() {
     fatal "Could not get image from ${source_url}"
   fi
   return 0
+}
+
+function get_image_from_container_registry() {
+  local source_image="$1"; shift
+  local image_format="$1"; shift
+  local product="$1"; shift
+  local environment="$1"; shift
+  local segment="$1"; shift
+  local build_unit="$1"; shift
+  local registry_dns="$1"; shift
+  local registry_provider="$1"; shift
+  local ecr_region="$1"; shift
+
+  image_tool=""
+
+  if docker info &>/dev/null; then
+
+    image_tool="docker"
+    docker image pull "${source_image}"
+
+    # Create Registry Image
+    registry_image="${registry_dns}/${source_image}"
+
+    # Establish the hamlet registry image
+    repository="${source_image%:*}"
+    create_containter_registry_repository "${repository}" "${registry_dns}" "${registry_provider}" "${ecr_region}" || return $?
+
+    # Push into the hamlet registry
+    login_to_container_registry "${registry_dns}" "${registry_provider}" "${ecr_region}" || return $?
+    docker tag "${source_image}" "${registry_image}" || return $?
+    docker image push "${registry_image}" || return $?
+
+    # Update build references to use the new image
+    docker image prune
+    build_reference="$( docker image inspect "${source_image}" --format '{{join .RepoDigests ";"}}' )"
+    warning "build ref ${build_reference}"
+
+    update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_image}"
+  fi
+
+  if [[ -z "${image_tool}" ]]; then
+    warning "No image tools available to deploy the image - skipping pull"
+  fi
+
 }
