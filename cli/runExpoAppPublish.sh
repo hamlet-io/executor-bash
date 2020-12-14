@@ -59,15 +59,14 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_EXPO_VERSION="3.20.1"
-DEFAULT_TURTLE_VERSION="0.14.11"
+DEFAULT_EXPO_VERSION="4.0.13"
+DEFAULT_TURTLE_VERSION="0.20.3"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
 DEFAULT_RUN_SETUP="false"
 DEFAULT_FORCE_BINARY_BUILD="false"
 DEFAULT_SUBMIT_BINARY="false"
 
-DEFAULT_QR_BUILD_FORMATS="ios,android"
 DEFAULT_BINARY_BUILD_PROCESS="turtle"
 
 DEFAULT_NODE_PACKAGE_MANAGER="yarn"
@@ -78,10 +77,6 @@ DEFAULT_BUILD_LOGS="false"
 DEFAULT_KMS_PREFIX="base64:"
 
 DEFAULT_DEPLOYMENT_GROUP="application"
-
-export FASTLANE_SKIP_UPDATE_CHECK="true"
-export FASTLANE_HIDE_CHANGELOG="true"
-export FASTLANE_DISABLE_COLORS=1
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
@@ -159,9 +154,8 @@ function env_setup() {
         python || return $?
 
     brew cask upgrade || return $?
-    brew cask install \
-        fastlane \
-        android-studio || return $?
+    brew cask install fastlane android-studio || return $?
+    brew link --overwrite fastlane
 
     # Install android sdk components
     # - Download the command line tools so that we can then install the appropriate tools in a shared location
@@ -179,7 +173,6 @@ function env_setup() {
 
     # Make sure we have required software installed
     pip3 install \
-        qrcode[pil] \
         awscli \
         yq || return $?
 
@@ -207,7 +200,6 @@ where
 (o) -n NODE_PACKAGE_MANAGER   Set the node package manager for app installation
 (o) -m SUBMIT_BINARY          submit the binary for testing
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
-(0) -q QR_BUILD_FORMATS       specify the formats you would like to generate QR urls for
 (o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
 (o) -l BUILD_LOGS             show the build logs for binary builds
 
@@ -219,7 +211,6 @@ BUILD_FORMATS = ${DEFAULT_BUILD_FORMATS}
 BINARY_EXPIRATION = ${DEFAULT_BINARY_EXPIRATION}
 RUN_SETUP = ${DEFAULT_RUN_SETUP}
 SUBMIT_BINARY = ${DEFAULT_SUBMIT_BINARY}
-QR_BUILD_FORMATS = ${DEFAULT_QR_BUILD_FORMATS}
 BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
@@ -265,9 +256,6 @@ function options() {
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
                 ;;
-            q)
-                QR_BUILD_FORMATS="${OPTARG}"
-                ;;
             s)
                 RUN_SETUP="true"
                 ;;
@@ -292,7 +280,6 @@ function options() {
     BINARY_EXPIRATION="${BINARY_EXPIRATION:-$DEFAULT_BINARY_EXPIRATION}"
     FORCE_BINARY_BUILD="${FORCE_BINARY_BUILD:-$DEFAULT_FORCE_BINARY_BUILD}"
     SUBMIT_BINARY="${SUBMIT_BINARY:-DEFAULT_SUBMIT_BINARY}"
-    QR_BUILD_FORMATS="${QR_BUILD_FORMATS:-$DEFAULT_QR_BUILD_FORMATS}"
     BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
@@ -310,8 +297,12 @@ function main() {
     env_setup || return $?
   fi
 
-   # make sure fastlane is on path
-   export PATH="$HOME/.fastlane/bin:$PATH"
+  # Fastlane Standard config
+  export LC_ALL=en_US.UTF-8
+  export LANG=en_US.UTF-8
+  export FASTLANE_SKIP_UPDATE_CHECK="true"
+  export FASTLANE_HIDE_CHANGELOG="true"
+  export FASTLANE_DISABLE_COLORS=1
 
   # Add android SDK tools to path
   export ANDROID_HOME=$HOME/Library/Android/sdk
@@ -379,8 +370,6 @@ function main() {
   BUILD_REFERENCE="$( jq -r '.BuildConfig.BUILD_REFERENCE' <"${CONFIG_FILE}" )"
   BUILD_NUMBER="$(date +"%Y%m%d.1%H%M%S")"
   RELEASE_CHANNEL="$( jq -r '.BuildConfig.RELEASE_CHANNEL' <"${CONFIG_FILE}" )"
-
-  arrayFromList EXPO_QR_BUILD_FORMATS "${QR_BUILD_FORMATS}"
 
   BUILD_BINARY="false"
 
@@ -756,20 +745,21 @@ function main() {
 
                         # Ensure mandatory arguments have been provided
                         if [[ -z "${IOS_TESTFLIGHT_USERNAME}" || -z "${IOS_TESTFLIGHT_PASSWORD}" || -z "${IOS_DIST_APP_ID}" ]]; then
-                            fatal "TestFlight details not found please provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID"
-                            return 255
+                            warning "IOS - TestFlight details not found please provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID - Skipping push"
+                            continue
                         fi
 
                         info "Submitting IOS binary to testflight"
                         export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
                         fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
                         DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to TestFlight</strong>"
+
                         ;;
 
                     "android")
                         if [[ -z "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
-                            fatal "Play Store details not found please provide ANDROID_PLAYSTORE_JSON_KEY"
-                            return 255
+                            warning "Android - Play Store details not found please provide ANDROID_PLAYSTORE_JSON_KEY - Skipping push"
+                            continue
                         fi
 
                         info "Submitting Android build to play store"
@@ -788,29 +778,14 @@ function main() {
   DETAILED_HTML="<html><body> <h4>Expo Mobile App Publish</h4> <p> A new Expo mobile app publish has completed </p> <ul>"
 
   if [[ "${BINARY_BUILD_PROCESS}" == "turtle" ]]; then
-
-    DETAILED_HTML_QR_MESSAGE="<h4>Expo Client App QR Codes</h4> <p>Use these codes to load the app through the Expo Client</p>"
-    for qr_build_format in "${EXPO_QR_BUILD_FORMATS[@]}"; do
-
-        #Generate EXPO QR Code
-        EXPO_QR_FILE_PREFIX="${qr_build_format}"
-        EXPO_QR_FILE_NAME="${EXPO_QR_FILE_PREFIX}-qr.png"
-        EXPO_QR_FILE_PATH="${REPORTS_PATH}/${EXPO_QR_FILE_NAME}"
-
-        qr "exp://${EXPO_VERSION_PUBLIC_URL#*//}/${qr_build_format}-index.json?release-channel=${RELEASE_CHANNEL}" > "${EXPO_QR_FILE_PATH}" || return $?
-
-        DETAILED_HTML_QR_MESSAGE="${DETAILED_HTML_QR_MESSAGE}<p><strong>${qr_build_format}</strong> <br> <img src=\"./${EXPO_QR_FILE_NAME}\" alt=\"EXPO QR Code\" width=\"200px\" /></p>"
-
-    done
-
-     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"
+     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"APP_BUILD_FORMATS
   fi
 
   if [[ "${BINARY_BUILD_PROCESS}" == "fastlane" ]]; then
     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"
   fi
 
-  DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_QR_MESSAGE} ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
+  DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
   echo "${DETAILED_HTML}" > "${REPORTS_PATH}/build-report.html"
 
   aws --region "${AWS_REGION}" s3 sync  --only-show-errors "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
