@@ -2862,7 +2862,7 @@ function get_image_from_container_registry() {
     # Update build references to use the new image
     docker image prune
     build_reference="$( docker image inspect "${source_image}" --format '{{join .RepoDigests ";"}}' )"
-    warning "buld ref ${build_reference}"
+    warning "build ref ${build_reference}"
 
     update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_image}"
   fi
