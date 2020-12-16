@@ -17,7 +17,9 @@ for dir in "${PLUGINDIRS[@]}"; do
 done
 
 # Set global default cache
-GENERATION_CACHE_DIR="${GENERATION_CACHE_DIR:-"${HOME}/.hamlet/cache"}"
+HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
+GENERATION_CACHE_DIR="${HAMLET_HOME_DIR}/cache"
+PLUGIN_CACHE_DIR="${HAMLET_HOME_DIR}/plugins"
 
 function getLogLevel() {
   checkLogLevel "${GENERATION_LOG_LEVEL}"
