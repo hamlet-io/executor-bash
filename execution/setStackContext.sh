@@ -188,7 +188,7 @@ if [[ ! -f "${CF_DIR}/${TEMPLATE}" ]]; then
 fi
 
 # Permit renaming of stack files without affecting existing stack status
-if [[ -f “${CF_DIR}/${STACK}” ]]; then
+if [[ -f "${CF_DIR}/${STACK}" ]]; then
     case ${ACCOUNT_PROVIDER} in
         azure)
             STACK_NAME=$(jq -r ".properties.outputs.resourceGroup.value" <  "${CF_DIR}/${STACK}")
