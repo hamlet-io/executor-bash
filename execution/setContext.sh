@@ -196,6 +196,9 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
     # This to support legacy configuration
     export PROVIDERID=${PROVIDERID:-$(runJQ -r '.Account.AWSId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PROVIDERID=${PROVIDERID:-$(runJQ -r '.Account.AzureId | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
+    export ACCOUNT_DEPLOYMENTUNIT_REGION=${ACCOUNT_DEPLOYMENTUNIT_REGION:-$(runJQ --arg du ${DEPLOYMENT_UNIT} -r '.Account[$du].Region | select(.!=null)' <${COMPOSITE_BLUEPRINT} )}
+    export ACCOUNT_REGION=${ACCOUNT_REGION:-${ACCOUNT_DEPLOYMENTUNIT_REGION}}
+    export DEPLOYMENTUNIT_REGION=${DEPLOYMENTUNIT_REGION:-${ACCOUNT_DEPLOYMENTUNIT_REGION}}
     export ACCOUNT_REGION=${ACCOUNT_REGION:-$(runJQ -r '.Account.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PID=${PID:-$(runJQ -r '.Product.Id | select(.!="Product") | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
     export PRODUCT_REGION=${PRODUCT_REGION:-$(runJQ -r '.Product.Region | select(.!=null)' < ${COMPOSITE_BLUEPRINT})}
@@ -266,7 +269,7 @@ if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
     fi
     if [[ $ACCOUNT_PROVIDER == 'aws' ]]; then
         aws configure list --profile "${PROVIDERID}" > $(getTempFile "awsid_profile_status_XXXXXX.txt") 2>&1
-        if [[ $? -eq 0 ]]; then 
+        if [[ $? -eq 0 ]]; then
             export AWS_DEFAULT_PROFILE="${PROVIDERID}"
         fi
     fi
