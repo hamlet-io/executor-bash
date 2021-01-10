@@ -296,7 +296,7 @@ function get_openapi_definition_file() {
   [[ -n "${openapi_definition}" ]] ||
       { fatal "Unable to locate ${registry} file in ${openapi_zip}"; popTempDir; return 1; }
 
-  info "Saving ${openapi_definition} to ${definition_file} ..."
+  info " ~ saving ${openapi_definition} to ${definition_file}"
 
   # Index via id to allow definitions to be combined into single composite
   addJSONAncestorObjects "${openapi_definition}" "${id}" > "${openapi_file_dir}/definition.json" ||
@@ -585,7 +585,7 @@ function process_template_pass() {
     # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
     # cleanup is done once all passes have been processed in this case
     if [[ (-f "${output_file}") && ("${deployment_unit_state_subdirectories}" == "false") ]]; then
-      info " * removing existing ${file_description} file ${output_file}"
+      info " ~ removing existing ${file_description} file ${output_file}"
       rm "${output_file}"
     fi
 
@@ -661,7 +661,7 @@ function process_template_pass() {
       fi
 
       if [[ "${pass}" == "pregeneration" ]]; then
-        info "Processing pregeneration script ..."
+        info " ~ processing pregeneration script"
         [[ "${differences_detected}" == "true" ]] &&
           . "${result_file}" ||
           . "${output_file}"
@@ -715,7 +715,7 @@ function process_template_pass() {
         cat "${output_file}" | jq --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
 
         diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-          info " ~ no change in ${file_description} detected " ||
+          info " ~ no change in ${file_description} detected" ||
           differences_detected="true"
       fi
       ;;
@@ -989,7 +989,7 @@ function process_template() {
     fi
 
   else
-    info "No differences detected."
+    info " ~ no differences detected"
   fi
 
   return 0
