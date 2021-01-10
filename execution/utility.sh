@@ -2902,7 +2902,7 @@ function get_url_image_to_registry() {
 
   popTempDir
 
-  update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source}"
+  update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_url}"
 
   info "Uploading image to registry..."
   if [[ -n "${build_reference}" && -f "${local_dir}/${registry_file_name}" ]]; then
