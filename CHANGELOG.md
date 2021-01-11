@@ -2,7 +2,7 @@
 
 
 
-# 0.0.0 (2021-01-11)
+# [8.0.0](https://github.com/hamlet-io/engine-plugin-aws/compare/5e6a35ec10b6b26b8773c13f63cf502a4c27a8ee...v8.0.0) (2021-01-11)
 
 
 * Refactor move bash from engine (#1) ([0378f22](https://github.com/hamlet-io/engine-plugin-aws/commit/0378f22409edd7c88e907dd7852531b10e8cb05b)), closes [#1](https://github.com/hamlet-io/engine-plugin-aws/issues/1)
@@ -120,12 +120,7 @@
 * **ecs:** add fargate platform support to runTask ([36aca75](https://github.com/hamlet-io/engine-plugin-aws/commit/36aca7531699785816cf0ecb8eb72481c1c240cb))
 * **expo:** add major version to OTA path ([e9913c8](https://github.com/hamlet-io/engine-plugin-aws/commit/e9913c87244e7d645e66d3a5764f8633b7d351d3))
 * **expo:** clean keychains and node pkg support ([8d01f22](https://github.com/hamlet-io/engine-plugin-aws/commit/8d01f229be70f755fbbfeae29491453b4a8630ec))
-* **expo:** support abi builds in android ([4c7605c](https://github.com/hamlet-io/engine-plugin-aws/commit/4c7605ca6a11a32f7ac69866ccd57d48a9e09b93))
-* **externalnetwork:** vpn attachment lookup ([d535a1d](https://github.com/hamlet-io/engine-plugin-aws/commit/d535a1d64480ef073b513db8adb365c01dd71875))
-* **filetranfer:** security group management for filetransfer ([ac7b178](https://github.com/hamlet-io/engine-plugin-aws/commit/ac7b178eb1283e50516941b68599cea3c9272cb1))
-* **plan:** enable dryrun for azure deployments ([#82](https://github.com/hamlet-io/engine-plugin-aws/issues/82)) ([6dd5cbf](https://github.com/hamlet-io/engine-plugin-aws/commit/6dd5cbfae9bb3076dab5f18aec120b9d87ada9be))
 * "Account" and fixed build scope ([#95](https://github.com/hamlet-io/engine-plugin-aws/issues/95)) ([cf94902](https://github.com/hamlet-io/engine-plugin-aws/commit/cf94902e9b4583a6cf34a96ff14662f1fb5643cc))
-* **schema:** fixed schema template load ([#73](https://github.com/hamlet-io/engine-plugin-aws/issues/73)) ([358898a](https://github.com/hamlet-io/engine-plugin-aws/commit/358898af0b5bb73e8c2fef7726720e9efa0e85ff))
 * account deployment unit region override ([855c832](https://github.com/hamlet-io/engine-plugin-aws/commit/855c832f1794f84af6a8d68d049191e6e4f50658))
 * Add content encoding metadata ([2f1497b](https://github.com/hamlet-io/engine-plugin-aws/commit/2f1497b4ae55a34da0efea5de3518bb793e26893))
 * add conventional commit formatting ([#119](https://github.com/hamlet-io/engine-plugin-aws/issues/119)) ([c6b3b18](https://github.com/hamlet-io/engine-plugin-aws/commit/c6b3b18858af40760694048a8b358a075d993dbd))
@@ -139,7 +134,7 @@
 * android sdk setup ([5bb5bcf](https://github.com/hamlet-io/engine-plugin-aws/commit/5bb5bcf0118ad6c59c205dc97c2420d29d2d8889))
 * Bare workflow support ([a736438](https://github.com/hamlet-io/engine-plugin-aws/commit/a736438c50f8a3c441723d715ac30a404be24e84))
 * Branch based deployment plans ([#70](https://github.com/hamlet-io/engine-plugin-aws/issues/70)) ([4634b44](https://github.com/hamlet-io/engine-plugin-aws/commit/4634b4455f7ccf85f660a2003d6ef77147bad67b))
-* **schema:** new template level - schema ([#66](https://github.com/hamlet-io/engine-plugin-aws/issues/66)) ([8dcfcdc](https://github.com/hamlet-io/engine-plugin-aws/commit/8dcfcdc76a549d7ac4e28357b98d1da2e19b13be))
+* changelog generation ([#147](https://github.com/hamlet-io/engine-plugin-aws/issues/147)) ([2920753](https://github.com/hamlet-io/engine-plugin-aws/commit/29207533b5faba64fcae1c3a26a24ba7fafe79fb))
 * CMDB Upgrades via pinning ([#53](https://github.com/hamlet-io/engine-plugin-aws/issues/53)) ([69a8ec2](https://github.com/hamlet-io/engine-plugin-aws/commit/69a8ec262eb4fff95e347b1c5ebe9c89c436e03c))
 * credential download for playstore key ([972f981](https://github.com/hamlet-io/engine-plugin-aws/commit/972f9819c70cc530ce40ae4adf355918265371bc))
 * custom entrance parameters ([#120](https://github.com/hamlet-io/engine-plugin-aws/issues/120)) ([54d1e6e](https://github.com/hamlet-io/engine-plugin-aws/commit/54d1e6ece0ff959c985119547f7964162b34e895))
@@ -150,8 +145,6 @@
 * Freemarker log level control ([#62](https://github.com/hamlet-io/engine-plugin-aws/issues/62)) ([e655ad1](https://github.com/hamlet-io/engine-plugin-aws/commit/e655ad12094d03f72574951f5027b9ab24735c9d))
 * Include encoding scheme(s) in filenames ([d77084a](https://github.com/hamlet-io/engine-plugin-aws/commit/d77084a0883c1f54c936cda89e1d44b2a40e0402))
 * installation of android sdk ([1a385a8](https://github.com/hamlet-io/engine-plugin-aws/commit/1a385a8ea80522839003a9bc3d6f87f739ae59e3))
-* **task:** support multiple env var overrides ([2fdb9ef](https://github.com/hamlet-io/engine-plugin-aws/commit/2fdb9ef89a41898bbb36e93068e93f740a9c70b9))
-* **utility:** pull image from external source for registry ([#126](https://github.com/hamlet-io/engine-plugin-aws/issues/126)) ([823c09d](https://github.com/hamlet-io/engine-plugin-aws/commit/823c09d61e8c1cec2ab7828fe8e738d33307207c))
 * make cache directory configurable ([b1aa08d](https://github.com/hamlet-io/engine-plugin-aws/commit/b1aa08d635a8f3ab3ee602f9ffd8143e72383a50))
 * plugin loading from contract ([#134](https://github.com/hamlet-io/engine-plugin-aws/issues/134)) ([f0ed3fa](https://github.com/hamlet-io/engine-plugin-aws/commit/f0ed3fae39848f641b0b18656284f0efc56c14ff))
 * Provider-specific account configuration should be determined from a provider-independent source ([dc2bdeb](https://github.com/hamlet-io/engine-plugin-aws/commit/dc2bdeb8f13f6b87127b2380524601fee8cf7219))
@@ -159,6 +152,14 @@
 * support mgmt contract generation ([5e64897](https://github.com/hamlet-io/engine-plugin-aws/commit/5e6489703d07bf77a422c44a473afbf1d081ff90))
 * Support shared build.json and shared_build.json ([#98](https://github.com/hamlet-io/engine-plugin-aws/issues/98)) ([14a84e0](https://github.com/hamlet-io/engine-plugin-aws/commit/14a84e0bba2a6c3c5c88683164f0bce62a7377b2))
 * update fatalmandatory calls with variable validator ([3fdd759](https://github.com/hamlet-io/engine-plugin-aws/commit/3fdd7597b828ba45ad590379fa28f3e56d03e056))
+* **expo:** support abi builds in android ([4c7605c](https://github.com/hamlet-io/engine-plugin-aws/commit/4c7605ca6a11a32f7ac69866ccd57d48a9e09b93))
+* **externalnetwork:** vpn attachment lookup ([d535a1d](https://github.com/hamlet-io/engine-plugin-aws/commit/d535a1d64480ef073b513db8adb365c01dd71875))
+* **filetranfer:** security group management for filetransfer ([ac7b178](https://github.com/hamlet-io/engine-plugin-aws/commit/ac7b178eb1283e50516941b68599cea3c9272cb1))
+* **plan:** enable dryrun for azure deployments ([#82](https://github.com/hamlet-io/engine-plugin-aws/issues/82)) ([6dd5cbf](https://github.com/hamlet-io/engine-plugin-aws/commit/6dd5cbfae9bb3076dab5f18aec120b9d87ada9be))
+* **schema:** fixed schema template load ([#73](https://github.com/hamlet-io/engine-plugin-aws/issues/73)) ([358898a](https://github.com/hamlet-io/engine-plugin-aws/commit/358898af0b5bb73e8c2fef7726720e9efa0e85ff))
+* **schema:** new template level - schema ([#66](https://github.com/hamlet-io/engine-plugin-aws/issues/66)) ([8dcfcdc](https://github.com/hamlet-io/engine-plugin-aws/commit/8dcfcdc76a549d7ac4e28357b98d1da2e19b13be))
+* **task:** support multiple env var overrides ([2fdb9ef](https://github.com/hamlet-io/engine-plugin-aws/commit/2fdb9ef89a41898bbb36e93068e93f740a9c70b9))
+* **utility:** pull image from external source for registry ([#126](https://github.com/hamlet-io/engine-plugin-aws/issues/126)) ([823c09d](https://github.com/hamlet-io/engine-plugin-aws/commit/823c09d61e8c1cec2ab7828fe8e738d33307207c))
 
 
 ### Reverts
