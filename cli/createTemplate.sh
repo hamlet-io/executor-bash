@@ -579,7 +579,7 @@ function process_template_pass() {
 
   # Ignore whitespace only files
   if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
-    info " ~ ignoring emtpy ${file_description}"
+    info " ~ ignoring empty ${file_description}"
 
     # Remove any previous version
     # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
