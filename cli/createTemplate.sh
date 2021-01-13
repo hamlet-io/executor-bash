@@ -296,7 +296,7 @@ function get_openapi_definition_file() {
   [[ -n "${openapi_definition}" ]] ||
       { fatal "Unable to locate ${registry} file in ${openapi_zip}"; popTempDir; return 1; }
 
-  info "Saving ${openapi_definition} to ${definition_file} ..."
+  info " ~ saving ${openapi_definition} to ${definition_file}"
 
   # Index via id to allow definitions to be combined into single composite
   addJSONAncestorObjects "${openapi_definition}" "${id}" > "${openapi_file_dir}/definition.json" ||
@@ -546,7 +546,7 @@ function process_template_pass() {
   [[ -n "${pass_deployment_unit_subset[${pass}]}" ]] && args+=("-v" "deploymentUnitSubset=${pass_deployment_unit_subset[${pass}]}")
 
   local file_description="${pass_description[${pass}]}"
-  info "Generating ${file_description} file ...\n"
+  info " - ${file_description}"
 
   [[ "${pass_alternative}" == "primary" ]] && pass_alternative=""
   pass_alternative_prefix=""
@@ -579,13 +579,13 @@ function process_template_pass() {
 
   # Ignore whitespace only files
   if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
-    info "Ignoring empty ${file_description} file ...\n"
+    info " ~ ignoring empty ${file_description}"
 
     # Remove any previous version
     # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
     # cleanup is done once all passes have been processed in this case
     if [[ (-f "${output_file}") && ("${deployment_unit_state_subdirectories}" == "false") ]]; then
-      info "... removing existing ${file_description} file ${output_file} ...\n"
+      info " ~ removing existing ${file_description} file ${output_file}"
       rm "${output_file}"
     fi
 
@@ -655,13 +655,13 @@ function process_template_pass() {
         cat "${output_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
 
         diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-          info "No change in ${file_description} detected ...\n" ||
+          info " ~ no change in ${file_description} detected" ||
           differences_detected="true"
 
       fi
 
       if [[ "${pass}" == "pregeneration" ]]; then
-        info "Processing pregeneration script ..."
+        info " ~ processing pregeneration script"
         [[ "${differences_detected}" == "true" ]] &&
           . "${result_file}" ||
           . "${output_file}"
@@ -715,7 +715,7 @@ function process_template_pass() {
         cat "${output_file}" | jq --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
 
         diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-          info "No change in ${file_description} detected ...\n" ||
+          info " ~ no change in ${file_description} detected" ||
           differences_detected="true"
       fi
       ;;
@@ -848,6 +848,8 @@ function process_template() {
   local results_dir="${tmp_dir}/results"
   mkdir -p "${results_dir}"
 
+  info "Generating outputs:"
+
   # First see if a generation contract can be generated
   process_template_pass \
       "${entrance}" \
@@ -894,7 +896,7 @@ function process_template() {
     0 | 255)
       # Use the contract to control further processing
       local generation_contract="${results_dir}/${results_list[0]}"
-      info "Generating documents from generation contract ${generation_contract}"
+      debug "Generating documents from generation contract ${generation_contract}"
       willLog "debug" && cat ${generation_contract}
 
       local task_list_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
@@ -957,10 +959,10 @@ function process_template() {
   # Copy the set of result file if necessary
   if [[ "${differences_detected}" == "true" ]]; then
 
-    info "Differences detected ..."
+    info "Differences detected:"
 
     for f in "${results_list[@]}"; do
-      info "... updating ${f} ..."
+      info " - updating ${f}"
       cp "${results_dir}/${f}" "${cf_dir}/${f}"
     done
 
@@ -975,19 +977,19 @@ function process_template() {
 
         for e in "${existing_files[@]}"; do
           local existing_filename="$(fileName "${e}")"
-          debug "... checking file ${existing_filename} ..."
+          debug " - checking file ${existing_filename}"
           # If generated, then ignore
           $(inArray "results_list" "${existing_filename}") && continue
 
           # Wasn't generated so remove
-          info "... removing ${existing_filename} ..."
+          info " - removing ${existing_filename}"
           rm  -f "${cf_dir}/${existing_filename}"
         done
       fi
     fi
 
   else
-    info "No differences detected."
+    info " ~ no differences detected"
   fi
 
   return 0
