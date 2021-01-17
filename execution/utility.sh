@@ -2863,14 +2863,19 @@ function get_image_from_url() {
   local local_dir="$1"; shift
   local registry_file_name="$1"; shift
 
-  local local_file="${local_dir}/${registry_file_name}"
-
-  info "Pulling image from Url Source - Url: ${url}"
+  if [[ "$( fileExtension "${url}" )" != "zip" ]]; then
+    local local_file="${local_dir}/$(fileName "${url}")"
+  else
+    local local_file="${local_dir}/${registry_file_name}"
+  fi
 
   curl --fail --show-error -L -o "${local_file}" "${url}" || return $?
   sha1sum "${local_file}" | cut -d " " -f 1  > "${local_file}.sha1"
 
-  info "Image pulled - local file: ${registry_file_name} - sha1: $(cat ${local_file}.sha1 )"
+  info "* Url Source image details"
+  info "  - url: ${url}"
+  info "  - sha1: $(cat ${local_file}.sha1 )"
+  info "  - local file: ${registry_file_name}"
   return 0
 }
 
@@ -2886,12 +2891,20 @@ function get_url_image_to_registry() {
   local environment="$1"; shift
   local segment="$1"; shift
   local build_unit="$1"; shift
+  local zip_image_content="${1}"; shift
 
   pushTempDir "hamlet_imageUrl_XXXXXX"
   local local_dir="$(getTopTempDir)"
 
   get_image_from_url "${source_url}" "${local_dir}" "${registry_file_name}"
-  local build_reference="$(cat ${local_dir}/${registry_file_name}.sha1 )"
+
+  if [[ "${zip_image_content}" == "true" && "$(fileExtension "${source_url}")" != "zip" ]]; then
+    local build_reference="$(cat ${local_dir}/$(fileName "${source_url}").sha1 )"
+    ( cd "${local_dir}" && zip -j "${local_dir}/${registry_file_name}" "${local_dir}/$(fileName "${source_url}")")
+    sha1sum "${local_dir}/${registry_file_name}" | cut -d " " -f 1  > "${local_dir}/${registry_file_name}.sha1"
+  else
+    local build_reference="$(cat ${local_dir}/${registry_file_name}.sha1 )"
+  fi
 
   if [[ -n "${expected_hash}" && -n "${build_reference}" ]]; then
     if [[ "${build_reference}" != "${expected_hash}" ]]; then
