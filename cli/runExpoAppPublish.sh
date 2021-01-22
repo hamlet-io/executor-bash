@@ -573,7 +573,12 @@ function main() {
                 if [[ "${TURTLE_VERSION}" != "${TURTLE_DEFAULT_VERSION}" ]]; then
                     npm install turtle-cli@"${TURTLE_VERSION}"
                 fi
-                npx turtle setup:"${build_format}" --sdk-version "${EXPO_SDK_VERSION}" || return $?
+
+                turtle_setup_extra_args=""
+                if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
+                    turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
+                fi
+                npx turtle setup:"${build_format}" --sdk-version "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
                 npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
