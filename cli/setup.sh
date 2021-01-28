@@ -158,6 +158,11 @@ function main() {
             local_path="${git_plugin_clone_dir}/${git_plugin_dir}"
           fi
 
+          if [[ ! -d "${local_path}" ]]; then
+            error "could not find plugin dir ${git_plugin_dir} in plugin repo ${git_url} - skipping plugin state update"
+            continue
+          fi
+
           if [[ -L "${plugin_instance_dir}" ]]; then
             ln -sfn "${local_path}" "${plugin_instance_dir}"
           else
