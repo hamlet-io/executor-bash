@@ -348,7 +348,7 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("plugincontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema")
+  local pass_list=("plugincontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema" "schemacontract")
 
   # Initialise the components of the pass filenames
   declare -A pass_entrance_prefix
@@ -382,38 +382,9 @@ function process_template_pass() {
   template_composites+=("FRAGMENT" )
 
   case "${entrance}" in
-    unitlist)
-      # Blueprint applies across accounts and regions
-      for p in "${pass_list[@]}"; do
-        pass_account_prefix["${p}"]=""
-        pass_region_prefix["${p}"]=""
-      done
-      ;;
 
-    blueprint)
-      # Blueprint applies across accounts and regions
-      for p in "${pass_list[@]}"; do
-        pass_account_prefix["${p}"]=""
-        pass_region_prefix["${p}"]=""
-      done
-      ;;
-
-    buildblueprint)
-      # Blueprint applies across accounts and regions
-      for p in "${pass_list[@]}"; do
-        pass_account_prefix["${p}"]=""
-        pass_region_prefix["${p}"]=""
-      done
-      ;;
-
-    schema)
-      for p in "${pass_list[@]}"; do
-        pass_account_prefix["${p}"]=""
-        pass_region_prefix["${p}"]=""
-      done
-      ;;
-
-    loader)
+    # Outputs which don't belong to a deployment don't require region or account prefixes
+    unitlist|blueprint|buildblueprint|schema|loader|schemacontract)
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
