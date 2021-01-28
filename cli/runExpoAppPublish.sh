@@ -78,7 +78,7 @@ DEFAULT_KMS_PREFIX="base64:"
 
 DEFAULT_DEPLOYMENT_GROUP="application"
 
-DEFAULT_IOS_CODESIGN_IDENTITY="iPhone Distribution"
+DEFAULT_IOS_DIST_CODESIGN_IDENTITY="iPhone Distribution"
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
@@ -288,7 +288,7 @@ function options() {
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
     KMS_PREFIX="${KMS_PREFIX:-${DEFAULT_KMS_PREFIX}}"
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
-    IOS_CODESIGN_IDENTITY="${IOS_CODESIGN_IDENTITY:-${DEFAULT_IOS_CODESIGN_IDENTITY}}"
+
 }
 
 
@@ -543,6 +543,9 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_USERNAME" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_CODESIGN_IDENTITY" "${KMS_PREFIX}" "${AWS_REGION}"
+
+            IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
 
             # Turtle Specific overrides
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
