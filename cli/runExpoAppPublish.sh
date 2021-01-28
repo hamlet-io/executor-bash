@@ -78,6 +78,8 @@ DEFAULT_KMS_PREFIX="base64:"
 
 DEFAULT_DEPLOYMENT_GROUP="application"
 
+DEFAULT_IOS_CODESIGN_IDENTITY="iPhone Distribution"
+
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
 # Get the generation context so we can run template generation
@@ -286,6 +288,7 @@ function options() {
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
     KMS_PREFIX="${KMS_PREFIX:-${DEFAULT_KMS_PREFIX}}"
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
+    IOS_CODESIGN_IDENTITY="${IOS_CODESIGN_IDENTITY:-${DEFAULT_IOS_CODESIGN_IDENTITY}}"
 }
 
 
@@ -636,11 +639,11 @@ function main() {
 
                     # codesigning setup
                     fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
-                    CODESIGN_IDENTITY="$( security find-certificate -c "iPhone Distribution" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
+                    CODESIGN_IDENTITY="$( security find-certificate -c "${IOS_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
 
                     # load the app provisioning profile
                     fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
-                    fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"iPhone Distribution" || return $?
+                    fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
 
                     # load extension profiles
                     # extension target name is assumed to be the string appended to "ios_profile" in the profile name
@@ -654,7 +657,7 @@ function main() {
                         TARGET="${TARGET#_}"
                         echo "Updating target ${TARGET} ..."
                         fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
-                        fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"iPhone Distribution" || return $?
+                        fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
                         # Update the plist file as well if present
                         TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
                         if [[ -f "${TARGET_PLIST_PATH}" ]]; then
@@ -666,7 +669,7 @@ function main() {
                         fi
                     done
 
-                    fastlane run automatic_code_signing use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"iPhone Distribution" || return $?
+                    fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
 
                     if [[ "${BUILD_LOGS}" == "true" ]]; then
                         FASTLANE_IOS_SILENT="false"
