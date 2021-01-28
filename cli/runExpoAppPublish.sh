@@ -640,6 +640,10 @@ function main() {
                     # codesigning setup
                     fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
                     CODESIGN_IDENTITY="$( security find-certificate -c "${IOS_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
+                    if [[ -z "${CODESIGN_IDENTITY}" ]]; then
+                        fatal "Could not find code signing identity matching type: ${IOS_CODESIGN_IDENTITY} - To get the identity download the distribution certificate and get the commonName. The IOS_CODESIGN_IDENTITY is the bit before the : ( will be Apple Distribution or iPhone Distribution"
+                        return 255
+                    fi
 
                     # load the app provisioning profile
                     fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
