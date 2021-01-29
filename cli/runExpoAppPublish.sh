@@ -403,7 +403,7 @@ function main() {
   find "${OPS_PATH}" -name \*.kms -exec decrypt_kms_file "${AWS_REGION}" "{}" \;
 
   # get the version of the expo SDK which is required
-  EXPO_SDK_VERSION="$(jq -r '.expo.sdkVersion' < ./app.json)"
+  EXPO_SDK_VERSION="$(jq -r '.expo.sdkVersion | select (.!=null)' < ./app.json)"
   EXPO_PROJECT_SLUG="$(jq -r '.expo.slug' < ./app.json)"
 
   case "${APP_VERSION_SOURCE}" in
@@ -426,13 +426,20 @@ function main() {
    arrayFromList EXPO_APP_VERSION_PARTS "$( semver_valid ${EXPO_APP_VERSION} )"
    EXPO_APP_MAJOR_VERSION="${EXPO_APP_VERSION_PARTS[0]}"
 
+   ## defines a prefix for the OTA versions - there can be different rules which define the OTA_VERSION
+   OTA_VERSION="${EXPO_APP_MAJOR_VERSION}"
+
+    if [[ -n "${EXPO_SDK_VERSION}" ]]; then
+        OTA_VERSION="${EXPO_SDK_VERSION}"
+    fi
+
   # Determine Binary Build status
-  EXPO_CURRENT_SDK_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${EXPO_SDK_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
-  arrayFromList EXPO_CURRENT_SDK_FILES "${EXPO_CURRENT_SDK_BUILD}"
+  EXPO_CURRENT_OTA_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${OTA_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
+  arrayFromList EXPO_CURRENT_OTA_FILES "${EXPO_CURRENT_OTA_BUILD}"
 
   # Determine if App Version has been incremented
-  if [[ -n "${EXPO_CURRENT_SDK_BUILD}" ]]; then
-    for sdk_file in "${EXPO_CURRENT_SDK_FILES[@]}" ; do
+  if [[ -n "${EXPO_CURRENT_OTA_BUILD}" ]]; then
+    for sdk_file in "${EXPO_CURRENT_OTA_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
             aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
             break
@@ -446,12 +453,12 @@ function main() {
   fi
 
   # If not built before, or the app version has changed, or forced to, build the binary
-  if [[ -z "${EXPO_CURRENT_SDK_BUILD}" || "${FORCE_BINARY_BUILD}" == "true" || "${EXPO_CURRENT_APP_VERSION}" != "${EXPO_APP_VERSION}" ]]; then
+  if [[ -z "${EXPO_CURRENT_OTA_BUILD}" || "${FORCE_BINARY_BUILD}" == "true" || "${EXPO_CURRENT_APP_VERSION}" != "${EXPO_APP_VERSION}" ]]; then
     BUILD_BINARY="true"
   fi
 
   # variable for sentry source map upload
-  SENTRY_SOURCE_MAP_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"
+  SENTRY_SOURCE_MAP_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${OTA_VERSION}"
   echo "SENTRY_SOURCE_MAP_S3_URL=${SENTRY_SOURCE_MAP_S3_URL}" >> ${AUTOMATION_DATA_DIR}/chain.properties
   echo "SENTRY_URL_PREFIX=~/${PUBLIC_PREFIX}" >> ${AUTOMATION_DATA_DIR}/chain.properties
 
@@ -478,32 +485,32 @@ function main() {
   fi
 
   # Create base OTA
-  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | SDK: ${EXPO_SDK_VERSION}"
-  EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}"
-  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}"  || return $?
+  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION}"
+  EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
+  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
 
-    jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
-    mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json"
+    jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
+    mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
 
-    jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
-    mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json"
+    jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
+    mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
 
   fi
 
   if [[ -n "${BUILD_REFERENCE}" ]]; then
     info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
-    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
-    mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json"
+    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" > "${tmpdir}/ios-expo-override.json"
+    mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
 
-    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
-    mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/android-index.json"
+    jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' < "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" > "${tmpdir}/android-expo-override.json"
+    mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
   fi
 
   info "Copying OTA to CDN"
-  aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${EXPO_SDK_VERSION}" || return $?
+  aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}" || return $?
 
    DETAILED_HTML_BINARY_MESSAGE="<h4>Expo Binary Builds</h4>"
    if [[ "${BUILD_BINARY}" == "false" ]]; then
@@ -572,7 +579,12 @@ function main() {
                 if [[ "${TURTLE_VERSION}" != "${TURTLE_DEFAULT_VERSION}" ]]; then
                     npm install turtle-cli@"${TURTLE_VERSION}"
                 fi
-                npx turtle setup:"${build_format}" --sdk-version "${EXPO_SDK_VERSION}" || return $?
+
+                turtle_setup_extra_args=""
+                if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
+                    turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
+                fi
+                npx turtle setup:"${build_format}" --sdk-version "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
                 npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
@@ -607,7 +619,9 @@ function main() {
                         fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${EXPO_MANIFEST_URL}" || return $?
 
                         # SDK Version
-                        fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
+                        if [[ -n "${EXPO_SDK_VERSION}" ]]; then
+                            fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
+                        fi
 
                         # Release channel
                         fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesReleaseChannel value:"${RELEASE_CHANNEL}" || return $?
@@ -622,13 +636,13 @@ function main() {
                         # Legacy Expokit support
                         # Update Expo Details and seed with latest expo expot bundles
                         BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
-                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
+                        cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
 
                         # Get the bundle file name from the manifest
                         BUNDLE_URL="$( jq -r '.bundleUrl' < "${BINARY_BUNDLE_FILE}")"
                         BUNDLE_FILE_NAME="$( basename "${BUNDLE_URL}")"
 
-                        cp "${SRC_PATH}/app/dist/build/${EXPO_SDK_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
+                        cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
 
                         jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <  "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" > "${tmpdir}/EXShell.json"
                         mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
@@ -795,7 +809,7 @@ function main() {
     DETAILED_HTML="${DETAILED_HTML}<li><strong>OTA URL</strong> ${EXPO_VERSION_PUBLIC_URL}</li>"
   fi
 
-  DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>SDK Version</strong> ${EXPO_SDK_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
+  DETAILED_HTML="${DETAILED_HTML}<li><strong>Release Channel</strong> ${RELEASE_CHANNEL}</li><li><strong>OTA Version</strong> ${OTA_VERSION}</li><li><strong>App Version</strong> ${EXPO_APP_VERSION}</li><li><strong>Build Number</strong> ${BUILD_NUMBER}</li><li><strong>Code Commit</strong> ${BUILD_REFERENCE}</li></ul> ${DETAILED_HTML_BINARY_MESSAGE} </body></html>"
   echo "${DETAILED_HTML}" > "${REPORTS_PATH}/build-report.html"
 
   aws --region "${AWS_REGION}" s3 sync  --only-show-errors "${REPORTS_PATH}/" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/reports/" || return $?
