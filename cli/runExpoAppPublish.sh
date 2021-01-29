@@ -656,15 +656,15 @@ function main() {
 
                     # codesigning setup
                     fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
-                    CODESIGN_IDENTITY="$( security find-certificate -c "${IOS_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
+                    CODESIGN_IDENTITY="$( security find-certificate -c "${IOS_DIST_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
                     if [[ -z "${CODESIGN_IDENTITY}" ]]; then
-                        fatal "Could not find code signing identity matching type: ${IOS_CODESIGN_IDENTITY} - To get the identity download the distribution certificate and get the commonName. The IOS_CODESIGN_IDENTITY is the bit before the : ( will be Apple Distribution or iPhone Distribution"
+                        fatal "Could not find code signing identity matching type: ${IOS_DIST_CODESIGN_IDENTITY} - To get the identity download the distribution certificate and get the commonName. The IOS_DIST_CODESIGN_IDENTITY is the bit before the : ( will be Apple Distribution or iPhone Distribution"
                         return 255
                     fi
 
                     # load the app provisioning profile
                     fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
-                    fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
+                    fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
                     # load extension profiles
                     # extension target name is assumed to be the string appended to "ios_profile" in the profile name
@@ -678,7 +678,7 @@ function main() {
                         TARGET="${TARGET#_}"
                         echo "Updating target ${TARGET} ..."
                         fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
-                        fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
+                        fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
                         # Update the plist file as well if present
                         TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
                         if [[ -f "${TARGET_PLIST_PATH}" ]]; then
@@ -690,7 +690,7 @@ function main() {
                         fi
                     done
 
-                    fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_CODESIGN_IDENTITY}" || return $?
+                    fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
                     if [[ "${BUILD_LOGS}" == "true" ]]; then
                         FASTLANE_IOS_SILENT="false"
