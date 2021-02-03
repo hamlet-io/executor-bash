@@ -305,6 +305,7 @@ function get_openapi_definition_file() {
   cp "${openapi_file_dir}/definition.json" "${definition_file}" ||
       { popTempDir; return 1; }
 
+  assemble_composite_definitions
   popTempDir
   return 0
 }
@@ -636,7 +637,6 @@ function process_template_pass() {
         [[ "${differences_detected}" == "true" ]] &&
           . "${result_file}" ||
           . "${output_file}"
-        assemble_composite_definitions
       fi
       ;;
 

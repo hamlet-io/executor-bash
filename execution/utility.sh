@@ -2844,9 +2844,8 @@ function update_build_reference_from_image {
   local image_format="$1"; shift
   local source="$1"; shift
 
-  info "Updating build reference..."
-  local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${product}" )"
-  local build_dir="$(findGen3ProductBuildsDir "${root_dir}" "${product}" )"
+  local settings_dir="$(findGen3ProductSettingsDir "${ROOT_DIR}" "${product}" )"
+  local build_dir="$(findGen3ProductBuildsDir "${ROOT_DIR}" "${product}" )"
 
   [[ "${build_dir}" == "${settings_dir}" ]] && build_dir="${settings_dir}"
   local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
@@ -2957,9 +2956,8 @@ function get_image_from_container_registry() {
     docker image push "${registry_image}" || return $?
 
     # Update build references to use the new image
-    docker image prune
+    docker image prune --force
     build_reference="$( docker image inspect "${source_image}" --format '{{join .RepoDigests ";"}}' )"
-    warning "build ref ${build_reference}"
 
     update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_image}"
   fi
