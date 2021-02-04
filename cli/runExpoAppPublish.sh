@@ -483,8 +483,8 @@ function main() {
   get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
   IOS_DIST_NON_EXEMPT_ENCRYPTION="${IOS_DIST_NON_EXEMPT_ENCRYPTION:-${DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION}}"
 
-  jq --arg IOS_NON_EXEMPT_ENCRYPTION "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" '.expo.ios.config.usesNonExemptEncryption=$IOS_NON_EXEMPT_ENCRYPTION' <  "./app.json" > "${tmpdir}/ios-bundle-app.json"
-  mv "${tmpdir}/ios-bundle-app.json" "./app.json"
+  jq --arg IOS_NON_EXEMPT_ENCRYPTION "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" '.expo.ios.config.usesNonExemptEncryption=$IOS_NON_EXEMPT_ENCRYPTION' <  "./app.json" > "${tmpdir}/ios-encexempt-app.json"
+  mv "${tmpdir}/ios-encexempt-app.json" "./app.json"
 
   ANDROID_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROID_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${ANDROID_DIST_BUNDLE_ID}" != "null" && -n "${ANDROID_DIST_BUNDLE_ID}" ]]; then
