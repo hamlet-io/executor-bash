@@ -79,6 +79,7 @@ DEFAULT_KMS_PREFIX="base64:"
 DEFAULT_DEPLOYMENT_GROUP="application"
 
 DEFAULT_IOS_DIST_CODESIGN_IDENTITY="iPhone Distribution"
+DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION="false"
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
@@ -544,6 +545,7 @@ function main() {
             export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
 
+            #Get properties from retrieved config file and decrypt if required
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_EXPORT_METHOD" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -551,8 +553,11 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_TESTFLIGHT_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_CODESIGN_IDENTITY" "${KMS_PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
 
+            #Setting Defaults
             IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
+            IOS_DIST_NON_EXEMPT_ENCRYPTION="${IOS_DIST_NON_EXEMPT_ENCRYPTION:-${DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION}}"
 
             # Turtle Specific overrides
             TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
@@ -775,7 +780,15 @@ function main() {
 
                         info "Submitting IOS binary to testflight"
                         export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
-                        fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
+
+                        testflight_args=""
+                        if [[ "${IOS_DIST_NON_EXEMPT_ENCRYPTION,,}" == "true" ]]; then
+                            testflight_args="${testflight_args} uses_non_exempt_encryption:true skip_waiting_for_build_processing:false"
+                        else
+                            testflight_args="${testflight_args} skip_waiting_for_build_processing:true"
+                        fi
+
+                        fastlane run upload_to_testflight ${testflight_args} apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
                         DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to TestFlight</strong>"
 
                         ;;
