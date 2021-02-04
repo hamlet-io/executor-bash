@@ -781,14 +781,7 @@ function main() {
                         info "Submitting IOS binary to testflight"
                         export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
 
-                        testflight_args=""
-                        if [[ "${IOS_DIST_NON_EXEMPT_ENCRYPTION,,}" == "true" ]]; then
-                            testflight_args="${testflight_args} uses_non_exempt_encryption:true skip_waiting_for_build_processing:false"
-                        else
-                            testflight_args="${testflight_args} skip_waiting_for_build_processing:true"
-                        fi
-
-                        fastlane run upload_to_testflight ${testflight_args} apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
+                        fastlane run upload_to_testflight uses_non_exempt_encryption:"${IOS_DIST_NON_EXEMPT_ENCRYPTION,,}" apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
                         DETAILED_HTML_BINARY_MESSAGE="${DETAILED_HTML_BINARY_MESSAGE}<strong> Submitted to TestFlight</strong>"
 
                         ;;
