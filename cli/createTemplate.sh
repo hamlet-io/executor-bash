@@ -481,7 +481,6 @@ function process_template_pass() {
   done
 
   args+=("-g" "${GENERATION_DATA_DIR}")
-  args+=("-v" "region=${region}")
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
@@ -492,6 +491,14 @@ function process_template_pass() {
   args+=("-v" "configurationReference=${configuration_reference}")
   args+=("-v" "deploymentMode=${DEPLOYMENT_MODE}")
   args+=("-v" "runId=${run_id}")
+
+  # Starting layers
+  args+=("-v" "tenant=${TENANT}")
+  args+=("-v" "account=${ACCOUNT}")
+  args+=("-v" "region=${region}")
+  args+=("-v" "product=${PRODUCT}")
+  args+=("-v" "environment=${ENVIRONMENT}")
+  args+=("-v" "segment=${SEGMENT}")
 
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" ","
