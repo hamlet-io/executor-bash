@@ -479,7 +479,8 @@ function process_template_pass() {
     args+=("-r" "${composite,,}List=${composite_var#/?/}")
   done
 
-  args+=("-g" "${GENERATION_DATA_DIR}")
+  args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
+
   args+=("-v" "region=${region}")
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
