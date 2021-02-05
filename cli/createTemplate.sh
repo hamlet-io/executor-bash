@@ -305,6 +305,7 @@ function get_openapi_definition_file() {
   cp "${openapi_file_dir}/definition.json" "${definition_file}" ||
       { popTempDir; return 1; }
 
+  assemble_composite_definitions
   popTempDir
   return 0
 }
@@ -480,18 +481,28 @@ function process_template_pass() {
   done
 
   args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
-
-  args+=("-v" "region=${region}")
+  
+  # Composites 
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
   args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
+  
+  # Run time references
   args+=("-v" "requestReference=${request_reference}")
   args+=("-v" "configurationReference=${configuration_reference}")
   args+=("-v" "deploymentMode=${DEPLOYMENT_MODE}")
   args+=("-v" "runId=${run_id}")
+
+  # Starting layers
+  args+=("-v" "tenant=${TENANT}")
+  args+=("-v" "account=${ACCOUNT}")
+  args+=("-v" "region=${region}")
+  args+=("-v" "product=${PRODUCT}")
+  args+=("-v" "environment=${ENVIRONMENT}")
+  args+=("-v" "segment=${SEGMENT}")
 
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" ","
@@ -637,7 +648,6 @@ function process_template_pass() {
         [[ "${differences_detected}" == "true" ]] &&
           . "${result_file}" ||
           . "${output_file}"
-        assemble_composite_definitions
       fi
       ;;
 
