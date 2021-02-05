@@ -480,13 +480,17 @@ function process_template_pass() {
     args+=("-r" "${composite,,}List=${composite_var#/?/}")
   done
 
-  args+=("-g" "${GENERATION_DATA_DIR}")
+  args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
+  
+  # Composites 
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
   args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
+  
+  # Run time references
   args+=("-v" "requestReference=${request_reference}")
   args+=("-v" "configurationReference=${configuration_reference}")
   args+=("-v" "deploymentMode=${DEPLOYMENT_MODE}")
