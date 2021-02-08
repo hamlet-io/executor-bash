@@ -178,11 +178,6 @@ function env_setup() {
     pip3 install \
         awscli \
         yq || return $?
-
-    # yarn install
-    yarn global add \
-        expo-cli@"${EXPO_VERSION}" \
-        turtle-cli@"${DEFAULT_TURTLE_VERSION}" || return $?
 }
 
 function usage() {
