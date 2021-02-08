@@ -59,8 +59,8 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_EXPO_VERSION="4.0.13"
-DEFAULT_TURTLE_VERSION="0.20.3"
+DEFAULT_EXPO_VERSION="4.1.6"
+DEFAULT_TURTLE_VERSION="0.20.7"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
 DEFAULT_RUN_SETUP="false"
@@ -387,6 +387,14 @@ function main() {
 
   cd "${SRC_PATH}"
 
+  # Setup Expo
+  info "Installing requested expo version - ${EXPO_VERSION}"
+  npm install --silent expo-cli@"${EXPO_VERSION}"
+
+  # Setup Turtle
+  info "Installing requested turtle version - ${TURTLE_VERSION}"
+  npm install --silent turtle-cli@"${TURTLE_VERSION}"
+
   # Support the usual node package manager preferences
   case "${NODE_PACKAGE_MANAGER}" in
     "yarn")
@@ -495,7 +503,7 @@ function main() {
   # Create base OTA
   info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+  npx expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -585,16 +593,11 @@ function main() {
             "turtle")
                 echo "Using turtle to build the binary image"
 
-                # Setup Turtle
-                if [[ "${TURTLE_VERSION}" != "${TURTLE_DEFAULT_VERSION}" ]]; then
-                    npm install turtle-cli@"${TURTLE_VERSION}"
-                fi
-
                 turtle_setup_extra_args=""
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
                 fi
-                npx turtle setup:"${build_format}" --sdk-version "${turtle_setup_extra_args}" || return $?
+                npx turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
                 npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
