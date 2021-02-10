@@ -491,7 +491,7 @@ function main() {
   fi
 
   # Create base OTA
-  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION}"
+  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
   npx ${npx_base_args} --package expo-cli@"${EXPO_VERSION}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
@@ -581,7 +581,7 @@ function main() {
 
         case "${BINARY_BUILD_PROCESS}" in
             "turtle")
-                echo "Using turtle to build the binary image"
+                echo "Using turtle to build the binary image | turtle-cli version: ${TURTLE_VERSION}"
 
                 turtle_setup_extra_args=""
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
