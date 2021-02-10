@@ -82,6 +82,9 @@ DEFAULT_IOS_DIST_CODESIGN_IDENTITY="iPhone Distribution"
 DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION="false"
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
+npm_tool_cache="$(getTempDir "cote_npm_XXX")"
+
+npx_base_args="--quiet --ignore-existing --cache ${npm_tool_cache}"
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -382,14 +385,6 @@ function main() {
 
   cd "${SRC_PATH}"
 
-  # Setup Expo
-  info "Installing requested expo version - ${EXPO_VERSION}"
-  npm install --silent expo-cli@"${EXPO_VERSION}"
-
-  # Setup Turtle
-  info "Installing requested turtle version - ${TURTLE_VERSION}"
-  npm install --silent turtle-cli@"${TURTLE_VERSION}"
-
   # Support the usual node package manager preferences
   case "${NODE_PACKAGE_MANAGER}" in
     "yarn")
@@ -496,9 +491,9 @@ function main() {
   fi
 
   # Create base OTA
-  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION}"
+  info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  npx expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+  npx ${npx_base_args} --package expo-cli@"${EXPO_VERSION}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -586,16 +581,16 @@ function main() {
 
         case "${BINARY_BUILD_PROCESS}" in
             "turtle")
-                echo "Using turtle to build the binary image"
+                echo "Using turtle to build the binary image | turtle-cli version: ${TURTLE_VERSION}"
 
                 turtle_setup_extra_args=""
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
                 fi
-                npx turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
+                npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
-                npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
+                npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
                 ;;
 
             "fastlane")
