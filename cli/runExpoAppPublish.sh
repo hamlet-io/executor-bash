@@ -59,8 +59,8 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_EXPO_VERSION="4.0.13"
-DEFAULT_TURTLE_VERSION="0.20.3"
+DEFAULT_EXPO_VERSION="4.1.6"
+DEFAULT_TURTLE_VERSION="0.20.7"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
 DEFAULT_RUN_SETUP="false"
@@ -79,6 +79,7 @@ DEFAULT_KMS_PREFIX="base64:"
 DEFAULT_DEPLOYMENT_GROUP="application"
 
 DEFAULT_IOS_DIST_CODESIGN_IDENTITY="iPhone Distribution"
+DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION="false"
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
 
@@ -177,11 +178,6 @@ function env_setup() {
     pip3 install \
         awscli \
         yq || return $?
-
-    # yarn install
-    yarn global add \
-        expo-cli@"${EXPO_VERSION}" \
-        turtle-cli@"${DEFAULT_TURTLE_VERSION}" || return $?
 }
 
 function usage() {
@@ -386,6 +382,14 @@ function main() {
 
   cd "${SRC_PATH}"
 
+  # Setup Expo
+  info "Installing requested expo version - ${EXPO_VERSION}"
+  npm install --silent expo-cli@"${EXPO_VERSION}"
+
+  # Setup Turtle
+  info "Installing requested turtle version - ${TURTLE_VERSION}"
+  npm install --silent turtle-cli@"${TURTLE_VERSION}"
+
   # Support the usual node package manager preferences
   case "${NODE_PACKAGE_MANAGER}" in
     "yarn")
@@ -478,6 +482,13 @@ function main() {
     mv "${tmpdir}/ios-bundle-app.json" "./app.json"
   fi
 
+  # IOS Non Exempt Encryption
+  get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
+  IOS_DIST_NON_EXEMPT_ENCRYPTION="${IOS_DIST_NON_EXEMPT_ENCRYPTION:-${DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION}}"
+
+  jq --arg IOS_NON_EXEMPT_ENCRYPTION "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" '.expo.ios.config.usesNonExemptEncryption=($IOS_NON_EXEMPT_ENCRYPTION | test("true"))' <  "./app.json" > "${tmpdir}/ios-encexempt-app.json"
+  mv "${tmpdir}/ios-encexempt-app.json" "./app.json"
+
   ANDROID_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.ANDROID_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${ANDROID_DIST_BUNDLE_ID}" != "null" && -n "${ANDROID_DIST_BUNDLE_ID}" ]]; then
     jq --arg ANDROID_DIST_BUNDLE_ID "${ANDROID_DIST_BUNDLE_ID}" '.expo.android.package=$ANDROID_DIST_BUNDLE_ID' <  "./app.json" > "${tmpdir}/android-bundle-app.json"
@@ -487,7 +498,7 @@ function main() {
   # Create base OTA
   info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+  npx expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -544,6 +555,7 @@ function main() {
             export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
 
+            #Get properties from retrieved config file and decrypt if required
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_EXPORT_METHOD" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -552,6 +564,7 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_CODESIGN_IDENTITY" "${KMS_PREFIX}" "${AWS_REGION}"
 
+            #Setting Defaults
             IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
 
             # Turtle Specific overrides
@@ -575,16 +588,11 @@ function main() {
             "turtle")
                 echo "Using turtle to build the binary image"
 
-                # Setup Turtle
-                if [[ "${TURTLE_VERSION}" != "${TURTLE_DEFAULT_VERSION}" ]]; then
-                    npm install turtle-cli@"${TURTLE_VERSION}"
-                fi
-
                 turtle_setup_extra_args=""
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
                 fi
-                npx turtle setup:"${build_format}" --sdk-version "${turtle_setup_extra_args}" || return $?
+                npx turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
                 npx turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
@@ -606,6 +614,14 @@ function main() {
                     [[ ! -e "ios/${INFO_PLIST_PATH}" ]] && INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Info.plist"
                     fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
                     fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
+
+                    if [[ "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" == "false" ]]; then
+                        IOS_USES_NON_EXEMPT_ENCRYPTION="NO"
+                    else
+                        IOS_USES_NON_EXEMPT_ENCRYPTION="YES"
+                    fi
+                    fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:ITSAppUsesNonExemptEncryption value:"${IOS_USES_NON_EXEMPT_ENCRYPTION}" || return $?
+
                     if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
                         cd "${SRC_PATH}/ios"
                         fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
