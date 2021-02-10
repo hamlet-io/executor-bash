@@ -133,7 +133,7 @@ export GENERATION_INPUT_SOURCE="${GENERATION_INPUT_SOURCE:-"composite"}"
 # Cache for asssembled components
 export CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
 
-if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
+if [[ "${GENERATION_INPUT_SOURCE}" == "composite" || "${GENERATION_INPUT_SOURCE}" == "whatif" ]]; then
 
     blueprint_alternate_dirs=( \
     "${SEGMENT_SOLUTIONS_DIR}" \

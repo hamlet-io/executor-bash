@@ -139,7 +139,7 @@ function options() {
   fi
 
   # Input control for composite/CMDB input
-  if [[ "${GENERATION_INPUT_SOURCE}" == "composite" ]]; then
+  if [[ "${GENERATION_INPUT_SOURCE}" == "composite" || "${GENERATION_INPUT_SOURCE}" == "whatif" ]]; then
 
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -184,7 +184,7 @@ function options() {
   fi
 
   # Specific input control for mock input
-  if [[ "${GENERATION_INPUT_SOURCE}" == "mock" ]]; then
+  if [[ "${GENERATION_INPUT_SOURCE}" == "mock" || "${GENERATION_INPUT_SOURCE}" == "whatif" ]]; then
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "OUTPUT_DIR required for mock input source"
       fatalMandatory
