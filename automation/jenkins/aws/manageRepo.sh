@@ -153,6 +153,7 @@ function push() {
     # Update upstream repo
     GENERATION_REPO_PUSH_RETRIES="${GENERATION_REPO_PUSH_RETRIES:-6}"
     REPO_PUSHED=false
+    HEAD_DETACHED=false
     if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
         for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
             # Check if remote branch exists
@@ -165,27 +166,22 @@ function push() {
             fi
 
             debug "Pushing the ${REPO_LOG_NAME} repo upstream..."
-            if git push --tags ${REPO_REMOTE} ${REPO_BRANCH}; then
-                # Push succeeded
-                REPO_PUSHED=true
-                break
+            git symbolic-ref -q HEAD
+            RESULT=$? && [[ ${RESULT} -ne 0 ]] && HEAD_DETACHED=true
+            if [[ "${HEAD_DETACHED}" == "false" ]]; then
+                git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && REPO_PUSHED=true && break || \
+                  info "Waiting to retry push to ${REPO_LOG_NAME} repo ..." && sleep 5
             else
-                # Take a breather
-                info "Waiting to retry push to ${REPO_LOG_NAME} repo ..."
-                sleep 5
-            fi
-        done
-
-        if [[ "${REPO_PUSHED}" == "false" ]]; then
-            # If push failed HEAD might be detached. Create a temp branch and merge it to the target to fix it.
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
+              # If push failed HEAD might be detached. Create a temp branch and merge it to the target to fix it.
                 git branch temp-${REPO_BRANCH} && \
                 git checkout ${REPO_BRANCH} && \
                 git merge temp-${REPO_BRANCH} && \
                 git branch -D temp-${REPO_BRANCH} && \
-                git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && \
-                RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-                    fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
+                git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && REPO_PUSHED=true
+            fi
+        done
+        if [[ "${REPO_PUSHED}" == "false" ]]; then
+            fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
         fi
     fi
 }
