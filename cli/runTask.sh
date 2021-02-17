@@ -69,9 +69,9 @@ while getopts ":c:d:e:hi:j:k:t:v:x:y:w:" opt; do
             ;;
         j)
             if [[ "${OPTARG}" == "default" ]]; then
-                COMPONET_INSTANCE=""
+                COMPONENT_INSTANCE=""
             else
-                COMPONET_INSTANCE="${OPTARG}"
+                COMPONENT_INSTANCE="${OPTARG}"
             fi
             ;;
         k)
