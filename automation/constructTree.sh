@@ -9,6 +9,8 @@ REFERENCE_MASTER="master"
 # Defaults
 PRODUCT_CONFIG_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
+ACCOUNT_CONFIG_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
+ACCOUNT_INFRASTRUCTURE_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 GENERATION_BIN_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 GENERATION_PATTERNS_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 GENERATION_STARTUP_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
@@ -24,21 +26,22 @@ where
 
 (o) -a                                  if the account directories should not be included
 (o) -b GENERATION_BIN_REFERENCE         is the git reference for the generation framework bin repo
-(o) -c CONFIG_REFERENCE                 is the git reference for the config repo
+(o) -c PRODUCT_CONFIG_REFERENCE                 is the git reference for the config repo
 (o) -f                                  if patterns and startup repos required - only bin repo is included by default
     -h                                  shows this text
-(o) -i INFRASTRUCTURE_REFERENCE         is the git reference for the config repo
+(o) -i PRODUCT_INFRASTRUCTURE_REFERENCE         is the git reference for the config repo
 (o) -n                                  initialise repos if not already initialised
 (o) -p GENERATION_PATTERNS_REFERENCE    is the git reference for the generation framework patterns repo
 (o) -r                                  if the product directories should not be included
 (o) -s GENERATION_STARTUP_REFERENCE     is the git reference for the generation framework startup repo
-
+(o) -x ACCOUNT_CONFIG_REFERENCE         is the git ref for the acccount config repo
+(o) -y ACCOUNT_INFRASTRUCTURE_REFERENCE is the git ref for the acccount infrastructure repo
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
 
-CONFIG_REFERENCE = ${PRODUCT_CONFIG_REFERENCE_DEFAULT}
-INFRASTRUCTURE_REFERENCE = ${PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT}
+PRODUCT_CONFIG_REFERENCE = ${PRODUCT_CONFIG_REFERENCE_DEFAULT}
+PRODUCT_INFRASTRUCTURE_REFERENCE = ${PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT}
 GENERATION_BIN_REFERENCE = ${GENERATION_BIN_REFERENCE_DEFAULT}
 GENERATION_PATTERNS_REFERENCE = ${GENERATION_PATTERNS_REFERENCE_DEFAULT}
 GENERATION_STARTUP_REFERENCE = ${GENERATION_STARTUP_REFERENCE_DEFAULT}
@@ -84,6 +87,12 @@ while getopts ":ab:c:fhi:np:rs:" opt; do
         s)
             GENERATION_STARTUP_REFERENCE="${OPTARG}"
             ;;
+        x)
+            ACCOUNT_CONFIG_REFERENCE="${OPTARG}"
+            ;;
+        y)
+            ACCOUNT_INFRASTRUCTURE_REFERENCE="${OPTARG}"
+            ;;
         \?)
             fatalOption
             ;;
@@ -96,6 +105,8 @@ done
 # Apply defaults
 PRODUCT_CONFIG_REFERENCE="${PRODUCT_CONFIG_REFERENCE:-$PRODUCT_CONFIG_REFERENCE_DEFAULT}"
 PRODUCT_INFRASTRUCTURE_REFERENCE="${PRODUCT_INFRASTRUCTURE_REFERENCE:-$PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT}"
+ACCOUNT_CONFIG_REFERENCE="${ACCOUNT_CONFIG_REFERENCE:-$ACCOUNT_CONFIG_REFERENCE_DEFAULT}"
+ACCOUNT_INFRASTRUCTURE_REFERENCE="${ACCOUNT_INFRASTRUCTURE_REFERENCE:-$ACCOUNT_INFRASTRUCTURE_REFERENCE_DEFAULT}"
 GENERATION_BIN_REFERENCE="${GENERATION_BIN_REFERENCE:-$GENERATION_BIN_REFERENCE_DEFAULT}"
 GENERATION_PATTERNS_REFERENCE="${GENERATION_PATTERNS_REFERENCE:-$GENERATION_PATTERNS_REFERENCE_DEFAULT}"
 GENERATION_STARTUP_REFERENCE="${GENERATION_STARTUP_REFERENCE:-$GENERATION_STARTUP_REFERENCE_DEFAULT}"
@@ -110,6 +121,8 @@ INIT_REPOS="${INIT_REPOS:-false}"
 # Save for later steps
 save_context_property PRODUCT_CONFIG_REFERENCE "${PRODUCT_CONFIG_REFERENCE}"
 save_context_property PRODUCT_INFRASTRUCTURE_REFERENCE "${PRODUCT_INFRASTRUCTURE_REFERENCE}"
+save_context_property ACCOUNT_CONFIG_REFERENCE "${ACCOUNT_CONFIG_REFERENCE}"
+save_context_property ACCOUNT_INFRASTRUCTURE_REFERENCE "${ACCOUNT_INFRASTRUCTURE_REFERENCE}"
 
 # Record what is happening
 info "Creating the context directory tree"
@@ -248,7 +261,7 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
     if [[ -z "${ACCOUNT_CONFIG_DIR}" ]]; then
         ${AUTOMATION_DIR}/manageRepo.sh -c -l "account config" \
             -n "${ACCOUNT_CONFIG_REPO}" -v "${ACCOUNT_GIT_PROVIDER}" \
-            -d "${BASE_DIR_TEMP}"
+            -d "${BASE_DIR_TEMP}" -b "${ACCOUNT_CONFIG_REFERENCE}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 
         # Ensure temporary files are ignored
@@ -297,7 +310,7 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
         # Pull in the account infrastructure repo
         ${AUTOMATION_DIR}/manageRepo.sh -c -l "account infrastructure" \
             -n "${ACCOUNT_INFRASTRUCTURE_REPO}" -v "${ACCOUNT_GIT_PROVIDER}" \
-            -d "${BASE_DIR_TEMP}"
+            -d "${BASE_DIR_TEMP}" -b "${ACCOUNT_INFRASTRUCTURE_REFERENCE}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 
         # Ensure temporary files are ignored
@@ -403,4 +416,3 @@ upgrade_cmdb "${BASE_DIR}" ||
 
 # Remember directories for future steps
 save_gen3_dirs_in_context
-
