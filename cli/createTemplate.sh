@@ -385,7 +385,7 @@ function process_template_pass() {
   case "${entrance}" in
 
     # Outputs which don't belong to a deployment don't require region or account prefixes
-    unitlist|blueprint|buildblueprint|schema|loader|schemacontract)
+    unitlist|blueprint|buildblueprint|schema|loader|schemacontract|diagram|diagraminfo)
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
@@ -481,15 +481,15 @@ function process_template_pass() {
   done
 
   args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
-  
-  # Composites 
+
+  # Composites
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
   args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
-  
+
   # Run time references
   args+=("-v" "requestReference=${request_reference}")
   args+=("-v" "configurationReference=${configuration_reference}")
