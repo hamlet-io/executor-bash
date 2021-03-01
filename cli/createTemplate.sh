@@ -481,15 +481,15 @@ function process_template_pass() {
   done
 
   args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
-  
-  # Composites 
+
+  # Composites
   args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
   args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
-  
+
   # Run time references
   args+=("-v" "requestReference=${request_reference}")
   args+=("-v" "configurationReference=${configuration_reference}")
@@ -547,18 +547,78 @@ function process_template_pass() {
   args+=("-v" "outputPrefix=${output_prefix}")
 
   local template_result_file="${tmp_dir}/${output_filename}"
+  local engine_result_file="${tmp_dir}/${output_filename}.freemarker.log"
   local output_file="${cf_dir}/${output_filename}"
   local result_file="${results_dir}/${output_filename}"
 
-      ${GENERATION_BASE_DIR}/execution/freemarker.sh \
-        -d "${template_dir}" \
-        ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
-        -d "${GENERATION_ENGINE_DIR}/engine" \
-        -d "${GENERATION_ENGINE_DIR}/providers" \
-        ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
-		    -t "${template}" \
-        -o "${template_result_file}" \
-        "${args[@]}" || return $?
+  if ${GENERATION_BASE_DIR}/execution/freemarker.sh \
+    -d "${template_dir}" \
+    ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
+    -d "${GENERATION_ENGINE_DIR}/engine" \
+    -d "${GENERATION_ENGINE_DIR}/providers" \
+    ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
+    -t "${template}" \
+    -o "${template_result_file}" \
+    -e "${engine_result_file}" \
+    "${args[@]}"; then
+    # Show any output from the freemarker engine depending on log level
+    if [[ -s "${engine_result_file}" ]]; then
+      cat "${engine_result_file}"
+    fi
+  else
+    # Capture the raw return code
+    return_code=$?
+
+    # Check for engine exceptions - 100 series of exit codes used for freemarker issues
+    if grep "Error executing FreeMarker template" < "${engine_result_file}" >/dev/null; then
+      if grep "Encountered stop instruction" < "${engine_result_file}" >/dev/null; then
+        # stop directive used
+        local engine_cause_file="${engine_result_file}-cause"
+        fatal "! template engine managed exception encountered. Details follow...\n"
+        grep -m 1 "Cause given: " "${engine_result_file}" | awk -F "Cause given: " '{print $2}' > "${engine_cause_file}"
+        if [[ -s "${engine_cause_file}" ]]; then
+          if grep "HamletMessages" < "${engine_cause_file}" >/dev/null; then
+            # stop via fatal macro
+            jq --indent 2 '.HamletMessages' < "${engine_cause_file}" >&2
+          else
+            # direct stop command
+            cat "${engine_cause_file}" >&2
+          fi
+        else
+          # Shouldn't get here - perhaps freemarker output format has changed?
+          cat "${engine_result_file}" >&2
+        fi
+
+        # Flag caught internal engine exception
+        return 100
+      else
+        if grep "Freemarker template error:" < "${engine_result_file}" >/dev/null; then
+          # Freemarker processing is unhappy
+          fatal "! template engine unmanaged exception encountered. Details follow...\n"
+          cat "${engine_result_file}" >&2
+
+          # Flag uncaught internal engine exception
+          return 101
+        else
+          # Some other Freemarker engine unhappiness
+          fatal "! template engine internal issue encountered. Details follow...\n"
+
+          # Show the engine output
+          cat "${engine_result_file}" >&2
+
+          return 102
+        fi
+      fi
+    else
+      # Some more general Freemarker engine unhappiness
+      fatal "! template engine condition encountered. Details follow...\n"
+
+      # Show the engine output
+      cat "${engine_result_file}"
+
+      return ${return_code}
+    fi
+  fi
 
   # Ignore whitespace only files
   if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
@@ -580,7 +640,7 @@ function process_template_pass() {
   grep "COTFatal:" < "${template_result_file}" > "${template_result_file}-exceptionstrings"
   grep "HamletFatal:" < "${template_result_file}" >> "${template_result_file}-exceptionstrings"
   if [[ -s "${template_result_file}-exceptionstrings"  ]]; then
-    fatal "Exceptions occurred during template generation. Details follow...\n"
+    fatal "! Exceptions occurred during template generation. Details follow...\n"
     case "$(fileExtension "${template_result_file}")" in
       json)
         jq --indent 2 '.' < "${template_result_file}-exceptionstrings" >&2
@@ -589,7 +649,7 @@ function process_template_pass() {
         cat "${template_result_file}-exceptionstrings" >&2
         ;;
     esac
-    return 1
+    return 100
   fi
 
   case "$(fileExtension "${template_result_file}")" in
@@ -597,9 +657,9 @@ function process_template_pass() {
       # Detect any exceptions during generation
       grep "\[fatal \]" < "${template_result_file}" > "${template_result_file}-exceptions"
       if [[ -s "${template_result_file}-exceptions" ]]; then
-        fatal "Exceptions occurred during script generation. Details follow...\n"
+        fatal "! Exceptions occurred during script generation. Details follow...\n"
         cat "${template_result_file}-exceptions" >&2
-        return 1
+        return 100
       fi
 
       # Capture the result
@@ -658,9 +718,9 @@ function process_template_pass() {
       jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
         < "${template_result_file}" >> "${template_result_file}-exceptions"
       if [[ -s "${template_result_file}-exceptions" ]]; then
-        fatal "Exceptions occurred during template generation. Details follow...\n"
+        fatal "! Exceptions occurred during template generation. Details follow...\n"
         cat "${template_result_file}-exceptions" >&2
-        return 1
+        return 100
       fi
 
       # Capture the result
