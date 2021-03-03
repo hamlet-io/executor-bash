@@ -385,7 +385,7 @@ function process_template_pass() {
   case "${entrance}" in
 
     # Outputs which don't belong to a deployment don't require region or account prefixes
-    unitlist|blueprint|buildblueprint|schema|loader|schemacontract)
+    unitlist|blueprint|buildblueprint|schema|loader|schemacontract|diagram|diagraminfo)
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
