@@ -60,7 +60,7 @@ function outputLogEntry() {
 function willLog() {
   local severity="$1"
 
-  [[ ${LOG_LEVEL_ORDER[$(getLogLevel)]} -le ${LOG_LEVEL_ORDER[${severity}]} ]]
+  (( "${LOG_LEVEL_ORDER[$(getLogLevel)]}" <= "${LOG_LEVEL_ORDER[${severity}]}" ))
 }
 
 function message() {
