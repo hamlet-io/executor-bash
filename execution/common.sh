@@ -21,6 +21,8 @@ HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
 GENERATION_CACHE_DIR="${HAMLET_HOME_DIR}/cache"
 PLUGIN_CACHE_DIR="${HAMLET_HOME_DIR}/plugins"
 
+# Set the log level if not set
+GENERATION_LOG_LEVEL="${GENERATION_LOG_LEVEL:-${LOG_LEVEL_INFORMATION}}"
 function getLogLevel() {
   checkLogLevel "${GENERATION_LOG_LEVEL}"
 }
