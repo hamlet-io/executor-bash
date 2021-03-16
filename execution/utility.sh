@@ -1821,6 +1821,14 @@ function get_transitgateway_vpn_attachment() {
 }
 
 # -- VPN Gateway --
+function get_vpn_connection_tunnel_ips() {
+  local region="${1}"; shift
+  local cfnStackName="$1"; shift
+  local vpnConnectionId="${1}"; shift
+
+  vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
+  echo "$( aws --region "${region}" ec2 describe-vpn-connections --output text --filters Name=vpn-connection-id,Values="${vpnConnection}" --query 'VpnConnections[0].VgwTelemetry[*].OutsideIpAddress' || return $? ) )"
+}
 
 function update_vpn_options() {
   local region="${1}"; shift
