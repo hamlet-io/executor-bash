@@ -349,7 +349,22 @@ function process_template_pass() {
   local template_composites=()
 
   # Define the possible passes
-  local pass_list=("plugincontract" "managementcontract" "generationcontract" "testcase" "pregeneration" "prologue" "template" "epilogue" "cli" "parameters" "config" "schema" "schemacontract")
+  local pass_list=(
+    "plugincontract"
+    "managementcontract"
+    "generationcontract"
+    "testcase"
+    "pregeneration"
+    "prologue"
+    "template"
+    "epilogue"
+    "cli"
+    "parameters"
+    "config"
+    "schema"
+    "schemacontract"
+    "state"
+  )
 
   # Initialise the components of the pass filenames
   declare -A pass_entrance_prefix
@@ -385,7 +400,7 @@ function process_template_pass() {
   case "${entrance}" in
 
     # Outputs which don't belong to a deployment don't require region or account prefixes
-    unitlist|blueprint|buildblueprint|schema|loader|schemacontract|diagram|diagraminfo)
+    unitlist|blueprint|buildblueprint|schema|loader|schemacontract|diagram|diagraminfo|occurrences)
       for p in "${pass_list[@]}"; do
         pass_account_prefix["${p}"]=""
         pass_region_prefix["${p}"]=""
