@@ -91,6 +91,7 @@ function main() {
 
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+    . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
     # Ensure we are in the right place
     checkInSegmentDirectory

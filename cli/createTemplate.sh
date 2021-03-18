@@ -720,6 +720,9 @@ function process_template_pass() {
 
       if [[ "${pass}" == "pregeneration" ]]; then
         info " ~ processing pregeneration script"
+
+        . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+
         [[ "${differences_detected}" == "true" ]] &&
           . "${result_file}" ||
           . "${output_file}"
@@ -978,7 +981,7 @@ function process_template() {
     process_template_pass \
       "${entrance}" \
       "${flows}" \
-      "${task_parameters[@]}" \
+      "${task_parameters[@]:0:7}" \
       "${level}" \
       "${deployment_unit}" \
       "${deployment_group}" \

@@ -91,6 +91,7 @@ done
 
 # Set up the context
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+. "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
 status_file="$(getTopTempDir)/snapshot_rds_status.txt"
 

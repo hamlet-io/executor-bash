@@ -92,6 +92,7 @@ function options() {
   # Set up the context
   info "${DRYRUN}Preparing the context..."
   . "${GENERATION_BASE_DIR}/execution/setStackContext.sh"
+  . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
   RESOURCE_GROUP=${RESOURCE_GROUP:-${STACK_NAME}}
 
