@@ -107,6 +107,7 @@ function main() {
 
   # Get the generation context so we can run template generation
   . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+  . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."

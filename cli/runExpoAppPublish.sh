@@ -88,6 +88,7 @@ npx_base_args="--quiet --ignore-existing --cache ${npm_tool_cache}"
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+. "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
 function get_configfile_property() {
     local configfile="$1"; shift

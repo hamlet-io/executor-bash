@@ -77,6 +77,7 @@ DISPLAY_ACLS="${DISPLAY_ACLS:-${DISPLAY_ACLS_DEFAULT}}"
 
 # Set up the context
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+. "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
 # Get the list of ECS clusters
 for KEY in $(aws --region ${REGION} s3 ls s3://${BUCKET}${PREFIX} --recursive  | tr -s " " | tr -d "\r" | cut -d " " -f4); do

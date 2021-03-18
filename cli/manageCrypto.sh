@@ -156,6 +156,7 @@ function main() {
 
     # Set up the context - LOCATION will tell us where we are
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+    . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
     # Set up the list of files to check
     FILES=()
