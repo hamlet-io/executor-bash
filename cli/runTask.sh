@@ -153,7 +153,7 @@ COMPONENT_BLUEPRINT="$(echo "${CLUSTER_BLUEPRINT}" | jq \
                                     ".Occurrences[] | objects | \
                                             select( \
                                                 .Core.Type==\"task\" \
-                                                and .Core.Component.RawName==\"${TASK}\" \
+                                                and .Core.SubComponent.RawName==\"${TASK}\" \
                                                 and .Core.Instance.Name==\"${INSTANCE}\" \
                                                 and .Core.Version.Name==\"${VERSION}\" \
                                             )")"
