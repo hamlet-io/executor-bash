@@ -322,6 +322,7 @@ function process_template_pass() {
   local pass="${1,,}"; shift
   local pass_alternative="${1,,}"; shift
   local level="${1,,}"; shift
+  local output_file_name="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
   local resource_group="${1,,}"; shift
@@ -483,6 +484,7 @@ function process_template_pass() {
   [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
   [[ -n "${deployment_group}" ]]          && args+=("-v" "deploymentGroup=${deployment_group}")
   [[ -n "${resource_group}" ]]            && args+=("-v" "resourceGroup=${resource_group}")
+  [[ -n "${output_file_name}" ]]          && args+=("-v" "outputFileName=${output_file_name}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-v" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-v" "inputSource=${GENERATION_INPUT_SOURCE}")
@@ -921,6 +923,7 @@ function process_template() {
       "generation-contract.json" \
       "generationcontract" \
       "" \
+      "" \
       "${level}" \
       "${deployment_unit}" \
       "${deployment_group}" \
@@ -981,7 +984,7 @@ function process_template() {
     process_template_pass \
       "${entrance}" \
       "${flows}" \
-      "${task_parameters[@]:0:7}" \
+      "${task_parameters[@]:0:8}" \
       "${level}" \
       "${deployment_unit}" \
       "${deployment_group}" \
