@@ -321,7 +321,6 @@ function process_template_pass() {
   local output_suffix="${1,,}"; shift
   local pass="${1,,}"; shift
   local pass_alternative="${1,,}"; shift
-  local level="${1,,}"; shift
   local output_file_name="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
@@ -340,7 +339,7 @@ function process_template_pass() {
 
   # Filename parts
   local entrance_prefix="${entrance:+${entrance}-}"
-  local level_prefix="${level:+${level}-}"
+  local deployment_group_prefix="${deployment_group:+${deployment_group}-}"
   local deployment_unit_prefix="${deployment_unit:+${deployment_unit}-}"
   local account_prefix="${account:+${account}-}"
   local region_prefix="${region:+${region}-}"
@@ -398,78 +397,9 @@ function process_template_pass() {
 
   template_composites+=("FRAGMENT" )
 
-  case "${entrance}" in
-
-    # Outputs which don't belong to a deployment don't require region or account prefixes
-    unitlist|blueprint|buildblueprint|schema|loader|schemacontract|diagram|diagraminfo|occurrences)
-      for p in "${pass_list[@]}"; do
-        pass_account_prefix["${p}"]=""
-        pass_region_prefix["${p}"]=""
-      done
-      ;;
-
-    deployment|deploymenttest)
-        case "${level}" in
-          account)
-            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
-            for p in "${pass_list[@]}"; do pass_region_prefix["${p}"]="${account_region}-"; done
-            template_composites+=("ACCOUNT")
-
-            # LEGACY: Support stacks created before deployment units added to account level
-            [[ ("${DEPLOYMENT_UNIT}" =~ s3) &&
-              (-f "${cf_dir}/${level_prefix}${region_prefix}template.json") ]] && \
-                for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]=""; done
-            ;;
-
-          solution)
-            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
-            if [[ -f "${cf_dir}/solution-${region}-template.json" ]]; then
-              for p in "${pass_list[@]}"; do
-                pass_deployment_unit_prefix["${p}"]=""
-              done
-            else
-              for p in "${pass_list[@]}"; do
-                pass_level_prefix["${p}"]="soln-"
-              done
-            fi
-            ;;
-
-          segment)
-            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
-            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="seg-"; done
-
-            # LEGACY: Support old formats for existing stacks so they can be updated
-            if [[ !("${DEPLOYMENT_UNIT}" =~ cmk|cert|dns ) ]]; then
-              if [[ -f "${cf_dir}/cont-${deployment_unit_prefix}${region_prefix}template.json" ]]; then
-                for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="cont-"; done
-              fi
-              if [[ -f "${cf_dir}/container-${region}-template.json" ]]; then
-                for p in "${pass_list[@]}"; do
-                  pass_level_prefix["${p}"]="container-"
-                  pass_deployment_unit_prefix["${p}"]=""
-                done
-              fi
-              if [[ -f "${cf_dir}/${SEGMENT}-container-template.json" ]]; then
-                for p in "${pass_list[@]}"; do
-                  pass_level_prefix["${p}"]="${SEGMENT}-container-"
-                  pass_deployment_unit_prefix["${p}"]=""
-                  pass_region_prefix["${p}"]=""
-                done
-              fi
-            fi
-            # "cmk" now used instead of "key"
-            [[ ("${DEPLOYMENT_UNIT}" == "cmk") &&
-              (-f "${cf_dir}/${level_prefix}key-${region_prefix}template.json") ]] && \
-                for p in "${pass_list[@]}"; do pass_deployment_unit_prefix["${p}"]="key-"; done
-            ;;
-
-          application)
-            for p in "${pass_list[@]}"; do pass_entrance_prefix["${p}"]=""; done
-            for p in "${pass_list[@]}"; do pass_level_prefix["${p}"]="app-"; done
-            ;;
-        esac
-
-      ;;
+  case "${deployment_group}" in
+    account)
+      template_composites+=("ACCOUNT")
 
   esac
 
@@ -562,6 +492,10 @@ function process_template_pass() {
     local output_prefix="${output_prefix_with_account}"
   fi
   args+=("-v" "outputPrefix=${output_prefix}")
+  args+=("-v" "outputDir=${tmp_dir}")
+
+  # Make the temp directory a cmdb so that we can write into it
+  echo '{}' > "${tmp_dir}/.cmdb"
 
   local template_result_file="${tmp_dir}/${output_filename}"
   local engine_result_file="${tmp_dir}/${output_filename}.freemarker.log"
@@ -575,6 +509,7 @@ function process_template_pass() {
     -d "${GENERATION_ENGINE_DIR}/providers" \
     ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
     -t "${template}" \
+    -g "${tmp_dir}" \
     -o "${template_result_file}" \
     -e "${engine_result_file}" \
     "${args[@]}"; then
@@ -811,7 +746,7 @@ function process_template() {
   # Defaults
   local passes=("template")
   local template_alternatives=("primary")
-  local cleanup_level="${level}"
+  local cleanup_level="${deployment_group}"
 
   case "${entrance}" in
 
@@ -820,7 +755,7 @@ function process_template() {
       ;;
 
     deployment)
-      case "${level}" in
+      case "${deployment_group}" in
         account)
           local cf_dir_default="${ACCOUNT_STATE_DIR}/cf/shared"
           ;;
@@ -846,7 +781,7 @@ function process_template() {
 
         *)
           local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
-          cleanup_level="${level}"
+          cleanup_level="${deployment_group}"
           ;;
       esac
       ;;
@@ -868,7 +803,7 @@ function process_template() {
   # that are no longer generated.
   if [[ -z "${OUTPUT_DIR}" ]]; then
     local deployment_unit_state_subdirectories="false"
-    case "${level}" in
+    case "${entrance}" in
       loader|unitlist|blueprint|buildblueprint)
         # No subdirectories for deployment units
         ;;
@@ -877,11 +812,11 @@ function process_template() {
           readarray -t legacy_files < <(find "${cf_dir_default}" -mindepth 1 -maxdepth 1 -type f -name "*${deployment_unit}*" )
 
           if [[ (-d "${cf_dir_default}/${deployment_unit}") || "${#legacy_files[@]}" -eq 0 ]]; then
-            local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
+            local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${deployment_group}" "${deployment_unit}" "" "${region}" )
             deployment_unit_state_subdirectories="true"
           fi
         else
-          local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${level}" "${deployment_unit}" "" "${region}" )
+          local cf_dir_default=$(getUnitCFDir "${cf_dir_default}" "${deployment_group}" "${deployment_unit}" "" "${region}" )
           deployment_unit_state_subdirectories="true"
         fi
         ;;
@@ -924,7 +859,6 @@ function process_template() {
       "generationcontract" \
       "" \
       "" \
-      "${level}" \
       "${deployment_unit}" \
       "${deployment_group}" \
       "${resource_group}" \
@@ -985,7 +919,6 @@ function process_template() {
       "${entrance}" \
       "${flows}" \
       "${task_parameters[@]:0:8}" \
-      "${level}" \
       "${deployment_unit}" \
       "${deployment_group}" \
       "${resource_group}" \
@@ -1066,35 +999,17 @@ function main() {
   tmp_dir="$(getTopTempDir)"
   tmpdir="${tmp_dir}"
 
-  case "${LEVEL}" in
-    blueprint-disabled)
-      process_template \
-        "${ENTRANCE}" \
-        "${FLOWS}" \
-        "${LEVEL}" \
-        "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
-        "" "${ACCOUNT_REGION}" \
-        "" \
-        "${REQUEST_REFERENCE}" \
-        "${CONFIGURATION_REFERENCE}" \
-        "${DEPLOYMENT_MODE}" \
-        "${ENTRANCE_PARAMETERS}"
-      ;;
-
-    *)
-      process_template \
-        "${ENTRANCE}" \
-        "${FLOWS}" \
-        "${LEVEL}" \
-        "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
-        "${ACCOUNT}" "${ACCOUNT_REGION}" \
-        "${REGION}" \
-        "${REQUEST_REFERENCE}" \
-        "${CONFIGURATION_REFERENCE}" \
-        "${DEPLOYMENT_MODE}"  \
-        "${ENTRANCE_PARAMETERS}"
-      ;;
-  esac
+  process_template \
+    "${ENTRANCE}" \
+    "${FLOWS}" \
+    "${LEVEL}" \
+    "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
+    "${ACCOUNT}" "${ACCOUNT_REGION}" \
+    "${REGION}" \
+    "${REQUEST_REFERENCE}" \
+    "${CONFIGURATION_REFERENCE}" \
+    "${DEPLOYMENT_MODE}"  \
+    "${ENTRANCE_PARAMETERS}" || return $?
 }
 
 main "$@"
