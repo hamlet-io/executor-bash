@@ -44,7 +44,6 @@ where
 (m) -u DEPLOYMENT_UNIT         is the deployment unit to be included in the template
 (o) -x DISABLE_OUTPUT_CLEANUP  disable removing existing outputs before adding new outputs
 (o) -y PARAM=VALUE             is an entrance specific parameter and its corresponding value
-(o) -z DEPLOYMENT_UNIT_SUBSET  is the subset of the deployment unit required
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -80,10 +79,7 @@ function options() {
           g) RESOURCE_GROUP="${OPTARG}" ;;
           h) usage; return 1 ;;
           i) GENERATION_INPUT_SOURCE="${OPTARG}" ;;
-          l)
-            LEVEL="${OPTARG}"
-            DEPLOYMENT_GROUP="${OPTARG}"
-            ;;
+          l) DEPLOYMENT_GROUP="${OPTARG}" ;;
           o) OUTPUT_DIR="${OPTARG}" ;;
           p) GENERATION_PROVIDERS_ARRAY+=("${OPTARG}") ;;
           q) REQUEST_REFERENCE="${OPTARG}" ;;
@@ -91,7 +87,6 @@ function options() {
           u) DEPLOYMENT_UNIT="${OPTARG}" ;;
           x) DISABLE_OUTPUT_CLEANUP="true" ;;
           y) ENTRANCE_PARAMETERS_ARRAY+=("${OPTARG}") ;;
-          z) DEPLOYMENT_UNIT_SUBSET="${OPTARG}" ;;
           \?) fatalOption; return 1 ;;
           :) fatalOptionArgument; return 1 ;;
       esac
@@ -144,7 +139,7 @@ function options() {
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-    case "${LEVEL}" in
+    case "${DEPLOYMENT_GROUP}" in
       account)
         [[ -z "${ACCOUNT_DIR}" ]] &&
           fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
@@ -318,14 +313,13 @@ function process_template_pass() {
   local deployment_framework="${1,,}"; shift
   local output_type="${1,,}"; shift
   local output_format="${1,,}"; shift
-  local output_suffix="${1,,}"; shift
   local pass="${1,,}"; shift
   local pass_alternative="${1,,}"; shift
-  local output_file_name="${1,,}"; shift
+  local output_filename="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
+  local deployment_unit_subset="${1,,}"; shift
   local deployment_group="${1,,}"; shift
   local resource_group="${1,,}"; shift
-  local deployment_unit_subset="${1,,}"; shift
   local account="$1"; shift
   local account_region="${1,,}"; shift
   local region="${1,,}"; shift
@@ -344,54 +338,11 @@ function process_template_pass() {
   local account_prefix="${account:+${account}-}"
   local region_prefix="${region:+${region}-}"
 
+  [[ "${pass_alternative}" == "primary" ]] && pass_alternative=""
+
   # Set up the level specific template information
   local template_dir="${GENERATION_ENGINE_DIR}/client"
   local template_composites=()
-
-  # Define the possible passes
-  local pass_list=(
-    "plugincontract"
-    "managementcontract"
-    "generationcontract"
-    "testcase"
-    "pregeneration"
-    "prologue"
-    "template"
-    "epilogue"
-    "cli"
-    "parameters"
-    "config"
-    "schema"
-    "schemacontract"
-    "state"
-  )
-
-  # Initialise the components of the pass filenames
-  declare -A pass_entrance_prefix
-  declare -A pass_level_prefix
-  declare -A pass_deployment_unit_prefix
-  declare -A pass_deployment_unit_subset
-  declare -A pass_deployment_unit_subset_prefix
-  declare -A pass_account_prefix
-  declare -A pass_region_prefix
-  declare -A pass_description
-
-  # Defaults
-  for p in "${pass_list[@]}"; do
-    pass_entrance_prefix["${p}"]="${entrance_prefix}"
-    pass_level_prefix["${p}"]="${level_prefix}"
-    pass_deployment_unit_prefix["${p}"]="${deployment_unit_prefix}"
-    pass_deployment_unit_subset["${p}"]="${p}"
-    pass_deployment_unit_subset_prefix["${p}"]=""
-    pass_account_prefix["${p}"]="${account_prefix}"
-    pass_region_prefix["${p}"]="${region_prefix}"
-    pass_description["${p}"]="${p}"
-
-  done
-
-  # Template pass specifics
-  pass_deployment_unit_subset["template"]="${deployment_unit_subset}"
-  pass_deployment_unit_subset_prefix["template"]="${deployment_unit_subset:+${deployment_unit_subset}-}"
 
   template="invokeEntrance.ftl"
 
@@ -400,21 +351,23 @@ function process_template_pass() {
   case "${deployment_group}" in
     account)
       template_composites+=("ACCOUNT")
-
+      ;;
   esac
 
   # Args common across all passes
   local args=()
   [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-v" "flows=${flows}")
+  [[ -n "${pass}" ]]                      && args+=("-v" "pass=${pass}")
   [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
   [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
   [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
   [[ -n "${output_format}" ]]             && args+=("-v" "outputFormat=${output_format}")
   [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
+  [[ -n "${deployment_unit_subset}" ]]    && args+=("-v" "deploymentUnitSubset=${deployment_unit_subset}")
   [[ -n "${deployment_group}" ]]          && args+=("-v" "deploymentGroup=${deployment_group}")
   [[ -n "${resource_group}" ]]            && args+=("-v" "resourceGroup=${resource_group}")
-  [[ -n "${output_file_name}" ]]          && args+=("-v" "outputFileName=${output_file_name}")
+  [[ -n "${output_filename}" ]]           && args+=("-v" "outputFileName=${output_filename}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-v" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-v" "inputSource=${GENERATION_INPUT_SOURCE}")
@@ -469,34 +422,19 @@ function process_template_pass() {
   # No differences seen so far
   local differences_detected="false"
 
-  # Determine output file
-  local output_prefix="${pass_entrance_prefix[${pass}]}${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_region_prefix[${pass}]}"
-  local output_prefix_with_account="${pass_entrance_prefix[${pass}]}${pass_level_prefix[${pass}]}${pass_deployment_unit_prefix[${pass}]}${pass_deployment_unit_subset_prefix[${pass}]}${pass_account_prefix[${pass}]}${pass_region_prefix[${pass}]}"
+  local file_description="${pass}"
+  if [[ -n "${pass_alternative}" ]]; then
+    file_description="${file_description} - ${pass_alternative}"
+  fi
 
-  [[ -n "${pass_deployment_unit_subset[${pass}]}" ]] && args+=("-v" "deploymentUnitSubset=${pass_deployment_unit_subset[${pass}]}")
-
-  local file_description="${pass_description[${pass}]}"
   info " - ${file_description}"
 
-  [[ "${pass_alternative}" == "primary" ]] && pass_alternative=""
-  pass_alternative_prefix=""
-  if [[ -n "${pass_alternative}" ]]; then
-    args+=("-v" "alternative=${pass_alternative}")
-    pass_alternative_prefix="${pass_alternative}-"
-  fi
-
-  local output_filename="${output_prefix}${pass_alternative_prefix}${output_suffix}"
-  if [[ ! -f "${cf_dir}/${output_filename}" ]]; then
-    # Include account prefix
-    local output_filename="${output_prefix_with_account}${pass_alternative_prefix}${output_suffix}"
-    local output_prefix="${output_prefix_with_account}"
-  fi
-  args+=("-v" "outputPrefix=${output_prefix}")
-  args+=("-v" "outputDir=${tmp_dir}")
-
   # Make the temp directory a cmdb so that we can write into it
+  args+=("-v" "outputDir=${tmp_dir}")
+  args+=("-g" "${tmp_dir}")
   echo '{}' > "${tmp_dir}/.cmdb"
 
+  local generation_log_file="${tmp_dir}/${output_filename}.generation-log.json"
   local template_result_file="${tmp_dir}/${output_filename}"
   local engine_result_file="${tmp_dir}/${output_filename}.freemarker.log"
   local output_file="${cf_dir}/${output_filename}"
@@ -509,8 +447,7 @@ function process_template_pass() {
     -d "${GENERATION_ENGINE_DIR}/providers" \
     ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
     -t "${template}" \
-    -g "${tmp_dir}" \
-    -o "${template_result_file}" \
+    -o "${generation_log_file}" \
     -e "${engine_result_file}" \
     "${args[@]}"; then
     # Show any output from the freemarker engine depending on log level
@@ -604,6 +541,30 @@ function process_template_pass() {
     return 100
   fi
 
+  # Check for errors in the generation log
+
+  # Fatals
+  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+    < "${generation_log_file}" > "${generation_log_file}-exceptions"
+  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+    < "${generation_log_file}" >> "${generation_log_file}-exceptions"
+  if [[ -s "${generation_log_file}-exceptions" ]]; then
+    fatal "! Exceptions occurred during template generation. Details follow...\n"
+    cat "${generation_log_file}-exceptions" >&2
+    return 100
+  fi
+
+  # Warnings
+  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"warning\")" \
+    < "${generation_log_file}" > "${generation_log_file}-warnings"
+  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"warning\")" \
+    < "${generation_log_file}" >> "${generation_log_file}-warnings"
+  if [[ -s "${generation_log_file}-warnings" ]]; then
+    warning "! Warnings were found during template generation. Details follow...\n"
+    cat "${generation_log_file}-warnings" >&2
+  fi
+
+  # Clean up the output file and check for change
   case "$(fileExtension "${template_result_file}")" in
     sh)
       # Detect any exceptions during generation
@@ -618,6 +579,7 @@ function process_template_pass() {
       cat "${template_result_file}" | sed "-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d' > "${result_file}"
       results_list+=("${output_filename}")
 
+      # Determine if output has changed
       if [[ ! -f "${output_file}" ]]; then
         # First generation
         differences_detected="true"
@@ -667,17 +629,6 @@ function process_template_pass() {
       ;;
 
     json)
-      # Detect any exceptions during generation
-      jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-        < "${template_result_file}" > "${template_result_file}-exceptions"
-      jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-        < "${template_result_file}" >> "${template_result_file}-exceptions"
-      if [[ -s "${template_result_file}-exceptions" ]]; then
-        fatal "! Exceptions occurred during template generation. Details follow...\n"
-        cat "${template_result_file}-exceptions" >&2
-        return 100
-      fi
-
       # Capture the result
       jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
       results_list+=("${output_filename}")
@@ -730,11 +681,9 @@ function process_template_pass() {
 function process_template() {
   local entrance="${1,,}"; shift
   local flows="${1,,}"; shift
-  local level="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
   local resource_group="${1,,}"; shift
-  local deployment_unit_subset="${1,,}"; shift
   local account="$1"; shift
   local account_region="${1,,}"; shift
   local region="${1,,}"; shift
@@ -845,6 +794,8 @@ function process_template() {
   local results_dir="${tmp_dir}/results"
   mkdir -p "${results_dir}"
 
+  generation_contract_filename="${entrance}-generation-contract.json"
+
   info "Generating outputs:"
 
   # First see if a generation contract can be generated
@@ -855,14 +806,13 @@ function process_template() {
       "${GENERATION_FRAMEWORK}" \
       "contract" \
       "" \
-      "generation-contract.json" \
       "generationcontract" \
       "" \
-      "" \
+      "${generation_contract_filename}" \
       "${deployment_unit}" \
+      "generationcontract" \
       "${deployment_group}" \
       "${resource_group}" \
-      "${deployment_unit_subset}" \
       "${account}" \
       "${account_region}" \
       "${region}" \
@@ -892,16 +842,46 @@ function process_template() {
 
     0 | 255)
       # Use the contract to control further processing
-      local generation_contract="${results_dir}/${results_list[0]}"
+      local generation_contract="${results_dir}/${generation_contract_filename}"
       debug "Generating documents from generation contract ${generation_contract}"
       willLog "debug" && cat ${generation_contract}
 
-      local task_list_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-      getTasksFromContract "${generation_contract}" "${task_list_file}" ";"
+      # This sets the order of the parameters provided to process_template_pass
+      # The contract outputs a hash so we need to make sure the bash parameters are passed in specific order
+      contract_pass_template_args=(
+        "entrance"
+        "flows"
+        "providers"
+        "deploymentFramework"
+        "outputType"
+        "outputFormat"
+        "pass"
+        "passAlternative"
+        "outputFileName"
+        "deploymentUnit"
+        "deploymentUnitSubset"
+        "deploymentGroup"
+        "resourceGroup"
+        "account"
+        "accountRegion"
+        "region"
+        "requestReference"
+        "configurationReference"
+        "deploymentMode"
+      )
 
       local process_template_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-      cat "${task_list_file}" | grep "^process_template_pass" > "${process_template_tasks_file}"
+      getTasksFromContract "${generation_contract}" "${process_template_tasks_file}" ";" "process_template_pass" "$( listFromArray "contract_pass_template_args" "," )"
       readarray -t process_template_tasks_list < "${process_template_tasks_file}"
+
+      contract_rename_file_args=(
+        "currentFileName"
+        "newFileName"
+      )
+
+      local rename_file_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
+      getTasksFromContract "${generation_contract}" "${rename_file_tasks_file}" ";" "rename_file" "$( listFromArray "contract_rename_file_args" "," )"
+      readarray -t rename_file_tasks_list < "${rename_file_tasks_file}"
       ;;
 
     *)
@@ -916,19 +896,7 @@ function process_template() {
     arrayFromList task_parameters "${task_parameter_string}" ";"
 
     process_template_pass \
-      "${entrance}" \
-      "${flows}" \
-      "${task_parameters[@]:0:8}" \
-      "${deployment_unit}" \
-      "${deployment_group}" \
-      "${resource_group}" \
-      "${deployment_unit_subset}" \
-      "${account}" \
-      "${account_region}" \
-      "${region}" \
-      "${request_reference}" \
-      "${configuration_reference}" \
-      "${deployment_mode}" \
+      "${task_parameters[@]}" \
       "${cf_dir}" \
       "${run_id}" \
       "${deployment_unit_state_subdirectories}" \
@@ -958,8 +926,21 @@ function process_template() {
     info "Differences detected:"
 
     for f in "${results_list[@]}"; do
-      info " - updating ${f}"
-      cp "${results_dir}/${f}" "${cf_dir}/${f}"
+      # We don't know what the expectant file name is until we have the generation contract
+      # For the generation contract this can't be found
+      # So we include the rename of the contract in the contract itself to handle this
+      dest_file="${f}"
+      for step in "${rename_file_tasks_list}"; do
+        rename_parameter_string="${step#"rename_file "}"
+        arrayFromList task_parameters "${rename_parameter_string}" ";"
+        if [[ "${f}" == "${task_parameters[0]}" ]]; then
+          dest_file="${task_parameters[1]}"
+          results_list+=("${task_parameters[1]}")
+        fi
+      done
+
+      info " - updating ${dest_file}"
+      cp "${results_dir}/${f}" "${cf_dir}/${dest_file}"
     done
 
     # Cleanup output directory
@@ -1002,8 +983,7 @@ function main() {
   process_template \
     "${ENTRANCE}" \
     "${FLOWS}" \
-    "${LEVEL}" \
-    "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" "${DEPLOYMENT_UNIT_SUBSET}" \
+    "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" \
     "${ACCOUNT}" "${ACCOUNT_REGION}" \
     "${REGION}" \
     "${REQUEST_REFERENCE}" \
