@@ -771,6 +771,8 @@ function getTasksFromContract() {
     local contractFile="$1"; shift
     local taskOutputFile="$1"; shift
     local paramSeperator="$1"; shift
+    local requiredTaskType="$1"; shift
+    local paramsList="$1"; shift
 
     pushTempDir "${FUNCNAME[0]}_XXXXXX"
     local tmp_dir="$(getTopTempDir)"
@@ -785,12 +787,30 @@ function getTasksFromContract() {
     for stageIndex in "${!stage_list[@]}"; do
         arrayFromList stage_steps_list "$( jq -r --arg stageIndex "${stageIndex}" '.Stages[$stageIndex | tonumber].Steps[].Id' < "${contractFile}" || return $? )"
         for stepIndex in "${!stage_steps_list[@]}"; do
-            parameters="$( jq -r --arg seperator "${paramSeperator}" --arg stageIndex "${stageIndex}" --arg stepIndex "${stepIndex}" \
-                            '[.Stages[$stageIndex | tonumber ].Steps[$stepIndex | tonumber].Parameters | to_entries[] | "\(.value)" ] | join($seperator )' < "${contractFile}" || return $?)"
+
+            parameter_set="$( jq -r --arg stageIndex "${stageIndex}" --arg stepIndex "${stepIndex}" \
+                              '.Stages[$stageIndex | tonumber ].Steps[$stepIndex | tonumber].Parameters' < "${contractFile}" || return $?)"
+
+            if [[ -n "${paramsList}" ]]; then
+              arrayFromList params_list "${paramsList}"
+              parameters_ordered=()
+
+              for param in "${params_list[@]}"; do
+                parameters_ordered+=( "$( echo "${parameter_set}" | jq -r --arg parameter "${param}" '"\(.[$parameter] | select (.!=null))"' || return $? )" )
+              done
+
+              parameters="$(listFromArray "parameters_ordered" "${paramSeperator}" )"
+
+            else
+              parameters="$( echo "${parameter_set}" | jq -r --arg seperator "${paramSeperator}" \
+                              '[ . | to_entries[] | "\(.value)" ] | join($seperator )' || return $?)"
+            fi
             taskType="$( jq -r --arg stageIndex "${stageIndex}" --arg stepIndex "${stepIndex}" \
                             '.Stages[$stageIndex | tonumber ].Steps[$stepIndex | tonumber].Type' < "${contractFile}" || return $?)"
 
-            echo -e "${taskType} ${parameters}" >> "${tmp_file}"
+            if [[ -z "${taskType}" || "${taskType}" == "${requiredTaskType}" ]]; then
+              echo -e "${taskType} ${parameters}" >> "${tmp_file}"
+            fi
         done
     done
 
