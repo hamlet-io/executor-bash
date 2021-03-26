@@ -659,8 +659,8 @@ function process_template_pass() {
           [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id}//g")
         fi
 
-        cat "${template_result_file}" | jq --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
-        cat "${output_file}" | jq --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
+        cat "${template_result_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
+        cat "${output_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
 
         diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
           info " ~ no change in ${file_description} detected" ||
