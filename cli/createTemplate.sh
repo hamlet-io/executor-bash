@@ -410,7 +410,7 @@ function process_template_pass() {
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" ","
   for entranceParameter in "${entranceParametersArray[@]}"; do
-    args+=("-v" "${entranceParameter}")
+    args+=("-r" "${entranceParameter}")
   done
 
   # Directory for temporary files
