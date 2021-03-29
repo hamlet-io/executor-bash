@@ -356,21 +356,22 @@ function process_template_pass() {
 
   # Args common across all passes
   local args=()
-  [[ -n "${entrance}" ]]                  && args+=("-v" "entrance=${entrance}")
-  [[ -n "${flows}" ]]                     && args+=("-v" "flows=${flows}")
-  [[ -n "${pass}" ]]                      && args+=("-v" "pass=${pass}")
-  [[ -n "${providers}" ]]                 && args+=("-v" "providers=${providers}")
-  [[ -n "${deployment_framework}" ]]      && args+=("-v" "deploymentFramework=${deployment_framework}")
-  [[ -n "${output_type}" ]]               && args+=("-v" "outputType=${output_type}")
-  [[ -n "${output_format}" ]]             && args+=("-v" "outputFormat=${output_format}")
-  [[ -n "${deployment_unit}" ]]           && args+=("-v" "deploymentUnit=${deployment_unit}")
-  [[ -n "${deployment_unit_subset}" ]]    && args+=("-v" "deploymentUnitSubset=${deployment_unit_subset}")
-  [[ -n "${deployment_group}" ]]          && args+=("-v" "deploymentGroup=${deployment_group}")
-  [[ -n "${resource_group}" ]]            && args+=("-v" "resourceGroup=${resource_group}")
-  [[ -n "${output_filename}" ]]           && args+=("-v" "outputFileName=${output_filename}")
-  [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-v" "logLevel=${GENERATION_LOG_LEVEL}")
+  [[ -n "${entrance}" ]]                  && args+=("-r" "entrance=${entrance}")
+  [[ -n "${flows}" ]]                     && args+=("-r" "flows=${flows}")
+  [[ -n "${pass}" ]]                      && args+=("-r" "pass=${pass}")
+  [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
+  [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
+  [[ -n "${output_type}" ]]               && args+=("-r" "outputType=${output_type}")
+  [[ -n "${output_format}" ]]             && args+=("-r" "outputFormat=${output_format}")
+  [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
+  [[ -n "${deployment_unit_subset}" ]]    && args+=("-r" "deploymentUnitSubset=${deployment_unit_subset}")
+  [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
+  [[ -n "${resource_group}" ]]            && args+=("-r" "resourceGroup=${resource_group}")
+  [[ -n "${output_filename}" ]]           && args+=("-r" "outputFileName=${output_filename}")
+  [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-r" "inputSource=${GENERATION_INPUT_SOURCE}")
+
+  [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-r" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
-  [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-v" "inputSource=${GENERATION_INPUT_SOURCE}")
 
   # Include the template composites
   # Removal of drive letter (/?/) is specifically for MINGW
@@ -383,7 +384,6 @@ function process_template_pass() {
   args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
 
   # Composites
-  args+=("-v" "accountRegion=${account_region}")
   args+=("-v" "pluginState=${PLUGIN_STATE}")
   args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   args+=("-v" "settings=${COMPOSITE_SETTINGS}")
@@ -391,18 +391,21 @@ function process_template_pass() {
   args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
 
   # Run time references
-  args+=("-v" "requestReference=${request_reference}")
-  args+=("-v" "configurationReference=${configuration_reference}")
-  args+=("-v" "deploymentMode=${DEPLOYMENT_MODE}")
-  args+=("-v" "runId=${run_id}")
+  args+=("-r" "requestReference=${request_reference}")
+  args+=("-r" "configurationReference=${configuration_reference}")
+  args+=("-r" "deploymentMode=${DEPLOYMENT_MODE}")
+  args+=("-r" "runId=${run_id}")
 
   # Starting layers
-  args+=("-v" "tenant=${TENANT}")
-  args+=("-v" "account=${ACCOUNT}")
-  args+=("-v" "region=${region}")
-  args+=("-v" "product=${PRODUCT}")
-  args+=("-v" "environment=${ENVIRONMENT}")
-  args+=("-v" "segment=${SEGMENT}")
+  args+=("-r" "tenant=${TENANT}")
+  args+=("-r" "account=${ACCOUNT}")
+  args+=("-r" "region=${region}")
+  args+=("-r" "product=${PRODUCT}")
+  args+=("-r" "environment=${ENVIRONMENT}")
+  args+=("-r" "segment=${SEGMENT}")
+
+  # Account Override
+  args+=("-r" "accountRegion=${account_region}")
 
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" ","
@@ -430,7 +433,7 @@ function process_template_pass() {
   info " - ${file_description}"
 
   # Make the temp directory a cmdb so that we can write into it
-  args+=("-v" "outputDir=${tmp_dir}")
+  args+=("-r" "outputDir=${tmp_dir}")
   args+=("-g" "${tmp_dir}")
   echo '{}' > "${tmp_dir}/.cmdb"
 
