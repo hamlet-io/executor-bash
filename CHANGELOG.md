@@ -1,4 +1,50 @@
-# [0.0.0](https://github.com/hamlet-io/engine-plugin-aws/compare/v8.0.0...v0.0.0) (2021-01-11)
+# [0.0.0](https://github.com/hamlet-io/engine-plugin-aws/compare/v8.0.1...v0.0.0) (2021-03-30)
+
+
+### Bug Fixes
+
+* handling of wrapper arguments ([7670bfd](https://github.com/hamlet-io/engine-plugin-aws/commit/7670bfd1a3e6049762318d6e54344c0404cf06cc))
+* use raw params for entrances ([28efcba](https://github.com/hamlet-io/engine-plugin-aws/commit/28efcba5df6278c38a2e3050f922d08c2f93a09c))
+
+
+### Features
+
+* pass outputfilename from gen contract ([#177](https://github.com/hamlet-io/engine-plugin-aws/issues/177)) ([06e3d1d](https://github.com/hamlet-io/engine-plugin-aws/commit/06e3d1d209e477e2af6202d9b2dd98e7025f51c3))
+
+
+
+## [8.0.1](https://github.com/hamlet-io/engine-plugin-aws/compare/v8.0.0...v8.0.1) (2021-03-25)
+
+
+### Bug Fixes
+
+* add a check for detached head ([b8b6f5c](https://github.com/hamlet-io/engine-plugin-aws/commit/b8b6f5c62da4cba829a14d182b19573c562c711b))
+* bash indirection bug ([#181](https://github.com/hamlet-io/engine-plugin-aws/issues/181)) ([5fb0038](https://github.com/hamlet-io/engine-plugin-aws/commit/5fb0038acfe4711e41019d9e36d82c2e6cf8c7d9)), closes [#179](https://github.com/hamlet-io/engine-plugin-aws/issues/179)
+* correct var for source build ref ([#145](https://github.com/hamlet-io/engine-plugin-aws/issues/145)) ([02ea2fe](https://github.com/hamlet-io/engine-plugin-aws/commit/02ea2feee95ddcec6108788adf8adb38ce5d5315))
+* **expo:** codesign variable names ([#153](https://github.com/hamlet-io/engine-plugin-aws/issues/153)) ([5ed6c45](https://github.com/hamlet-io/engine-plugin-aws/commit/5ed6c4592e35fcc93016ea8864b71bc5783e2afe))
+* **expo:** control code sign id for ios ([#152](https://github.com/hamlet-io/engine-plugin-aws/issues/152)) ([d0fbeb6](https://github.com/hamlet-io/engine-plugin-aws/commit/d0fbeb6d25e51476b7a2ef5e2927db27abdf0978))
+* diagram file output naming ([#167](https://github.com/hamlet-io/engine-plugin-aws/issues/167)) ([e77c2ab](https://github.com/hamlet-io/engine-plugin-aws/commit/e77c2ab00b62d2661bfe337b02286afd8a9ae79a))
+* force Expo tool versions ([#161](https://github.com/hamlet-io/engine-plugin-aws/issues/161)) ([1841701](https://github.com/hamlet-io/engine-plugin-aws/commit/18417014d66fc913af13a84cd443abd12b37f9f8))
+* freemarker wrapper write functions ([a76202f](https://github.com/hamlet-io/engine-plugin-aws/commit/a76202f5b146f8a272857f6390a3a6b90fd4195e))
+* runtask lookup of subcomponent ([f73d110](https://github.com/hamlet-io/engine-plugin-aws/commit/f73d110822ab941ea4874871f832c4c0fdaa7409))
+* typo ([11c5513](https://github.com/hamlet-io/engine-plugin-aws/commit/11c551365c2e0de61d605791da7b852485eac560))
+* url image updates ([#155](https://github.com/hamlet-io/engine-plugin-aws/issues/155)) ([a3e7dc4](https://github.com/hamlet-io/engine-plugin-aws/commit/a3e7dc4bbaa5e5aba0a11bd5c725733e9928f6a2))
+
+
+### Features
+
+* add occurrences entrance support ([#174](https://github.com/hamlet-io/engine-plugin-aws/issues/174)) ([08644da](https://github.com/hamlet-io/engine-plugin-aws/commit/08644da956eb4307f329e9449a60127eadeaa94a))
+* engine status codes ([#168](https://github.com/hamlet-io/engine-plugin-aws/issues/168)) ([b88ade8](https://github.com/hamlet-io/engine-plugin-aws/commit/b88ade844184429d63d8f6f80e0f7293fbf4ae68))
+* non zip image url sourcing ([#148](https://github.com/hamlet-io/engine-plugin-aws/issues/148)) ([00594c0](https://github.com/hamlet-io/engine-plugin-aws/commit/00594c0a179084a3bb87e4a13b52733772f7c866))
+* set log level default ([defa328](https://github.com/hamlet-io/engine-plugin-aws/commit/defa328a2448694292dc7a9972e1615641bf8f5b))
+* starting layers ([4cc4f9a](https://github.com/hamlet-io/engine-plugin-aws/commit/4cc4f9a8f81bad2a91f2a208a2c0fbd9e6a6de25))
+* switch to v1.12.3 of the wrapper ([#166](https://github.com/hamlet-io/engine-plugin-aws/issues/166)) ([dd85c83](https://github.com/hamlet-io/engine-plugin-aws/commit/dd85c83b0e80ccf00fb327c9fcf5d5477fa9d034))
+* whatif input source ([#156](https://github.com/hamlet-io/engine-plugin-aws/issues/156)) ([f2f871e](https://github.com/hamlet-io/engine-plugin-aws/commit/f2f871eb4801e63e55d7341dfb4dfab62685ab1d))
+* wrapper upgrade to 1.12.1 ([#154](https://github.com/hamlet-io/engine-plugin-aws/issues/154)) ([c5bebac](https://github.com/hamlet-io/engine-plugin-aws/commit/c5bebac8e6dd4f75194a027bf125cf7dea94f7dd))
+* **automation:** add ref for account repos ([06f0e29](https://github.com/hamlet-io/engine-plugin-aws/commit/06f0e291bbfd54640228d32d96a51c259faf7043))
+* **createTemplate:** schemacontract outputs ([#151](https://github.com/hamlet-io/engine-plugin-aws/issues/151)) ([773c6b1](https://github.com/hamlet-io/engine-plugin-aws/commit/773c6b115a7ec27637fee4be1e19c9858e8c8908))
+* **expo:** set encryption exemption on upload ([#157](https://github.com/hamlet-io/engine-plugin-aws/issues/157)) ([71cd1a6](https://github.com/hamlet-io/engine-plugin-aws/commit/71cd1a688f3a4bb66e3789b1641c122a39dc835c))
+* **util:** aws vpn connection tunnel ip ([#175](https://github.com/hamlet-io/engine-plugin-aws/issues/175)) ([2000950](https://github.com/hamlet-io/engine-plugin-aws/commit/200095097d4fe3cfc383f3356f496016f01981cc))
 
 
 
