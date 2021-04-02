@@ -381,25 +381,6 @@ if [[ -z "${GENERATION_PATTERNS_DIR}" ]]; then
     fi
 fi
 
-
-# Pull in the default generation startup repo if not overridden by product or locally installed
-if [[ -z "${GENERATION_STARTUP_DIR}" ]]; then
-    if [[ "${INCLUDE_ALL_REPOS}" == "true" ]]; then
-        GENERATION_STARTUP_DIR="${BASE_DIR}/startup"
-        PRODUCT_GENERATION_STARTUP_DIR="$(findDir "${BASE_DIR}" "${PRODUCT}/startup" )"
-        if [[ -n "${PRODUCT_GENERATION_STARTUP_DIR}" ]]; then
-            mkdir -p "${GENERATION_STARTUP_DIR}"
-            cp -rp "${PRODUCT_GENERATION_STARTUP_DIR}" "${GENERATION_STARTUP_DIR}"
-        else
-            ${AUTOMATION_DIR}/manageRepo.sh -c -l "generation startup" \
-                -n "${GENERATION_STARTUP_REPO}" -v "${GENERATION_GIT_PROVIDER}" \
-                -d "${GENERATION_STARTUP_DIR}" -b "${GENERATION_STARTUP_REFERENCE}"
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
-        fi
-        save_context_property GENERATION_STARTUP_DIR "${GENERATION_STARTUP_DIR}"
-    fi
-fi
-
 # Examine the structure and define key directories
 
 findGen3Dirs "${BASE_DIR}"

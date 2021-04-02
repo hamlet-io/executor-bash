@@ -26,8 +26,6 @@ These options must be set in order for Hamlet Deploy Executor to function correc
 | GENERATION_ENGINE_DIR   | A fully qualified filepath to a local copy of the Hamlet Deploy Engine Core repository.                      |
 | GENERATION_PATTERNS_DIR | A fully qualified filepath to a local copy of the Hamlet Deploy Patterns repository.                         |
 | GENERATION_PLUGIN_DIRS  | A semicolon delimited list of fully qualified filepaths, each to a local instance of a Hamlet Deploy Plugin. |
-| GENERATION_STARTUP_DIR  | A fully qualified filepath to a local copy of the Hamlet Deploy Startup repository.                          |
-
 
 #### Optional Variables
 
