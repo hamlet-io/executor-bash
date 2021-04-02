@@ -67,7 +67,7 @@ function main() {
   GIT_CLONE_DIR="${PLUGIN_CACHE_DIR}/_git"
   PLUGIN_STATE_FILE="${PLUGIN_CACHE_DIR}/plugin-state.json"
 
-  ${GENERATION_DIR}/createTemplate.sh -p "shared" -e loader -o "${LOADER_DIR}" ${TEMPLATE_ARGS} || return $?
+  ${GENERATION_DIR}/createTemplate.sh -p "shared" -e loader -y missingPluginAction=ignore -o "${LOADER_DIR}" ${TEMPLATE_ARGS} || return $?
 
   # check for a plugin contract
   if [[ -f "${LOADER_DIR}/loader-plugincontract.json" &&  -s "${LOADER_DIR}/loader-plugincontract.json" ]]; then
