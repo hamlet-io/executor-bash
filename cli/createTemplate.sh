@@ -378,7 +378,9 @@ function process_template_pass() {
   # It shouldn't affect other platforms as it won't be matched
   for composite in "${template_composites[@]}"; do
     composite_var="${CACHE_DIR}/composite_${composite,,}.ftl"
+    # TODO(mfl) Remove the -r variant once changes to engine in place to support -v
     args+=("-r" "${composite,,}List=${composite_var#/?/}")
+    args+=("-v" "${composite,,}Template=${composite_var}")
   done
 
   args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
