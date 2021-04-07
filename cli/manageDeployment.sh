@@ -19,12 +19,11 @@ function usage() {
 
   Manage an Azure Resource Manager (ARM) deployment
 
-  Usage: $(basename $0) -l LEVEL -r REGION -s DEPLOYMENT_SCOPE -u DEPLOYMENT_UNIT -n DEPLOYMENT_NAME
+  Usage: $(basename $0) -l LEVEL -r REGION -s DEPLOYMENT_SCOPE -u DEPLOYMENT_UNIT
 
   where
 
   (o) -d (DEPLOYMENT_OPERATION=delete)  to delete the deployment
-  (o) -g RESOURCE_GROUP                 Overrides the Resource Group to deploy into, default is to generate a deployment group per deployment unit
       -h                                shows this text
   (o) -i (DEPLOYMENT_MONITOR=false)     initiates but does not monitor the deployment operation.
   (m) -l LEVEL                          is the deployment level - "account", "product", "segment", "solution", "application" or "multiple"
@@ -56,7 +55,6 @@ function options() {
   while getopts ":dg:hil:mo:qr:s:u:w::yz:" option; do
     case "${option}" in
       d) DEPLOYMENT_OPERATION=delete ;;
-      g) RESOURCE_GROUP="${OPTARG}" ;;
       h) usage; return 1 ;;
       i) DEPLOYMENT_MONITOR=false ;;
       l) LEVEL="${OPTARG}" ;;
