@@ -33,7 +33,6 @@ where
 (o) -d DEPLOYMENT_MODE         is the deployment mode the template will be generated for
 (o) -e ENTRANCE                is the hamlet entrance to start processing with
 (o) -f GENERATION_FRAMEWORK    is the output framework to use for template generation
-(o) -g RESOURCE_GROUP          is the deployment unit resource group
 (o) -i GENERATION_INPUT_SOURCE is the source of input data to use when generating the template - "composite", "mock"
     -h                         shows this text
 (m) -l LEVEL                   is the template level - "unitlist", "blueprint", "account", "segment", "solution" or "application"
@@ -69,14 +68,13 @@ EOF
 function options() {
 
   # Parse options
-  while getopts ":b:c:d:e:f:g:hi:l:o:p:q:r:u:xy:z:" option; do
+  while getopts ":b:c:d:e:f:hi:l:o:p:q:r:u:xy:z:" option; do
       case "${option}" in
           b) FLOWS_ARRAY+=("${OPTARG}") ;;
           c) CONFIGURATION_REFERENCE="${OPTARG}" ;;
           d) DEPLOYMENT_MODE="${OPTARG}" ;;
           e) ENTRANCE="${OPTARG}" ;;
           f) GENERATION_FRAMEWORK="${OPTARG}" ;;
-          g) RESOURCE_GROUP="${OPTARG}" ;;
           h) usage; return 1 ;;
           i) GENERATION_INPUT_SOURCE="${OPTARG}" ;;
           l) DEPLOYMENT_GROUP="${OPTARG}" ;;
@@ -319,7 +317,6 @@ function process_template_pass() {
   local deployment_unit="${1,,}"; shift
   local deployment_unit_subset="${1,,}"; shift
   local deployment_group="${1,,}"; shift
-  local resource_group="${1,,}"; shift
   local account="$1"; shift
   local account_region="${1,,}"; shift
   local region="${1,,}"; shift
@@ -367,7 +364,6 @@ function process_template_pass() {
   [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
   [[ -n "${deployment_unit_subset}" ]]    && args+=("-r" "deploymentUnitSubset=${deployment_unit_subset}")
   [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
-  [[ -n "${resource_group}" ]]            && args+=("-r" "resourceGroup=${resource_group}")
   [[ -n "${output_filename}" ]]           && args+=("-r" "outputFileName=${output_filename}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-r" "inputSource=${GENERATION_INPUT_SOURCE}")
 
@@ -640,7 +636,6 @@ function process_template() {
   local flows="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
   local deployment_group="${1,,}"; shift
-  local resource_group="${1,,}"; shift
   local account="$1"; shift
   local account_region="${1,,}"; shift
   local region="${1,,}"; shift
@@ -769,7 +764,6 @@ function process_template() {
       "${deployment_unit}" \
       "generationcontract" \
       "${deployment_group}" \
-      "${resource_group}" \
       "${account}" \
       "${account_region}" \
       "${region}" \
@@ -818,7 +812,6 @@ function process_template() {
         "deploymentUnit"
         "deploymentUnitSubset"
         "deploymentGroup"
-        "resourceGroup"
         "account"
         "accountRegion"
         "region"
@@ -940,7 +933,7 @@ function main() {
   process_template \
     "${ENTRANCE}" \
     "${FLOWS}" \
-    "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" "${RESOURCE_GROUP}" \
+    "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" \
     "${ACCOUNT}" "${ACCOUNT_REGION}" \
     "${REGION}" \
     "${REQUEST_REFERENCE}" \
