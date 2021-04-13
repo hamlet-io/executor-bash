@@ -359,6 +359,7 @@ function process_template_pass() {
   [[ -n "${entrance}" ]]                  && args+=("-r" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-r" "flows=${flows}")
   [[ -n "${pass}" ]]                      && args+=("-r" "pass=${pass}")
+  [[ -n "${pass_alternative}" ]]          && args+=("-r" "passAlternative=${pass_alternative}")
   [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
   [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
   [[ -n "${output_type}" ]]               && args+=("-r" "outputType=${output_type}")
@@ -567,6 +568,16 @@ function process_template_pass() {
   if [[ -s "${generation_log_file}-warnings" ]]; then
     warning "! Warnings were found during template generation. Details follow...\n"
     cat "${generation_log_file}-warnings" >&2
+  fi
+
+  # debug
+  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"debug\")" \
+    < "${generation_log_file}" > "${generation_log_file}-debugs"
+  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"debug\")" \
+    < "${generation_log_file}" >> "${generation_log_file}-debugs"
+  if [[ -s "${generation_log_file}-debugs" ]]; then
+    warning "! Debug messages were found during template generation. Details follow...\n"
+    cat "${generation_log_file}-debugs" >&2
   fi
 
   # Clean up the output file and check for change
