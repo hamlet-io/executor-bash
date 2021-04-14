@@ -433,18 +433,25 @@ function process_template_pass() {
     file_description="${file_description} - ${pass_alternative}"
   fi
 
-  info " - ${file_description}"
-
   # Make the temp directory a cmdb so that we can write into it
   args+=("-r" "outputDir=${tmp_dir}")
   args+=("-g" "${tmp_dir}")
   echo '{}' > "${tmp_dir}/.cmdb"
 
-  local generation_log_file="${tmp_dir}/${output_filename}.generation-log.json"
+  # Setup log outputs
+  local generation_log_file_name="${output_filename}.generation-log.json"
+  local generation_log_file="${tmp_dir}/${generation_log_file_name}"
+  args+=("-r" "logFileName=${generation_log_file_name}")
+  args+=("-r" "logDir=${tmp_dir}")
+
+  # Set the result file
   local template_result_file="${tmp_dir}/${output_filename}"
   local engine_result_file="${tmp_dir}/${output_filename}.freemarker.log"
   local output_file="${cf_dir}/${output_filename}"
   local result_file="${results_dir}/${output_filename}"
+
+  # The debug file is the default output and should only be used for serious debugging
+  local debug_file="${tmp_dir}/${output_filename}.debug"
 
   if ${GENERATION_BASE_DIR}/execution/freemarker.sh \
     -d "${template_dir}" \
@@ -453,7 +460,7 @@ function process_template_pass() {
     -d "${GENERATION_ENGINE_DIR}/providers" \
     ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
     -t "${template}" \
-    -o "${generation_log_file}" \
+    -o "${debug_file}" \
     -e "${engine_result_file}" \
     "${args[@]}"; then
     # Show any output from the freemarker engine depending on log level
@@ -550,34 +557,17 @@ function process_template_pass() {
   # Check for errors in the generation log
 
   # Fatals
-  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-    < "${generation_log_file}" > "${generation_log_file}-exceptions"
-  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-    < "${generation_log_file}" >> "${generation_log_file}-exceptions"
-  if [[ -s "${generation_log_file}-exceptions" ]]; then
-    fatal "! Exceptions occurred during template generation. Details follow...\n"
-    cat "${generation_log_file}-exceptions" >&2
+  if [[ -s "${generation_log_file}" ]]; then
+    jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+      < "${generation_log_file}" > "${generation_log_file}-exceptions"
+    jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+      < "${generation_log_file}" >> "${generation_log_file}-exceptions"
+    if [[ -s "${generation_log_file}-exceptions" ]]; then
+      return 100
+    fi
+  else
+    fatal "! engine log could not be found treating as fatal"
     return 100
-  fi
-
-  # Warnings
-  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"warning\")" \
-    < "${generation_log_file}" > "${generation_log_file}-warnings"
-  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"warning\")" \
-    < "${generation_log_file}" >> "${generation_log_file}-warnings"
-  if [[ -s "${generation_log_file}-warnings" ]]; then
-    warning "! Warnings were found during template generation. Details follow...\n"
-    cat "${generation_log_file}-warnings" >&2
-  fi
-
-  # debug
-  jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"debug\")" \
-    < "${generation_log_file}" > "${generation_log_file}-debugs"
-  jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"debug\")" \
-    < "${generation_log_file}" >> "${generation_log_file}-debugs"
-  if [[ -s "${generation_log_file}-debugs" ]]; then
-    warning "! Debug messages were found during template generation. Details follow...\n"
-    cat "${generation_log_file}-debugs" >&2
   fi
 
   # Clean up the output file and check for change
