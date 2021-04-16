@@ -522,6 +522,24 @@ function process_template_pass() {
     fi
   fi
 
+  # First check the generation log
+
+  # Fatals
+  if [[ -s "${generation_log_file}" ]]; then
+    jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+      < "${generation_log_file}" > "${generation_log_file}-exceptions"
+    jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
+      < "${generation_log_file}" >> "${generation_log_file}-exceptions"
+    if [[ -s "${generation_log_file}-exceptions" ]]; then
+      return 100
+    fi
+  else
+    fatal "! engine log could not be found treating as fatal"
+    return 100
+  fi
+
+  # Now a few tests on the result file
+
   # Ignore whitespace only files
   if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
     info " ~ ignoring empty ${file_description}"
@@ -554,23 +572,7 @@ function process_template_pass() {
     return 100
   fi
 
-  # Check for errors in the generation log
-
-  # Fatals
-  if [[ -s "${generation_log_file}" ]]; then
-    jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-      < "${generation_log_file}" > "${generation_log_file}-exceptions"
-    jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-      < "${generation_log_file}" >> "${generation_log_file}-exceptions"
-    if [[ -s "${generation_log_file}-exceptions" ]]; then
-      return 100
-    fi
-  else
-    fatal "! engine log could not be found treating as fatal"
-    return 100
-  fi
-
-  # Clean up the output file and check for change
+    # Clean up the output file and check for change
   case "$(fileExtension "${template_result_file}")" in
     sh)
       # Detect any exceptions during generation
