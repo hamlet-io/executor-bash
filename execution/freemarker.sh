@@ -123,7 +123,7 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.12.3.jar" \
+java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.13.0.jar" \
     -i $TEMPLATE "${TEMPLATEDIRS[@]}" \
     -o $OUTPUT \
     "${VARIABLES[@]}" \
