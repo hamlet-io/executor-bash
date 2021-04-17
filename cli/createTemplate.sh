@@ -446,9 +446,8 @@ function process_template_pass() {
 
   # Set the result file
   local template_result_file="${tmp_dir}/${output_filename}"
-  local engine_result_file="${tmp_dir}/${output_filename}.freemarker.log"
-  local output_file="${cf_dir}/${output_filename}"
   local result_file="${results_dir}/${output_filename}"
+  local output_file="${cf_dir}/${output_filename}"
 
   # The debug file is the default output and should only be used for serious debugging
   local debug_file="${tmp_dir}/${output_filename}.debug"
@@ -461,81 +460,57 @@ function process_template_pass() {
     ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
     -t "${template}" \
     -o "${debug_file}" \
-    -e "${engine_result_file}" \
     "${args[@]}"; then
-    # Show any output from the freemarker engine depending on log level
-    if [[ -s "${engine_result_file}" ]]; then
-      cat "${engine_result_file}"
-    fi
+      info "generation successful"
   else
     # Capture the raw return code
     return_code=$?
 
-    # Check for engine exceptions - 100 series of exit codes used for freemarker issues
-    if grep "Error executing FreeMarker template" < "${engine_result_file}" >/dev/null; then
-      if grep "Encountered stop instruction" < "${engine_result_file}" >/dev/null; then
-        # stop directive used
-        local engine_cause_file="${engine_result_file}-cause"
-        fatal "! template engine managed exception encountered. Details follow...\n"
-        grep -m 1 "Cause given: " "${engine_result_file}" | awk -F "Cause given: " '{print $2}' > "${engine_cause_file}"
-        if [[ -s "${engine_cause_file}" ]]; then
-          if grep "HamletMessages" < "${engine_cause_file}" >/dev/null; then
-            # stop via fatal macro
-            jq --indent 2 '.HamletMessages' < "${engine_cause_file}" >&2
-          else
-            # direct stop command
-            cat "${engine_cause_file}" >&2
-          fi
-        else
-          # Shouldn't get here - perhaps freemarker output format has changed?
-          cat "${engine_result_file}" >&2
-        fi
+    # The engine does most of the work here - this is mostly to put errors in context
+    case "${return_code}" in
+      100)
+        fatal "[!] hamlet managed exception"
+        ;;
 
-        # Flag caught internal engine exception
-        return 100
-      else
-        if grep "Freemarker template error:" < "${engine_result_file}" >/dev/null; then
-          # Freemarker processing is unhappy
-          fatal "! template engine unmanaged exception encountered. Details follow...\n"
-          cat "${engine_result_file}" >&2
+      101)
+        fatal "[!] hamlet unmanaged exception"
+        ;;
 
-          # Flag uncaught internal engine exception
-          return 101
-        else
-          # Some other Freemarker engine unhappiness
-          fatal "! template engine internal issue encountered. Details follow...\n"
+      102)
+        fatal "[!] hamlet internal isssue"
+        ;;
 
-          # Show the engine output
-          cat "${engine_result_file}" >&2
+      110)
+        fatal "[!] hamlet log errors"
+        ;;
 
-          return 102
-        fi
-      fi
-    else
-      # Some more general Freemarker engine unhappiness
-      fatal "! template engine condition encountered. Details follow...\n"
+      200)
+        fatal "[!] engine I/O issue"
+        ;;
 
-      # Show the engine output
-      cat "${engine_result_file}"
+      202|203)
+        fatal "[!] engine invalid parameters found"
+        ;;
 
-      return ${return_code}
-    fi
-  fi
+      209)
+        fatal "[!] engine issue in freemarker wrapper"
+        ;;
 
-  # First check the generation log
+      1**)
+        fatal "[!] hamlet unkown issue"
+        ;;
 
-  # Fatals
-  if [[ -s "${generation_log_file}" ]]; then
-    jq -r ".COTMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-      < "${generation_log_file}" > "${generation_log_file}-exceptions"
-    jq -r ".HamletMessages | select(.!=null) | .[] | select(.Severity == \"fatal\")" \
-      < "${generation_log_file}" >> "${generation_log_file}-exceptions"
-    if [[ -s "${generation_log_file}-exceptions" ]]; then
-      return 100
-    fi
-  else
-    fatal "! engine log could not be found treating as fatal"
-    return 100
+      2**)
+        fatal "[!] engine unkown issue"
+        ;;
+
+      *)
+        fatal "[!] unkown issue"
+        ;;
+
+    esac
+
+    return ${return_code}
   fi
 
   # Now a few tests on the result file
@@ -556,32 +531,9 @@ function process_template_pass() {
     return 254
   fi
 
-  # Check for fatal strings in the output
-  grep "COTFatal:" < "${template_result_file}" > "${template_result_file}-exceptionstrings"
-  grep "HamletFatal:" < "${template_result_file}" >> "${template_result_file}-exceptionstrings"
-  if [[ -s "${template_result_file}-exceptionstrings"  ]]; then
-    fatal "! Exceptions occurred during template generation. Details follow...\n"
-    case "$(fileExtension "${template_result_file}")" in
-      json)
-        jq --indent 2 '.' < "${template_result_file}-exceptionstrings" >&2
-        ;;
-      *)
-        cat "${template_result_file}-exceptionstrings" >&2
-        ;;
-    esac
-    return 100
-  fi
-
-    # Clean up the output file and check for change
+  # Clean up the output file and check for change
   case "$(fileExtension "${template_result_file}")" in
     sh)
-      # Detect any exceptions during generation
-      grep "\[fatal \]" < "${template_result_file}" > "${template_result_file}-exceptions"
-      if [[ -s "${template_result_file}-exceptions" ]]; then
-        fatal "! Exceptions occurred during script generation. Details follow...\n"
-        cat "${template_result_file}-exceptions" >&2
-        return 100
-      fi
 
       # Capture the result
       cat "${template_result_file}" | sed "-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d' > "${result_file}"
