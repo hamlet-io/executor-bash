@@ -452,7 +452,7 @@ function process_template_pass() {
   # The debug file is the default output and should only be used for serious debugging
   local debug_file="${tmp_dir}/${output_filename}.debug"
 
-  if ${GENERATION_BASE_DIR}/execution/freemarker.sh \
+  if ! ${GENERATION_BASE_DIR}/execution/freemarker.sh \
     -d "${template_dir}" \
     ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
     -d "${GENERATION_ENGINE_DIR}/engine" \
@@ -461,8 +461,7 @@ function process_template_pass() {
     -t "${template}" \
     -o "${debug_file}" \
     "${args[@]}"; then
-      info "generation successful"
-  else
+
     # Capture the raw return code
     return_code=$?
 
