@@ -49,10 +49,9 @@ RAW_VARIABLES=()
 VARIABLES=()
 CMDBS=()
 CMDB_MAPPINGS=()
-ENGINE_OUTPUT="/dev/stdout"
 
 # Parse options
-while getopts ":b:c:d:e:g:hl:o:r:t:v:" opt; do
+while getopts ":b:c:d:g:hl:o:r:t:v:" opt; do
     case $opt in
         b)
             BASE_CMDB="${OPTARG}"
@@ -62,9 +61,6 @@ while getopts ":b:c:d:e:g:hl:o:r:t:v:" opt; do
             ;;
         d)
             TEMPLATEDIRS+=("${OPTARG}")
-            ;;
-        e)
-            ENGINE_OUTPUT="${OPTARG}"
             ;;
         g)
             CMDB_MAPPINGS+=("${OPTARG}")
@@ -131,5 +127,5 @@ java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.13.0.jar" \
     "${CMDB_MAPPINGS[@]}" \
     ${BASE_CMDB:+-b "${BASE_CMDB}"} \
     ${LOGLEVEL:+--${LOGLEVEL}} \
-    "${CMDBS[@]}" &> ${ENGINE_OUTPUT}
+    "${CMDBS[@]}"
 RESULT=$?
