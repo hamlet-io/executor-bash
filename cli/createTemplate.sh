@@ -452,7 +452,7 @@ function process_template_pass() {
   # The debug file is the default output and should only be used for serious debugging
   local debug_file="${tmp_dir}/${output_filename}.debug"
 
-  if ! ${GENERATION_BASE_DIR}/execution/freemarker.sh \
+  ${GENERATION_BASE_DIR}/execution/freemarker.sh \
     -d "${template_dir}" \
     ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
     -d "${GENERATION_ENGINE_DIR}/engine" \
@@ -460,11 +460,9 @@ function process_template_pass() {
     ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
     -t "${template}" \
     -o "${debug_file}" \
-    "${args[@]}"; then
+    "${args[@]}"; return_code=$?
 
-    # Capture the raw return code
-    return_code=$?
-
+  if [[ ${return_code} -ne 0 ]]; then
     # The engine does most of the work here - this is mostly to put errors in context
     case "${return_code}" in
       100)
@@ -496,15 +494,15 @@ function process_template_pass() {
         ;;
 
       1**)
-        fatal "[!] hamlet unkown issue"
+        fatal "[!] hamlet unknown issue, code = ${return_code}"
         ;;
 
       2**)
-        fatal "[!] engine unkown issue"
+        fatal "[!] engine unknown issue, code = ${return_code}"
         ;;
 
       *)
-        fatal "[!] unkown issue"
+        fatal "[!] unknown issue, code = ${return_code}"
         ;;
 
     esac
