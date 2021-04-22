@@ -20,6 +20,10 @@ export LOG_LEVEL_WARNING="warn"
 export LOG_LEVEL_ERROR="error"
 export LOG_LEVEL_FATAL="fatal"
 
+# log display modes for engine
+export LOG_FORMAT_COMPACT="compact"
+export LOG_FORMAT_FULL="full"
+
 # -- Error tracing --
 # -- Output an errors source, line and function name --
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
