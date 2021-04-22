@@ -369,6 +369,7 @@ function process_template_pass() {
 
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-r" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
+  [[ -n "${GENERATION_LOG_FORMAT}" ]]     && args+=("-r" "logFormat=${GENERATION_LOG_FORMAT}")
 
   # Include the template composites
   # Removal of drive letter (/?/) is specifically for MINGW
