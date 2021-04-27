@@ -601,12 +601,11 @@ function getTempFile() {
 
 function getCacheDir() {
   local cache_root="$1"; shift
+  local cache_path="${1//"/"/"_"}"; shift
 
   if [[ -n "${cache_root}" ]]; then
     mkdir -p "${cache_root}"
   fi
-
-  cache_path="${ROOT_DIR//"/"/"_"}"
 
   if [[ -n "${cache_path}" ]]; then
     cache_dir="${cache_root}/${cache_path}"
