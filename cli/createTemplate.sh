@@ -134,46 +134,66 @@ function options() {
   # Input control for composite/CMDB input
   if [[ "${GENERATION_INPUT_SOURCE}" == "composite" || "${GENERATION_INPUT_SOURCE}" == "whatif" ]]; then
 
+    # Ensure we have something to work with
+    [[ -z "${GENERATION_DATA_DIR}" ]] && { fatal "Can't locate the root of the directory tree."; exit 1; }
+
     # Set up the context
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-    case "${DEPLOYMENT_GROUP}" in
-      account)
-        [[ -z "${ACCOUNT_DIR}" ]] &&
-          fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
-        ;;
+    if [[ "${GENERATION_USE_CMDB_PLUGIN}" == "true" ]]; then
 
-      *)
-        [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
-          fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
-        ;;
-    esac
+      debug "Using CMDB plugin"
+      # Load the cmdb provider if not already requested
+      if ! inArray GENERATION_PROVIDERS_ARRAY "cmdb"; then
+        GENERATION_PROVIDERS_ARRAY+=("cmdb")
+        GENERATION_PROVIDERS="$(listFromArray "GENERATION_PROVIDERS_ARRAY" ",")"
+      fi
 
-    # Assemble settings
-    export COMPOSITE_SETTINGS="${CACHE_DIR}/composite_settings.json"
-    if [[ (("${GENERATION_USE_CACHE}" != "true") &&
-            ("${GENERATION_USE_SETTINGS_CACHE}" != "true")) ||
-        (! -f "${COMPOSITE_SETTINGS}") ]]; then
-        debug "Generating composite settings ..."
-        assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}" || return $?
+      # Remove any composites
+      for composite in "blueprint.json" "settings.json" "definitions.json" "stack_outputs.json" "fragment.ftl"; do
+          rm -rf "${CACHE_DIR}/composite_${composite}"
+      done
+
+    else
+      debug "Using CMDB composites"
+
+      case "${DEPLOYMENT_GROUP}" in
+        account)
+          [[ -z "${ACCOUNT_DIR}" ]] &&
+            fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
+          ;;
+
+        *)
+          [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
+            fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
+          ;;
+      esac
+
+      # Assemble settings
+      export COMPOSITE_SETTINGS="${CACHE_DIR}/composite_settings.json"
+      if [[ (("${GENERATION_USE_CACHE}" != "true") &&
+              ("${GENERATION_USE_SETTINGS_CACHE}" != "true")) ||
+          (! -f "${COMPOSITE_SETTINGS}") ]]; then
+          debug "Generating composite settings ..."
+          assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}" || return $?
+      fi
+
+      # Create the composite definitions
+      export COMPOSITE_DEFINITIONS="${CACHE_DIR}/composite_definitions.json"
+      if [[ (("${GENERATION_USE_CACHE}" != "true") &&
+              ("${GENERATION_USE_DEFINITIONS_CACHE}" != "true")) ||
+          (! -f "${COMPOSITE_DEFINITIONS}") ]]; then
+          assemble_composite_definitions || return $?
+      fi
+
+      # Create the composite stack outputs
+      export COMPOSITE_STACK_OUTPUTS="${CACHE_DIR}/composite_stack_outputs.json"
+      if [[ (("${GENERATION_USE_CACHE}" != "true") &&
+              ("${GENERATION_USE_STACK_OUTPUTS_CACHE}" != "true")) ||
+          (! -f "${COMPOSITE_STACK_OUTPUTS}") ]]; then
+          assemble_composite_stack_outputs || return $?
+      fi
     fi
-
-    # Create the composite definitions
-    export COMPOSITE_DEFINITIONS="${CACHE_DIR}/composite_definitions.json"
-    if [[ (("${GENERATION_USE_CACHE}" != "true") &&
-            ("${GENERATION_USE_DEFINITIONS_CACHE}" != "true")) ||
-        (! -f "${COMPOSITE_DEFINITIONS}") ]]; then
-        assemble_composite_definitions || return $?
-    fi
-
-    # Create the composite stack outputs
-    export COMPOSITE_STACK_OUTPUTS="${CACHE_DIR}/composite_stack_outputs.json"
-    if [[ (("${GENERATION_USE_CACHE}" != "true") &&
-            ("${GENERATION_USE_STACK_OUTPUTS_CACHE}" != "true")) ||
-        (! -f "${COMPOSITE_STACK_OUTPUTS}") ]]; then
-        assemble_composite_stack_outputs || return $?
-    fi
-
   fi
 
   # Specific input control for mock input
@@ -183,7 +203,6 @@ function options() {
       fatalMandatory
       return 1
     fi
-    CACHE_DIR="$( getCacheDir "${GENERATION_CACHE_DIR}" )"
   fi
 
   # Add default composite fragments including end fragment
@@ -191,7 +210,11 @@ function options() {
       ("${GENERATION_USE_FRAGMENTS_CACHE}" != "true")) ||
       (! -f "${CACHE_DIR}/composite_account.ftl") ]]; then
 
-      TEMPLATE_COMPOSITES=("account" "fragment")
+      TEMPLATE_COMPOSITES=("account")
+      if [[ "${GENERATION_USE_CMDB_PLUGIN}" != "true" ]]; then
+        TEMPLATE_COMPOSITES+=("fragment")
+      fi
+
       for composite in "${TEMPLATE_COMPOSITES[@]}"; do
 
         # define the array holding the list of composite fragment filenames
@@ -243,6 +266,16 @@ function options() {
       for composite in "segment" "solution" "application" "id" "name" "policy" "resource"; do
           rm -rf "${CACHE_DIR}/composite_${composite}.ftl"
       done
+  fi
+
+  # Context that will be used
+  if willLog "debug"; then
+    debug "TENANT=${TENANT}"
+    debug "ACCOUNT=${ACCOUNT}"
+    debug "REGION=${REGION}"
+    debug "PRODUCT=${PRODUCT}"
+    debug "ENVIRONMENT=${ENVIRONMENT}"
+    debug "SEGMENT=${SEGMENT}"
   fi
 
   return 0
@@ -377,18 +410,18 @@ function process_template_pass() {
   for composite in "${template_composites[@]}"; do
     composite_var="${CACHE_DIR}/composite_${composite,,}.ftl"
     # TODO(mfl) Remove the -r variant once changes to engine in place to support -v
-    args+=("-r" "${composite,,}List=${composite_var#/?/}")
-    args+=("-v" "${composite,,}Template=${composite_var}")
+    [[ -f "${composite_var}" ]] && args+=("-r" "${composite,,}List=${composite_var#/?/}")
+    [[ -f "${composite_var}" ]] && args+=("-v" "${composite,,}Template=${composite_var}")
   done
 
-  args+=( "-g" "${GENERATION_DATA_DIR:-$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")}" )
+  args+=( "-g" "${GENERATION_DATA_DIR}" )
 
   # Composites
   args+=("-v" "pluginState=${PLUGIN_STATE}")
-  args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
-  args+=("-v" "settings=${COMPOSITE_SETTINGS}")
-  args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
-  args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
+  [[ -f "${COMPOSITE_BLUEPRINT}" ]] && args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
+  [[ -f "${COMPOSITE_SETTINGS}" ]] && args+=("-v" "settings=${COMPOSITE_SETTINGS}")
+  [[ -f "${COMPOSITE_DEFINITIONS}" ]] && args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
+  [[ -f "${COMPOSITE_STACK_OUTPUTS}" ]] && args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
 
   # Run time references
   args+=("-r" "requestReference=${request_reference}")
