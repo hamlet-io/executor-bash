@@ -113,6 +113,11 @@ popd >/dev/null
 # default for the CF_DIR
 findGen3Dirs "${GENERATION_DATA_DIR}" || exit
 
+if [[ "${GENERATION_USE_CMDB_PLUGIN}" == "true" ]]; then
+    debug "--- finished setContext.sh ---\n"
+    return 0
+fi
+
 # Build the composite solution ( aka blueprint)
 # TODO(mfl)  Remove this once the engine is completely controlling where outputs are put
 # Currently a few of the variables like REGION are used in file naming
