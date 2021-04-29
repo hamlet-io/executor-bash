@@ -336,19 +336,12 @@ function get_openapi_definition_file() {
   return 0
 }
 
-
 function process_template_pass() {
   local entrance="${1,,}"; shift
   local flows="${1,,}"; shift
   local providers="${1,,}"; shift
   local deployment_framework="${1,,}"; shift
-  local output_type="${1,,}"; shift
-  local output_format="${1,,}"; shift
-  local pass="${1,,}"; shift
-  local pass_alternative="${1,,}"; shift
-  local output_filename="${1,,}"; shift
   local deployment_unit="${1,,}"; shift
-  local deployment_unit_subset="${1,,}"; shift
   local deployment_group="${1,,}"; shift
   local account="$1"; shift
   local account_region="${1,,}"; shift
@@ -360,6 +353,8 @@ function process_template_pass() {
   local run_id="${1,,}"; shift
   local deployment_unit_state_subdirectories="${1,,}"; shift
   local entrance_parameters="${1}"; shift
+  local generation_contract_stage="${1}"; shift
+  local output_filename="${1}"; shift
 
   # Filename parts
   local entrance_prefix="${entrance:+${entrance}-}"
@@ -388,14 +383,9 @@ function process_template_pass() {
   local args=()
   [[ -n "${entrance}" ]]                  && args+=("-r" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-r" "flows=${flows}")
-  [[ -n "${pass}" ]]                      && args+=("-r" "pass=${pass}")
-  [[ -n "${pass_alternative}" ]]          && args+=("-r" "passAlternative=${pass_alternative}")
   [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
   [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
-  [[ -n "${output_type}" ]]               && args+=("-r" "outputType=${output_type}")
-  [[ -n "${output_format}" ]]             && args+=("-r" "outputFormat=${output_format}")
   [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
-  [[ -n "${deployment_unit_subset}" ]]    && args+=("-r" "deploymentUnitSubset=${deployment_unit_subset}")
   [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
   [[ -n "${output_filename}" ]]           && args+=("-r" "outputFileName=${output_filename}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-r" "inputSource=${GENERATION_INPUT_SOURCE}")
@@ -403,6 +393,8 @@ function process_template_pass() {
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-r" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_FORMAT}" ]]     && args+=("-r" "logFormat=${GENERATION_LOG_FORMAT}")
+
+  [[ -n "${generation_contract_stage}" ]] && args+=("-v" "generationContractStage=${generation_contract_stage}")
 
   # Include the template composites
   # Removal of drive letter (/?/) is specifically for MINGW
@@ -456,11 +448,14 @@ function process_template_pass() {
   local results_dir="${tmp_dir}/results"
 
   # No differences seen so far
-  local differences_detected="false"
+  local differences_detected=()
 
-  local file_description="${pass}"
-  if [[ -n "${pass_alternative}" ]]; then
-    file_description="${file_description} - ${pass_alternative}"
+  if [[ -f "${generation_contract_stage}" ]]; then
+    local output_filename="$( jq -r '.Id' < "${generation_contract_stage}")"
+    arrayFromList pass_result_files "$( jq -r '[ .Steps[] | select( .Type == "process_template_pass" ) | .Parameters.outputFileName ] | join(",")' < "${generation_contract_stage}" )"
+
+  else
+    arrayFromList pass_result_files "${output_filename}"
   fi
 
   # Make the temp directory a cmdb so that we can write into it
@@ -473,11 +468,6 @@ function process_template_pass() {
   local generation_log_file="${tmp_dir}/${generation_log_file_name}"
   args+=("-r" "logFileName=${generation_log_file_name}")
   args+=("-r" "logDir=${tmp_dir}")
-
-  # Set the result file
-  local template_result_file="${tmp_dir}/${output_filename}"
-  local result_file="${results_dir}/${output_filename}"
-  local output_file="${cf_dir}/${output_filename}"
 
   # The debug file is the default output and should only be used for serious debugging
   local debug_file="${tmp_dir}/${output_filename}.debug"
@@ -541,123 +531,119 @@ function process_template_pass() {
   fi
 
   # Now a few tests on the result file
+  for pass_result_file in "${pass_result_files[@]}"; do
 
-  # Ignore whitespace only files
-  if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
-    info " ~ ignoring empty ${file_description}"
+    # Set the result file
+    local template_result_file="${tmp_dir}/${pass_result_file}"
+    local result_file="${results_dir}/${pass_result_file}"
+    local output_file="${cf_dir}/${pass_result_file}"
 
-    # Remove any previous version
-    # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
-    # cleanup is done once all passes have been processed in this case
-    if [[ (-f "${output_file}") && ("${deployment_unit_state_subdirectories}" == "false") ]]; then
-      info " ~ removing existing ${file_description} file ${output_file}"
-      rm "${output_file}"
+    # Ignore whitespace only files
+    if [[ $(tr -d " \t\n\r\f" < "${template_result_file}" | wc -m) -eq 0 ]]; then
+      info " ~ ignoring empty ${pass_result_file}"
+
+      # Remove any previous version
+      # TODO(mfl): remove this check once all customers on cmdb >=2.0.1, as
+      # cleanup is done once all passes have been processed in this case
+      if [[ (-f "${output_file}") && ("${deployment_unit_state_subdirectories}" == "false") ]]; then
+        info " ~ removing existing ${pass_result_file} file ${output_file}"
+        rm "${output_file}"
+      fi
+
+      # Indicate template should be ignored
+      rm "${template_result_file}"
+      continue
     fi
 
-    # Indicate template should be ignored
-    return 254
-  fi
+    # Clean up the output file and check for change
+    case "$(fileExtension "${template_result_file}")" in
+      sh)
 
-  # Clean up the output file and check for change
-  case "$(fileExtension "${template_result_file}")" in
-    sh)
+        # Capture the result
+        cat "${template_result_file}" | sed "-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d' > "${result_file}"
 
-      # Capture the result
-      cat "${template_result_file}" | sed "-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d' > "${result_file}"
-      results_list+=("${output_filename}")
+        # Determine if output has changed
+        if [[ ! -f "${output_file}" ]]; then
+          # First generation
+          differences_detected+=("true")
+        else
 
-      # Determine if output has changed
-      if [[ ! -f "${output_file}" ]]; then
-        # First generation
-        differences_detected="true"
-      else
+          # Ignore if only the metadata/timestamps have changed
+          sed_patterns=("-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d')
+          sed_patterns+=("-e" "s/${request_reference}//g")
+          sed_patterns+=("-e" "s/${configuration_reference}//g")
 
-        # Ignore if only the metadata/timestamps have changed
-        sed_patterns=("-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d')
-        sed_patterns+=("-e" "s/${request_reference}//g")
-        sed_patterns+=("-e" "s/${configuration_reference}//g")
+          existing_request_reference="$( grep "#--COT-RequestReference=" "${output_file}" )"
+          [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--COT-RequestReference="}//g")
+          existing_request_reference="$( grep "#--Hamlet-RequestReference=" "${output_file}" )"
+          [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--Hamlet-RequestReference="}//g")
 
-        existing_request_reference="$( grep "#--COT-RequestReference=" "${output_file}" )"
-        [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--COT-RequestReference="}//g")
-        existing_request_reference="$( grep "#--Hamlet-RequestReference=" "${output_file}" )"
-        [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference#"#--Hamlet-RequestReference="}//g")
+          existing_configuration_reference="$( grep "#--COT-ConfigurationReference=" "${output_file}" )"
+          [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--COT-ConfigurationReference="}//g")
+          existing_configuration_reference="$( grep "#--Hamlet-ConfigurationReference=" "${output_file}" )"
+          [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--Hamlet-ConfigurationReference="}//g")
 
-        existing_configuration_reference="$( grep "#--COT-ConfigurationReference=" "${output_file}" )"
-        [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--COT-ConfigurationReference="}//g")
-        existing_configuration_reference="$( grep "#--Hamlet-ConfigurationReference=" "${output_file}" )"
-        [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference#"#--Hamlet-ConfigurationReference="}//g")
+          if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
+            sed_patterns+=("-e" "s/${run_id}//g")
+            existing_run_id="$( grep "#--COT-RunId=" "${output_file}" )"
+            [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--COT-RunId="}//g")
+            existing_run_id="$( grep "#--Hamlet-RunId=" "${output_file}" )"
+            [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--Hamlet-RunId="}//g")
+          fi
 
-        if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
-          sed_patterns+=("-e" "s/${run_id}//g")
-          existing_run_id="$( grep "#--COT-RunId=" "${output_file}" )"
-          [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--COT-RunId="}//g")
-          existing_run_id="$( grep "#--Hamlet-RunId=" "${output_file}" )"
-          [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id#"#--Hamlet-RunId="}//g")
+          cat "${template_result_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
+          cat "${output_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
+
+          diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
+            info " ~ no change in ${pass_result_file} detected" ||
+            differences_detected+=("true")
+
         fi
+        ;;
 
-        cat "${template_result_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
-        cat "${output_file}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
+      json)
+        # Capture the result
+        jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
 
-        diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-          info " ~ no change in ${file_description} detected" ||
-          differences_detected="true"
+        if [[ ! -f "${output_file}" ]]; then
+          # First generation
+          differences_detected+=("true")
+        else
 
-      fi
+          # Ignore if only the metadata/timestamps have changed
+          jq_pattern="del(.Metadata)"
+          sed_patterns=("-e" "s/${request_reference}//g")
+          sed_patterns+=("-e" "s/${configuration_reference}//g")
+          sed_patterns+=("-e" "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}Z//g")
 
-      if [[ "${pass}" == "pregeneration" ]]; then
-        info " ~ processing pregeneration script"
+          existing_request_reference="$( jq -r ".Metadata.RequestReference | select(.!=null)" < "${output_file}" )"
+          [[ -z "${existing_request_reference}" ]] && existing_request_reference="$( jq -r ".REQUEST_REFERENCE | select(.!=null)" < "${output_file}" )"
+          [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference}//g")
 
-        . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+          existing_configuration_reference="$( jq -r ".Metadata.ConfigurationReference | select(.!=null)" < "${output_file}" )"
+          [[ -z "${existing_configuration_reference}" ]] && existing_configuration_reference="$( jq -r ".CONFIGURATION_REFERENCE | select(.!=null)" < "${output_file}" )"
+          [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference}//g")
 
-        [[ "${differences_detected}" == "true" ]] &&
-          . "${result_file}" ||
-          . "${output_file}"
-      fi
-      ;;
+          if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
+            sed_patterns+=("-e" "s/${run_id}//g")
+            existing_run_id="$( jq -r ".Metadata.RunId | select(.!=null)" < "${output_file}" )"
+            [[ -z "${existing_run_id}" ]] && existing_run_id="$( jq -r ".RUN_ID | select(.!=null)" < "${output_file}" )"
+            [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id}//g")
+          fi
 
-    json)
-      # Capture the result
-      jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
-      results_list+=("${output_filename}")
+          cat "${template_result_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
+          cat "${output_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
 
-      if [[ ! -f "${output_file}" ]]; then
-        # First generation
-        differences_detected="true"
-      else
-
-        # Ignore if only the metadata/timestamps have changed
-        jq_pattern="del(.Metadata)"
-        sed_patterns=("-e" "s/${request_reference}//g")
-        sed_patterns+=("-e" "s/${configuration_reference}//g")
-        sed_patterns+=("-e" "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}Z//g")
-
-        existing_request_reference="$( jq -r ".Metadata.RequestReference | select(.!=null)" < "${output_file}" )"
-        [[ -z "${existing_request_reference}" ]] && existing_request_reference="$( jq -r ".REQUEST_REFERENCE | select(.!=null)" < "${output_file}" )"
-        [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference}//g")
-
-        existing_configuration_reference="$( jq -r ".Metadata.ConfigurationReference | select(.!=null)" < "${output_file}" )"
-        [[ -z "${existing_configuration_reference}" ]] && existing_configuration_reference="$( jq -r ".CONFIGURATION_REFERENCE | select(.!=null)" < "${output_file}" )"
-        [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference}//g")
-
-        if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
-          sed_patterns+=("-e" "s/${run_id}//g")
-          existing_run_id="$( jq -r ".Metadata.RunId | select(.!=null)" < "${output_file}" )"
-          [[ -z "${existing_run_id}" ]] && existing_run_id="$( jq -r ".RUN_ID | select(.!=null)" < "${output_file}" )"
-          [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id}//g")
+          diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
+            info " ~ no change in ${pass_result_file} detected" ||
+            differences_detected+=("true")
         fi
-
-        cat "${template_result_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
-        cat "${output_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
-
-        diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-          info " ~ no change in ${file_description} detected" ||
-          differences_detected="true"
-      fi
-      ;;
-  esac
+        ;;
+    esac
+  done
 
   # Indicate something changed
-  if [[ "${differences_detected}" == "true" ]]; then
+  if inArray "differences_detected" "true"; then
     return 0
   fi
 
@@ -775,7 +761,7 @@ function process_template() {
   # As any file could change, we need to gather them all
   # and copy as a set at the end of processing if a change
   # is detected
-  local differences_detected="false"
+  local differences_detected=()
   local results_list=()
   local results_dir="${tmp_dir}/results"
   mkdir -p "${results_dir}"
@@ -790,13 +776,7 @@ function process_template() {
       "${flows}" \
       "${GENERATION_PROVIDERS}" \
       "${GENERATION_FRAMEWORK}" \
-      "contract" \
-      "" \
-      "generationcontract" \
-      "" \
-      "${generation_contract_filename}" \
       "${deployment_unit}" \
-      "generationcontract" \
       "${deployment_group}" \
       "${account}" \
       "${account_region}" \
@@ -807,14 +787,11 @@ function process_template() {
       "${cf_dir}" \
       "${run_id}" \
       "${deployment_unit_state_subdirectories}" \
-      "${entranceParameters}"
-  local result=$?
+      "${entranceParameters}" \
+      "" \
+      "${generation_contract_filename}"
 
-  # Include contract in difference checking
-  if [[ ${result} == 0 ]]; then
-      # At least one difference seen
-      differences_detected="true"
-  fi
+  local result=$?
 
   case ${result} in
     254)
@@ -830,42 +807,6 @@ function process_template() {
       local generation_contract="${results_dir}/${generation_contract_filename}"
       debug "Generating documents from generation contract ${generation_contract}"
       willLog "debug" && cat ${generation_contract}
-
-      # This sets the order of the parameters provided to process_template_pass
-      # The contract outputs a hash so we need to make sure the bash parameters are passed in specific order
-      contract_pass_template_args=(
-        "entrance"
-        "flows"
-        "providers"
-        "deploymentFramework"
-        "outputType"
-        "outputFormat"
-        "pass"
-        "passAlternative"
-        "outputFileName"
-        "deploymentUnit"
-        "deploymentUnitSubset"
-        "deploymentGroup"
-        "account"
-        "accountRegion"
-        "region"
-        "requestReference"
-        "configurationReference"
-        "deploymentMode"
-      )
-
-      local process_template_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-      getTasksFromContract "${generation_contract}" "${process_template_tasks_file}" ";" "process_template_pass" "$( listFromArray "contract_pass_template_args" "," )"
-      readarray -t process_template_tasks_list < "${process_template_tasks_file}"
-
-      contract_rename_file_args=(
-        "currentFileName"
-        "newFileName"
-      )
-
-      local rename_file_tasks_file="$( getTempFile "XXXXXX" "${tmp_dir}" )"
-      getTasksFromContract "${generation_contract}" "${rename_file_tasks_file}" ";" "rename_file" "$( listFromArray "contract_rename_file_args" "," )"
-      readarray -t rename_file_tasks_list < "${rename_file_tasks_file}"
       ;;
 
     *)
@@ -873,58 +814,117 @@ function process_template() {
       return ${result}
   esac
 
-  # Perform each pass/alternative combination
-  for step in "${process_template_tasks_list[@]}"; do
+  arrayFromList stage_list "$( jq -r '.Stages[].Id' < "${generation_contract}" || return $?)"
 
-    task_parameter_string="${step#"process_template_pass "}"
-    arrayFromList task_parameters "${task_parameter_string}" ";"
+  for stageIndex in "${!stage_list[@]}"; do
 
-    process_template_pass \
-      "${task_parameters[@]}" \
-      "${cf_dir}" \
-      "${run_id}" \
-      "${deployment_unit_state_subdirectories}" \
-      "${entranceParameters}"
+      stage_content="$( jq -c --arg stageIndex "${stageIndex}" '.Stages[$stageIndex | tonumber]' < "${generation_contract}" || return $? )"
 
-    local result=$?
-    case ${result} in
-      254)
-        # Nothing generated
-        ;;
-      255)
-        # No difference
-        ;;
-      0)
-        # At least one difference seen
-        differences_detected="true"
-        ;;
-      *)
-        # Fatal error of some description
-        return ${result}
-    esac
+      stage_content_file="${tmp_dir}/generation_contract_stage_${stageIndex}.json"
+      echo "${stage_content}" > "${stage_content_file}"
+
+      arrayFromList stage_step_types "$( getStepTypesFromContractStage "${stage_content}" "," )"
+
+      if inArray "stage_step_types" "process_template_pass"; then
+
+        process_template_pass \
+          "${entrance}" \
+          "${flows}" \
+          "${GENERATION_PROVIDERS}" \
+          "${GENERATION_FRAMEWORK}" \
+          "${deployment_unit}" \
+          "${deployment_group}" \
+          "${account}" \
+          "${account_region}" \
+          "${region}" \
+          "${request_reference}" \
+          "${configuration_reference}" \
+          "${deployment_mode}" \
+          "${cf_dir}" \
+          "${run_id}" \
+          "${deployment_unit_state_subdirectories}" \
+          "${entranceParameters}" \
+          "${stage_content_file}" \
+          ""
+
+        local result=$?
+
+        arrayFromList process_template_files "$( echo "${stage_content}" | jq -r '[ .Steps[] | select( .Type == "process_template_pass" ) | .Parameters.outputFileName ] | join(",")' )"
+        for file in "${process_template_files[@]}"; do
+          results_list+=("${file}")
+        done
+
+        case ${result} in
+          254)
+            # Nothing generated
+            ;;
+          255)
+            # No difference
+            ;;
+          0)
+            # At least one difference seen
+            differences_detected+=("true")
+            ;;
+          *)
+            # Fatal error of some description
+            return ${result}
+        esac
+      fi
+
+      if inArray "stage_step_types" "run_bash_script"; then
+
+          contract_run_bash_script_args=(
+            "scriptFileName"
+          )
+
+          bash_script_stage_steps="$( echo "${stage_content}" | jq -rc '.Steps[] | select( .Type == "run_bash_script" )' )"
+
+          for step in "${bash_script_stage_steps[@]}"; do
+
+            task="$(getTaskFromContractStep "${step}" ";" "$( listFromArray "contract_run_bash_script_args" "," )")"
+            task_parameter_string="${task#"run_bash_script "}"
+            arrayFromList task_parameters "${task_parameter_string}" ";"
+
+            bash_script_file="${results_dir}/${task_parameters[0]}"
+
+            info " ~ running generation script"
+
+            . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+            . "${bash_script_file}"
+
+          done
+      fi
+
+      if inArray "stage_step_types" "rename_file"; then
+
+        contract_rename_file_args=(
+          "currentFileName"
+          "newFileName"
+        )
+
+        rename_stage_steps="$( echo "${stage_content}" | jq -rc '.Steps[] | select( .Type == "rename_file" )')"
+
+        for step in "${rename_stage_steps[@]}"; do
+            task="$(getTaskFromContractStep "${step}" ";" "$( listFromArray "contract_rename_file_args" "," )")"
+            task_parameter_string="${task#"rename_file "}"
+            arrayFromList task_parameters "${task_parameter_string}" ";"
+
+            if [[ "${task_parameters[0]}" != "${task_parameters[1]}" ]]; then
+              cp "${results_dir}/${task_parameters[0]}" "${results_dir}/${task_parameters[1]}"
+            fi
+            results_list+=("${task_parameters[1]}")
+
+        done
+      fi
   done
 
   # Copy the set of result file if necessary
-  if [[ "${differences_detected}" == "true" ]]; then
-
-    info "Differences detected:"
-
+  if inArray "differences_detected" "true"; then
     for f in "${results_list[@]}"; do
-      # We don't know what the expectant file name is until we have the generation contract
-      # For the generation contract this can't be found
-      # So we include the rename of the contract in the contract itself to handle this
-      dest_file="${f}"
-      for step in "${rename_file_tasks_list}"; do
-        rename_parameter_string="${step#"rename_file "}"
-        arrayFromList task_parameters "${rename_parameter_string}" ";"
-        if [[ "${f}" == "${task_parameters[0]}" ]]; then
-          dest_file="${task_parameters[1]}"
-          results_list+=("${task_parameters[1]}")
-        fi
-      done
-
-      info " - updating ${dest_file}"
-      cp "${results_dir}/${f}" "${cf_dir}/${dest_file}"
+      if [[ -f "${results_dir}/${f}" ]]; then
+        info " - updating ${f}"
+        cp "${results_dir}/${f}" "${cf_dir}/${f}"
+      fi
     done
 
     # Cleanup output directory

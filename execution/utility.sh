@@ -790,30 +790,7 @@ function getTasksFromContract() {
     for stageIndex in "${!stage_list[@]}"; do
         arrayFromList stage_steps_list "$( jq -r --arg stageIndex "${stageIndex}" '.Stages[$stageIndex | tonumber].Steps[].Id' < "${contractFile}" || return $? )"
         for stepIndex in "${!stage_steps_list[@]}"; do
-
-            parameter_set="$( jq -r --arg stageIndex "${stageIndex}" --arg stepIndex "${stepIndex}" \
-                              '.Stages[$stageIndex | tonumber ].Steps[$stepIndex | tonumber].Parameters' < "${contractFile}" || return $?)"
-
-            if [[ -n "${paramsList}" ]]; then
-              arrayFromList params_list "${paramsList}"
-              parameters_ordered=()
-
-              for param in "${params_list[@]}"; do
-                parameters_ordered+=( "$( echo "${parameter_set}" | jq -r --arg parameter "${param}" '"\(.[$parameter] | select (.!=null))"' || return $? )" )
-              done
-
-              parameters="$(listFromArray "parameters_ordered" "${paramSeperator}" )"
-
-            else
-              parameters="$( echo "${parameter_set}" | jq -r --arg seperator "${paramSeperator}" \
-                              '[ . | to_entries[] | "\(.value)" ] | join($seperator )' || return $?)"
-            fi
-            taskType="$( jq -r --arg stageIndex "${stageIndex}" --arg stepIndex "${stepIndex}" \
-                            '.Stages[$stageIndex | tonumber ].Steps[$stepIndex | tonumber].Type' < "${contractFile}" || return $?)"
-
-            if [[ -z "${taskType}" || "${taskType}" == "${requiredTaskType}" ]]; then
-              echo -e "${taskType} ${parameters}" >> "${tmp_file}"
-            fi
+            getTaskFromContractStep >> "${tmp_file}"
         done
     done
 
@@ -826,6 +803,46 @@ function getTasksFromContract() {
 
     popTempDir
     return
+}
+
+
+function getTaskFromContractStep() {
+  local contractStep="$1"; shift
+  local paramSeperator="$1"; shift
+  local paramsList="$1"; shift
+  local requiredTaskType="$1"; shift
+
+  parameter_set="$( echo "${contractStep}" | jq -c '.Parameters' || return $? )"
+
+  if [[ -n "${paramsList}" ]]; then
+    arrayFromList params_list "${paramsList}"
+    parameters_ordered=()
+
+    for param in "${params_list[@]}"; do
+      parameters_ordered+=( "$( echo "${parameter_set}" | jq -r --arg parameter "${param}" '"\(.[$parameter] | select (.!=null))"' || return $? )" )
+    done
+
+    parameters="$(listFromArray "parameters_ordered" "${paramSeperator}" )"
+
+  else
+    parameters="$( echo "${parameter_set}" | jq -r --arg seperator "${paramSeperator}" \
+                    '[ . | to_entries[] | "\(.value)" ] | join($seperator )' || return $?)"
+  fi
+
+  taskType="$( echo "${contractStep}" | jq -r '.Type' || return $?)"
+
+  if [[ -z "${requiredTaskType}" || "${taskType}" == "${requiredTaskType}" ]]; then
+    echo "${taskType} ${parameters}"
+  else
+    echo ""
+  fi
+}
+
+function getStepTypesFromContractStage() {
+  local contractStage="$1"; shift
+  local seperator="$1"; shift
+
+  echo "$( echo "${contractStage}" | jq -r --arg seperator "${seperator}" '[ .Steps[].Type ] | join($seperator)' || return $?)"
 }
 
 # -- KMS --
