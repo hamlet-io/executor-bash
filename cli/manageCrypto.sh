@@ -41,7 +41,7 @@ where
 (o) -p JSON_PATH    is the path to the attribute within CRYPTO_FILE to be processed
 (o) -q              don't display result (quiet)
 (o) -r              re-encrypt operation
-(o) -s KEY_SCOPE    the sope of the key to use ( segment or account ) - current location wins over default
+(o) -s KEY_SCOPE    the scope of the key to use ( segment or account ) - current location wins over default
 (o) -t CRYPTO_TEXT  is the plaintext or ciphertext to be processed
     -u              update the attribute at JSON_PATH (if provided), or replace CRYPTO_FILE with operation result
     -v              result is base64 decoded (visible)
