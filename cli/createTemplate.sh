@@ -794,14 +794,6 @@ function process_template() {
   local result=$?
 
   case ${result} in
-    254)
-      # Nothing generated
-      # Need contract to define generation processing required
-      # Treat as complete
-      warn "No generation contract generated - treating as successful"
-      return 0
-      ;;
-
     0 | 255)
       # Use the contract to control further processing
       local generation_contract="${results_dir}/${generation_contract_filename}"
@@ -813,6 +805,12 @@ function process_template() {
       # Fatal error of some description
       return ${result}
   esac
+
+
+  if [[ ! -f "${generation_contract}" ]]; then
+    warn "No generation contract generated - treating as successful"
+    return 0
+  fi
 
   arrayFromList stage_list "$( jq -r '.Stages[].Id' < "${generation_contract}" || return $?)"
 
