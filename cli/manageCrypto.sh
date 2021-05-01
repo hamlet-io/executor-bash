@@ -10,6 +10,7 @@ BASE64_REGEX="^[A-Za-z0-9+/=\n]\+$"
 CRYPTO_OPERATION_DEFAULT="decrypt"
 CRYPTO_FILENAME_DEFAULT="credentials.json"
 PREFIX_DEFAULT="base64"
+KEY_SCOPE_DEFAULT="segment"
 
 tmp_dir="$(getTempDir "cote_crypto_XXX")"
 
@@ -40,6 +41,7 @@ where
 (o) -p JSON_PATH    is the path to the attribute within CRYPTO_FILE to be processed
 (o) -q              don't display result (quiet)
 (o) -r              re-encrypt operation
+(o) -s KEY_SCOPE    the sope of the key to use ( segment or account ) - current location wins over default
 (o) -t CRYPTO_TEXT  is the plaintext or ciphertext to be processed
     -u              update the attribute at JSON_PATH (if provided), or replace CRYPTO_FILE with operation result
     -v              result is base64 decoded (visible)
@@ -52,6 +54,7 @@ DEFAULTS:
 OPERATION = ${CRYPTO_OPERATION_DEFAULT}
 FILENAME = ${CRYPTO_FILENAME_DEFAULT}
 PREFIX = ${PREFIX_DEFAULT}
+SCOPE = ${KEY_SCOPE_DEFAULT}
 
 NOTES:
 
@@ -86,7 +89,7 @@ EOF
 
 function options() {
     # Parse options
-    while getopts ":a:bdef:hk:lnp:qrt:uvx:" opt; do
+    while getopts ":a:bdef:hk:lnp:qrs:t:uvx:" opt; do
         case $opt in
             a)
                 ALIAS="${OPTARG}"
@@ -124,6 +127,9 @@ function options() {
             r)
                 CRYPTO_OPERATION="reencrypt"
                 ;;
+            s)
+                KEY_SCOPE="${OPTARG}"
+                ;;
             t)
                 CRYPTO_TEXT="${OPTARG}"
                 ;;
@@ -146,6 +152,7 @@ function options() {
     done
 
     CRYPTO_OPERATION="${CRYPTO_OPERATION:-$CRYPTO_OPERATION_DEFAULT}"
+    KEY_SCOPE="${KEY_SCOPE:-$KEY_SCOPE_DEFAULT}"
 
     return 0
 }
@@ -157,6 +164,8 @@ function main() {
     # Set up the context - LOCATION will tell us where we are
     . "${GENERATION_BASE_DIR}/execution/setContext.sh"
     . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+
+    KEY_SCOPE="${LOCATION:-"${KEY_SCOPE}"}"
 
     # Set up the list of files to check
     FILES=()
@@ -188,7 +197,7 @@ function main() {
                     return 255
                 fi
 
-                case "${LOCATION}" in
+                case "${KEY_SCOPE}" in
                     "segment")
 
                         arrayFromList "KEY_IDS" "$(jq -r '.Occurrence.Occurrences[] | select( .Core.Type == "baselinekey" and .Configuration.Solution.Engine == "cmk" ) | .State.Attributes.ARN' < ${BUILD_BLUEPRINT})"
@@ -220,8 +229,7 @@ function main() {
     fi
 
     # Location base file search
-    case "${LOCATION}" in
-
+    case "${KEY_SCOPE}" in
         "segment")
             if [[ -n "${CRYPTO_FILE}" ]]; then
                 FILES+=("${SEGMENT_OPERATIONS_DIR}/${CRYPTO_FILE}")
