@@ -788,7 +788,7 @@ function getTasksFromContract() {
 
     arrayFromList stage_list "$( jq -r '.Stages[].Id' < "${contractFile}" || return $?)"
     for stageIndex in "${!stage_list[@]}"; do
-        arrayFromList stage_steps_list "$( jq -r --arg stageIndex "${stageIndex}" '.Stages[$stageIndex | tonumber].Steps[].Id' < "${contractFile}" || return $? )"
+        arrayFromList stage_steps_list "$( jq -r --arg stageIndex "${stageIndex}" '.Stages[$stageIndex | tonumber].Steps[] | select(.Status == "available" ) | .Id' < "${contractFile}" || return $? )"
         for stepIndex in "${!stage_steps_list[@]}"; do
             getTaskFromContractStep >> "${tmp_file}"
         done
