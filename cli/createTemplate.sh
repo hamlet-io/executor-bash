@@ -557,10 +557,49 @@ function process_template_pass() {
 
     # Clean up the output file and check for change
     case "$(fileExtension "${template_result_file}")" in
-      sh)
+      json)
+        # Capture the result
+        jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
+
+        if [[ ! -f "${output_file}" ]]; then
+          # First generation
+          differences_detected+=("true")
+        else
+
+          # Ignore if only the metadata/timestamps have changed
+          jq_pattern="del(.Metadata)"
+          sed_patterns=("-e" "s/${request_reference}//g")
+          sed_patterns+=("-e" "s/${configuration_reference}//g")
+          sed_patterns+=("-e" "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}Z//g")
+
+          existing_request_reference="$( jq -r ".Metadata.RequestReference | select(.!=null)" < "${output_file}" )"
+          [[ -z "${existing_request_reference}" ]] && existing_request_reference="$( jq -r ".REQUEST_REFERENCE | select(.!=null)" < "${output_file}" )"
+          [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference}//g")
+
+          existing_configuration_reference="$( jq -r ".Metadata.ConfigurationReference | select(.!=null)" < "${output_file}" )"
+          [[ -z "${existing_configuration_reference}" ]] && existing_configuration_reference="$( jq -r ".CONFIGURATION_REFERENCE | select(.!=null)" < "${output_file}" )"
+          [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference}//g")
+
+          if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
+            sed_patterns+=("-e" "s/${run_id}//g")
+            existing_run_id="$( jq -r ".Metadata.RunId | select(.!=null)" < "${output_file}" )"
+            [[ -z "${existing_run_id}" ]] && existing_run_id="$( jq -r ".RUN_ID | select(.!=null)" < "${output_file}" )"
+            [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id}//g")
+          fi
+
+          cat "${template_result_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
+          cat "${output_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
+
+          diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
+            info " ~ no change in ${pass_result_file} detected" ||
+            differences_detected+=("true")
+        fi
+        ;;
+
+      *)
 
         # Capture the result
-        cat "${template_result_file}" | sed "-e" 's/^ *//; s/ *$//; /^$/d; /^\s*$/d' > "${result_file}"
+        cat "${template_result_file}" > "${result_file}"
 
         # Determine if output has changed
         if [[ ! -f "${output_file}" ]]; then
@@ -598,45 +637,6 @@ function process_template_pass() {
             info " ~ no change in ${pass_result_file} detected" ||
             differences_detected+=("true")
 
-        fi
-        ;;
-
-      json)
-        # Capture the result
-        jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
-
-        if [[ ! -f "${output_file}" ]]; then
-          # First generation
-          differences_detected+=("true")
-        else
-
-          # Ignore if only the metadata/timestamps have changed
-          jq_pattern="del(.Metadata)"
-          sed_patterns=("-e" "s/${request_reference}//g")
-          sed_patterns+=("-e" "s/${configuration_reference}//g")
-          sed_patterns+=("-e" "s/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}Z//g")
-
-          existing_request_reference="$( jq -r ".Metadata.RequestReference | select(.!=null)" < "${output_file}" )"
-          [[ -z "${existing_request_reference}" ]] && existing_request_reference="$( jq -r ".REQUEST_REFERENCE | select(.!=null)" < "${output_file}" )"
-          [[ -n "${existing_request_reference}" ]] && sed_patterns+=("-e" "s/${existing_request_reference}//g")
-
-          existing_configuration_reference="$( jq -r ".Metadata.ConfigurationReference | select(.!=null)" < "${output_file}" )"
-          [[ -z "${existing_configuration_reference}" ]] && existing_configuration_reference="$( jq -r ".CONFIGURATION_REFERENCE | select(.!=null)" < "${output_file}" )"
-          [[ -n "${existing_configuration_reference}" ]] && sed_patterns+=("-e" "s/${existing_configuration_reference}//g")
-
-          if [[ "${TREAT_RUN_ID_DIFFERENCES_AS_SIGNIFICANT}" != "true" ]]; then
-            sed_patterns+=("-e" "s/${run_id}//g")
-            existing_run_id="$( jq -r ".Metadata.RunId | select(.!=null)" < "${output_file}" )"
-            [[ -z "${existing_run_id}" ]] && existing_run_id="$( jq -r ".RUN_ID | select(.!=null)" < "${output_file}" )"
-            [[ -n "${existing_run_id}" ]] && sed_patterns+=("-e" "s/${existing_run_id}//g")
-          fi
-
-          cat "${template_result_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-new"
-          cat "${output_file}" | jq --sort-keys --indent 1 "${jq_pattern}" | sed "${sed_patterns[@]}" > "${template_result_file}-existing"
-
-          diff "${template_result_file}-existing" "${template_result_file}-new" > "${template_result_file}-difference" &&
-            info " ~ no change in ${pass_result_file} detected" ||
-            differences_detected+=("true")
         fi
         ;;
     esac
@@ -885,10 +885,12 @@ function process_template() {
 
             bash_script_file="${results_dir}/${task_parameters[0]}"
 
-            info " ~ running generation script"
+            if [[ -f "${bash_script_file}" ]]; then
+              info " ~ running generation script"
 
-            . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
-            . "${bash_script_file}"
+              . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+              . "${bash_script_file}"
+            fi
 
           done
       fi
