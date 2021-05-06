@@ -720,7 +720,8 @@ function main() {
 
                     # Bundle Overrides
                     export ANDROID_DIST_BUNDLE_ID="${ANDROID_DIST_BUNDLE_ID}"
-                    export ANDROID_VERSION_CODE="$( echo "${BUILD_NUMBER//".1"}" | cut -c 3- | rev | cut -c 3- | rev )"
+                    # Handle Google Id formatting rules ( https://developer.android.com/studio/publish/versioning.html )
+                    export ANDROID_VERSION_CODE="$( echo "${BUILD_NUMBER//".1"}" | cut -c 3- | rev | cut -c 3- | rev | cut -c -9)"
                     export ANDROID_VERSION_NAME="${EXPO_APP_VERSION}"
 
                     if [[ -e "${SRC_PATH}/android/app/src/main/AndroidManifest.xml" ]]; then
