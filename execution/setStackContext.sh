@@ -217,7 +217,6 @@ if [[ ! -f "${CF_DIR}/${CONFIG}" ]]; then
     if [[ -f "${CF_DIR}/${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}config.json" ]]; then
 
         CONFIG="${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${DEPLOYMENT_UNIT_SUBSET_PREFIX}${ACCOUNT_PREFIX}${REGION_PREFIX}config.json"
-        echo "Setting Config to ${CONFIG}"
     fi
 fi
 
