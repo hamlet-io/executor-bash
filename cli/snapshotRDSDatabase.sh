@@ -5,7 +5,6 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' E
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 # Defaults
-DELAY_DEFAULT=30
 TIER_DEFAULT="database"
 
 function usage() {
@@ -13,13 +12,12 @@ function usage() {
 
 Snapshot an RDS Database
 
-Usage: $(basename $0) -t TIER -i COMPONENT -s SUFFIX -c -m -d DELAY -r RETAIN -a AGE
+Usage: $(basename $0) -t TIER -i COMPONENT -s SUFFIX -c -m  -r RETAIN -a AGE
 
 where
 
 (o) -a AGE              is the maximum age in days of snapshots to retain
 (o) -c (CREATE ONLY)    initiates but does not monitor the snapshot creation process
-(o) -d DELAY            is the interval between checking the progress of snapshot creation
     -h                  shows this text
 (m) -i COMPONENT        is the name of the database component in the solution
 (o) -m (MONITOR ONLY)   monitors but does not initiate the snapshot creation process
@@ -31,7 +29,6 @@ where
 
 DEFAULTS:
 
-DELAY     = ${DELAY_DEFAULT} seconds
 TIER      = ${TIER_DEFAULT}
 
 NOTES:
@@ -43,7 +40,6 @@ EOF
     exit
 }
 
-DELAY=${DELAY_DEFAULT}
 TIER=${TIER_DEFAULT}
 CREATE=true
 WAIT=true
@@ -55,9 +51,6 @@ while getopts ":a:cd:hi:mr:s:t:" opt; do
             ;;
         c)
             WAIT=false
-            ;;
-        d)
-            DELAY="${OPTARG}"
             ;;
         h)
             usage
@@ -93,8 +86,6 @@ done
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
-status_file="$(getTopTempDir)/snapshot_rds_status.txt"
-
 # Ensure we are in the right place
 checkInSegmentDirectory
 
@@ -114,7 +105,8 @@ if [[ "${SUFFIX}" != "" ]]; then
 fi
 
 if [[ "${CREATE}" == "true" ]]; then
-    aws --region ${REGION} rds create-db-snapshot --db-snapshot-identifier ${DB_SNAPSHOT_IDENTIFIER} --db-instance-identifier ${DB_INSTANCE_IDENTIFIER}
+    info "Creating snapshot ${DB_SNAPSHOT_IDENTIFIER}"
+    aws --region "${REGION}" rds create-db-snapshot --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --db-instance-identifier "${DB_INSTANCE_IDENTIFIER}"
     RESULT=$?
     if [ "$RESULT" -ne 0 ]; then exit; fi
 fi
@@ -140,22 +132,23 @@ if [[ ("${RETAIN}" != "") || ("${AGE}" != "") ]]; then
     fi
     if [[ "${LIST}" != "" ]]; then
         for SNAPSHOT in $(echo $LIST); do
-            aws --region ${REGION} rds delete-db-snapshot --db-snapshot-identifier $SNAPSHOT
+            info "Removing old snapshot - ${SNAPSHOT}"
+            aws --region "${REGION}" rds delete-db-snapshot --db-snapshot-identifier "${SNAPSHOT}"
         done
     fi
 fi
 
-RESULT=1
 if [[ "${WAIT}" == "true" ]]; then
-    while true; do
-        aws --region ${REGION} rds describe-db-snapshots --db-snapshot-identifier ${DB_SNAPSHOT_IDENTIFIER} 2>/dev/null | grep "Status" > "${status_file}"
-        cat "${status_file}"
-        grep "available" "${status_file}" >/dev/null 2>&1
-        RESULT=$?
-        if [ "$RESULT" -eq 0 ]; then break; fi
-        grep "creating" "${status_file}"  >/dev/null 2>&1
-        RESULT=$?
-        if [ "$RESULT" -ne 0 ]; then break; fi
-        sleep $DELAY
+    sleep 5s
+    while [ "${exit_status}" != "0" ]; do
+        SNAPSHOT_STATE="$(aws --region "${REGION}" rds describe-db-snapshots --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --query 'DBSnapshots[0].Status' || return $? )"
+        SNAPSHOT_PROGRESS="$(aws --region "${REGION}" rds describe-db-snapshots --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --query 'DBSnapshots[0].PercentProgress' || return $? )"
+        info "Snapshot id ${DB_SNAPSHOT_IDENTIFIER} creation: state is ${SNAPSHOT_STATE}, ${SNAPSHOT_PROGRESS}%..."
+
+        aws --region "${REGION}" rds wait db-snapshot-available --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}"
+        exit_status="$?"
     done
+
+    info "Snapshot Created - ${DB_SNAPSHOT_IDENTIFIER} - $(aws --region "${REGION}" rds describe-db-snapshots --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --query 'DBSnapshots[].SnapshotCreateTime' --output text || return $?)"
+
 fi
