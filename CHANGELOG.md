@@ -1,16 +1,38 @@
-# [0.0.0](https://github.com/hamlet-io/executor-bash/compare/v8.0.1...v0.0.0) (2021-04-02)
+# [0.0.0](https://github.com/hamlet-io/executor-bash/compare/8.1.2...0.0.0) (2021-05-13)
+
+
+
+## [8.1.2](https://github.com/hamlet-io/executor-bash/compare/v8.0.1...8.1.2) (2021-05-12)
 
 
 ### Bug Fixes
 
+* command line options of pass alternative ([6a486b1](https://github.com/hamlet-io/executor-bash/commit/6a486b1a5b2c6f29c5417c65f3d49eb1dcbdb6be))
+* config file location in context ([896bda0](https://github.com/hamlet-io/executor-bash/commit/896bda0e89c1c008119ab7e062e5a0f5a77b835a))
+* file condition for config ([4726c0c](https://github.com/hamlet-io/executor-bash/commit/4726c0c1a5ad9e5228e27ab04a4480e76aedea9b))
+* freemarker output redirection ([#197](https://github.com/hamlet-io/executor-bash/issues/197)) ([e990a64](https://github.com/hamlet-io/executor-bash/commit/e990a64b2592d2af1b65dc66ba041f15d1e797bd))
+* freemarker status code analysis ([#198](https://github.com/hamlet-io/executor-bash/issues/198)) ([b1673b6](https://github.com/hamlet-io/executor-bash/commit/b1673b67bebf1c06612efa1d44fd7122d7088c9f))
+* handling for missing generation contract ([6ac7ceb](https://github.com/hamlet-io/executor-bash/commit/6ac7cebc0cc7a6650597ad70b8c579d7913e1780))
 * handling of wrapper arguments ([7670bfd](https://github.com/hamlet-io/executor-bash/commit/7670bfd1a3e6049762318d6e54344c0404cf06cc))
+* rds snapshot wait process ([fcae4f9](https://github.com/hamlet-io/executor-bash/commit/fcae4f98d7e1ed14c0185b913a408c4cfa074e8a))
+* remove debug ([e446436](https://github.com/hamlet-io/executor-bash/commit/e4464369b965b8c84f5144f1be6099b67796c7ec))
+* **expo:** reduce version code for android ([3ffe488](https://github.com/hamlet-io/executor-bash/commit/3ffe48845ef7b1fec8f1758876079afa24da1494))
+* plugin refresh should ignore modules ([#190](https://github.com/hamlet-io/executor-bash/issues/190)) ([aa80528](https://github.com/hamlet-io/executor-bash/commit/aa8052894a24615041cc2cd6bcf74c1b3b904f21))
+* region in filenames ([#203](https://github.com/hamlet-io/executor-bash/issues/203)) ([bc21f66](https://github.com/hamlet-io/executor-bash/commit/bc21f6650aaa121f17576bd27ffd1fa6a0b95098))
+* reorder template error checks ([#195](https://github.com/hamlet-io/executor-bash/issues/195)) ([4345a6e](https://github.com/hamlet-io/executor-bash/commit/4345a6eba8a446b605cf27a7365ee6cf635b0b01))
+* repo url in changelog ([3062101](https://github.com/hamlet-io/executor-bash/commit/3062101867432e5c8bfa7926e1cf9f520a782ac2))
 * setup entrance parameters ([f3535ce](https://github.com/hamlet-io/executor-bash/commit/f3535ce74d25fb12b24ff599b29b23058b6cf2f1))
 * use raw params for entrances ([28efcba](https://github.com/hamlet-io/executor-bash/commit/28efcba5df6278c38a2e3050f922d08c2f93a09c))
 
 
 ### Features
 
+* engine log formatting support ([e305fae](https://github.com/hamlet-io/executor-bash/commit/e305fae9f9d2c6d0ccf40f2023e0666940b2dee6))
+* filter contract steps based on status ([625429c](https://github.com/hamlet-io/executor-bash/commit/625429c5a83692929f8ed0f151302fd673ba7181))
+* move to using the latest freemarker wrapper ([a56e629](https://github.com/hamlet-io/executor-bash/commit/a56e62921f3f5903a6e8486e2675d75aa59d68a9))
 * pass outputfilename from gen contract ([#177](https://github.com/hamlet-io/executor-bash/issues/177)) ([06e3d1d](https://github.com/hamlet-io/executor-bash/commit/06e3d1d209e477e2af6202d9b2dd98e7025f51c3))
+* set key scope for out of repo crypto ([102cd97](https://github.com/hamlet-io/executor-bash/commit/102cd978aef0202e8d0cc7c3937b6a326b10860a))
+* yaml config output support ([cc97eaa](https://github.com/hamlet-io/executor-bash/commit/cc97eaae0f6ecf101c6fb419c0b5cef35804ceb7))
 
 
 
