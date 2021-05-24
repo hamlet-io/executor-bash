@@ -36,7 +36,7 @@ export GENERATION_LOG_FORMAT="${GENERATION_LOG_FORMAT:-${LOG_FORMAT_COMPACT}}"
 # Determine if using the cmdb plugin
 # Provide an explicit override as well
 # TODO(mfl) remove once migration to the cmdb plugin is complete and proven
-if contains "${GENERATION_PLUGIN_DIRS}" "(engine-plugin-cmdb|cmdb;)"; then
+if contains "${GENERATION_PLUGIN_DIRS};" "(engine-plugin-cmdb|cmdb;)"; then
   export GENERATION_USE_CMDB_PLUGIN="${GENERATION_USE_CMDB_PLUGIN:-true}"
 fi
 
