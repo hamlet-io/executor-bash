@@ -3015,3 +3015,11 @@ function get_image_from_container_registry() {
   fi
 
 }
+
+# SES Rule Set Activation
+function setActiveSESRuleSet {
+  local region="$1"; shift
+  local ruleset_name="$1"; shift
+
+  aws --region "${region}"  set-active-receipt-rule-set --rule-set-name "{ruleset_name}"
+}
