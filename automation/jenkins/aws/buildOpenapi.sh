@@ -149,33 +149,28 @@ for VALIDATOR in "${VALIDATORS[@]}"; do
       { exit_status=$?; fatal "OpenAPI file is not valid"; exit ${exit_status}; }
 done
 
-# Remove definitions in swagger file not supported by AWS
-OPENAPI_EXTENDED_BASE_FILE="${tmpdir}/${REGISTRY_TYPE}-extended-base.json"
-
-runJQ -f "${AUTOMATION_DIR}/cleanUpOpenapi.jq" < "${TEMP_OPENAPI_SPEC_FILE}" > "${OPENAPI_EXTENDED_BASE_FILE}"
-
-# Augment the swagger file if required
+# Check for any legacy api extensions
 APIGW_CONFIG=$(findFile \
                 "${AUTOMATION_BUILD_DIR}/apigw.json" \
                 "${AUTOMATION_BUILD_DEVOPS_DIR}/apigw.json" \
                 "${AUTOMATION_BUILD_DEVOPS_DIR}/codeontap/apigw.json")
 
-# Define the desired result file
-DIST_DIR="${AUTOMATION_BUILD_DIR}/dist"
-mkdir -p ${DIST_DIR}
-OPENAPI_RESULT_FILE="${DIST_DIR}/${REGISTRY_TYPE}.zip"
-
 if [[ -f "${APIGW_CONFIG}" ]]; then
-    # Generate the swagger file
-    ${GENERATION_DIR}/createExtendedSwaggerSpecification.sh \
-        -s "${OPENAPI_EXTENDED_BASE_FILE}" \
-        -o "${OPENAPI_RESULT_FILE}" \
-        -i "${APIGW_CONFIG}"
-
-    # Check generation was successful
-    [[ ! -f "${OPENAPI_RESULT_FILE}" ]] &&
-        fatal "Can't find generated openAPI files. Were they generated successfully?" && exit 1
+    # Build time openapi extensions are no longer supported
+    # They should be implemented as config provided during
+    # the generation of templates for the deployment process.
+    fatal "Openapi extension at build time is no longer supported. Please convert to deployment based extensions."
+    exit 1
 else
+    # Rename result to that expected by deployment extension process
+    OPENAPI_EXTENDED_BASE_FILE="${tmpdir}/${REGISTRY_TYPE}-extended-base.json"
+    cp "${TEMP_OPENAPI_SPEC_FILE}" "${OPENAPI_EXTENDED_BASE_FILE}"
+
+    # Define the desired result location
+    DIST_DIR="${AUTOMATION_BUILD_DIR}/dist"
+    mkdir -p ${DIST_DIR}
+    OPENAPI_RESULT_FILE="${DIST_DIR}/${REGISTRY_TYPE}.zip"
+
     zip -j "${OPENAPI_RESULT_FILE}" "${OPENAPI_EXTENDED_BASE_FILE}"
 fi
 
