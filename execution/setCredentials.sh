@@ -39,8 +39,9 @@ if [[ "${ACCOUNT_PROVIDER}" == 'aws' ]]; then
         fi
     fi
 
+    profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
+
     if [[ -n "${PROVIDERID}" ]]; then
-        profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
         if [[ "${profile_account}" != "${PROVIDERID:-$AID}" ]]; then
             if [[ -n "${AWS_DEFAULT_PROFILE}" ]]; then
                 fatal "The aws config profile ${AWS_DEFAULT_PROFILE} doesn't provide access to the account requested - ${ACCOUNT} ${PROVIDERID}"
