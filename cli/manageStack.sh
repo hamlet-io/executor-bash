@@ -271,7 +271,7 @@ function process_stack() {
         fi
 
         # Check if stack needs to be created
-        # List state returns stacks that have been deleted as well as those created as  part of the change set
+        # List state returns stacks that have been deleted as well
         if [[ -z "${existing_stack_status}"
               || "${existing_stack_status}" == "REVIEW_IN_PROGRESS"
               || "${existing_stack_status}" == "DELETE_COMPLETE" ]]; then
@@ -310,10 +310,10 @@ function process_stack() {
 
           else
 
-            replacement=$( echo "${change_set_state}" | jq '[.Changes[].ResourceChange.Replacement] | contains(["True"])' )
-            REPLACE_TEMPLATE=$( for i in ${ALTERNATIVE_TEMPLATES} ; do echo $i | awk '/-replace-template\.json$/' ; done  | sort  )
+            replacement="$( echo "${change_set_state}" | jq -r '[.Changes[].ResourceChange.Replacement] | contains(["True"])' )"
+            REPLACE_TEMPLATES=$( for i in ${ALTERNATIVE_TEMPLATES} ; do echo $i | awk '/-replace[0-9]-template\.json$/'; done  | sort  )
 
-            if [[ "${replacement}" == "true" && -n "${REPLACE_TEMPLATE}" ]]; then
+            if [[ "${replacement}" == "true" && -n "${REPLACE_TEMPLATES}" ]]; then
 
                 info "Replacement operation required"
 
@@ -328,7 +328,7 @@ function process_stack() {
 
                   # Check ChangeSet for results
                   change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
-                      --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" || return $?)"
+                      --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" || exit_status=$?)"
 
                   if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
 
@@ -352,7 +352,7 @@ function process_stack() {
                 done
 
                 # catch loop failures
-                [[ "${exit_status}" != "0" ]] && return "${exit_status}"
+                [[ "${exit_status}" -ne 0 ]] && { fatal "An issue occurred during replace template processing"; return "${exit_status}"; }
 
             else
               # Execute the primary template change
@@ -360,7 +360,7 @@ function process_stack() {
                     --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" \
                     --client-request-token "${PRIMARY_CHANGE_SET}" > /dev/null || return $?
 
-              wait_for_stack_execution "${PRIMARY_CHANGE_SET}" "${change_set_state}" || exit_status=$?
+              wait_for_stack_execution "${PRIMARY_CHANGE_SET}" "${change_set_state}" || return $?
 
             fi
           fi
@@ -368,19 +368,19 @@ function process_stack() {
         ;;
 
       *)
-        fatal "\"${STACK_OPERATION}\" is not one of the known stack operations."; return 1
+        fatal "\"${STACK_OPERATION}\" is not one of the known stack operations"
+        return 1
         ;;
     esac
   fi
 
-
   # Clean up the stack if required
-  if [[ "${STACK_OPERATION}" == "delete" ]]; then
-    if [[ ("${exit_status}" -eq 0) || !( -s "${STACK}" ) ]]; then
-      rm -f "${STACK}"
+  if [[ "${STACK_OPERATION}" == "delete" && "${exit_stats}" -eq 0 ]]; then
+    if [[ -f "${STACK}" ]]; then
+      rm "${STACK}"
     fi
-    if [[ ("${exit_status}" -eq 0) || !( -s "${CHANGE}" ) ]]; then
-      rm -f "${CHANGE}"
+    if [[ -f "${CHANGE}" ]]; then
+      rm "${CHANGE}"
     fi
   fi
 
@@ -409,17 +409,8 @@ function main() {
   process_stack_status=0
   # Process the stack
   if [[ -f "${TEMPLATE}" ]]; then
-     process_stack || process_stack_status=$?
+     process_stack || return $?
   fi
-
-  # Check to see if the work has already been completed
-  case ${process_stack_status} in
-    0);;
-    *)
-      fatal "Operation for ${STACK_NAME} did not complete"
-      return ${process_stack_status}
-    ;;
-  esac
 
   # Run the epilogue script if present
   # by the epilogue script
