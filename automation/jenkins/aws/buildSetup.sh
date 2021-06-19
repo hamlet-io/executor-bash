@@ -114,40 +114,10 @@ for IMAGE_FORMAT in "${IMAGE_FORMATS_ARRAY[@]}"; do
             [[ "${RESULT}" -eq 0 ]] && PRESENT=1
             ;;
 
-        lambda)
-            ${AUTOMATION_DIR}/manageLambda.sh -v -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}"
-            RESULT=$?
-            [[ "${RESULT}" -eq 0 ]] && PRESENT=1
-            ;;
-
-        pipeline)
-            ${AUTOMATION_DIR}/managePipeline.sh -v -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}"
-            RESULT=$?
-            [[ "${RESULT}" -eq 0 ]] && PRESENT=1
-            ;;
-
-        scripts)
-            ${AUTOMATION_DIR}/manageScripts.sh -v -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}"
-            RESULT=$?
-            [[ "${RESULT}" -eq 0 ]] && PRESENT=1
-            ;;
-
-        openapi|swagger)
-            ${AUTOMATION_DIR}/manageOpenapi.sh -v \
-                -y "${IMAGE_FORMAT,,}"  -c "${REGISTRY_SCOPE}" -f "${IMAGE_FORMAT,,}.zip" \
-                -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}"
-            RESULT=$?
-            [[ "${RESULT}" -eq 0 ]] && PRESENT=1
-            ;;
-
-        spa)
-            ${AUTOMATION_DIR}/manageSpa.sh -v -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}"
-            RESULT=$?
-            [[ "${RESULT}" -eq 0 ]] && PRESENT=1
-            ;;
-
-        contentnode)
-            ${AUTOMATION_DIR}/manageContentNode.sh -v -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}"
+        lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+            ${AUTOMATION_DIR}/manageS3Registry.sh -v \
+                -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}" \
+                -y "${IMAGE_FORMAT,,}" -f "${IMAGE_FORMAT,,}.zip"
             RESULT=$?
             [[ "${RESULT}" -eq 0 ]] && PRESENT=1
             ;;
