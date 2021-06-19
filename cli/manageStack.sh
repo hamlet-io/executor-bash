@@ -148,6 +148,7 @@ function wait_for_stack_execution() {
     exit_status=$?
 
     if [[ ("${STACK_OPERATION}" == "delete") && ("${exit_status}" -eq 255) ]]; then
+      echo ""
       info "Delete completed for ${STACK_NAME}"
       exit_status=0
       break
@@ -156,8 +157,7 @@ function wait_for_stack_execution() {
     if [[ "${STACK_MONITOR}" = "true" ]]; then
 
       if [[ "${monitor_header}" == "0" ]]; then
-        info "Watching stack execution"
-        echo -n " state: "
+        echo -n " Status: "
         monitor_header="1"
       fi
 
@@ -300,6 +300,12 @@ function process_stack() {
           if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
             if [[ "$( echo "${change_set_state}" | jq -r '.StatusReason')" == \
                   "The submitted information didn't contain changes. Submit different information to create a change set." ]]; then
+
+              # Refresh the state if we can't find it
+              if [[ ! -f "${STACK}" ]]; then
+                wait_for_stack_execution > /dev/null
+              fi
+
               info "No updates needed for existing stack ${STACK_NAME}"
               return 0
             else
