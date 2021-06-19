@@ -50,6 +50,9 @@ where
 (o) -t DOCKER_TAG               is the local tag
 (o) -u DOCKER_IMAGE_SOURCE      is the registry to pull from
 (o) -v                          verify image is present in local registry
+(o) -w DOCKER_LOCAL_REPO        local image that will be copied based on registry naming
+(o) -x DOCKER_CONTEXT_DIR       set the local context dir during builds
+(o) -y DOCKERFILE               set the dockerfile to use during builds
 (o) -z REMOTE_DOCKER_PROVIDER   is the docker provider to pull from
 
 (m) mandatory, (o) optional, (d) deprecated
@@ -77,7 +80,7 @@ EOF
 }
 
 # Parse options
-while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vz:" opt; do
+while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vw:x:y:z:" opt; do
     case $opt in
         a)
             DOCKER_PROVIDER="${OPTARG}"
@@ -123,6 +126,15 @@ while getopts ":a:bc:d:g:hki:l:pr:s:t:u:vz:" opt; do
             ;;
         v)
             DOCKER_OPERATION="${DOCKER_OPERATION_VERIFY}"
+            ;;
+        w)
+            DOCKER_LOCAL_REPO="${OPTARG}"
+            ;;
+        x)
+            DOCKER_CONTEXT_DIR="${OPTARG}"
+            ;;
+        y)
+            DOCKERFILE="${OPTARG}"
             ;;
         z)
             REMOTE_DOCKER_PROVIDER="${OPTARG}"
@@ -248,6 +260,7 @@ DOCKER_TAG="${DOCKER_TAG:-${DOCKER_TAG_DEFAULT}}"
 DOCKER_IMAGE_SOURCE="${DOCKER_IMAGE_SOURCE:-${DOCKER_IMAGE_SOURCE_DEFAULT}}"
 DOCKER_OPERATION="${DOCKER_OPERATION:-${DOCKER_OPERATION_DEFAULT}}"
 DOCKER_PRODUCT="${DOCKER_PRODUCT:-${PRODUCT}}"
+DOCKER_CONTEXT_DIR="${DOCKER_CONTEXT_DIR:-${DOCKER_CONTEXT_DIR_DEFAULT}}"
 
 # Handle registry scope values
 REGISTRY_SUBTYPE=""
@@ -268,14 +281,6 @@ case "${REGISTRY_SCOPE}" in
         [[ "${REGISTRY_SCOPE:-unset}" != "unset" && "${REGISTRY_SCOPE}" != "?" ]] && REGISTRY_SUBTYPE="-${REGISTRY_SCOPE}"
         ;;
 esac
-
-
-# Allow for the docker context to be overriden for shared dependencies
-if [[ -n "${DOCKER_CONTEXT_DIR}" ]]; then
-    DOCKER_CONTEXT_DIR="${AUTOMATION_DATA_DIR}/${DOCKER_CONTEXT_DIR}"
-else
-    DOCKER_CONTEXT_DIR="${DOCKER_CONTEXT_DIR_DEFAULT}"
-fi
 
 # Default local repository is based on standard image naming conventions
 if [[ (-n "${DOCKER_PRODUCT}") &&
@@ -314,6 +319,7 @@ DOCKER_IMAGE="${DOCKER_REPO}:${DOCKER_TAG}"
 FULL_DOCKER_IMAGE="${DOCKER_PROVIDER_DNS}/${DOCKER_IMAGE}"
 
 # Confirm access to the local registry
+echo "DOCKER REG: ${DOCKER_PROVIDER_DNS} - ${DOCKER_PROVIDER}"
 dockerLogin ${DOCKER_PROVIDER_DNS} ${DOCKER_PROVIDER} ${!DOCKER_PROVIDER_USER_VAR} ${!DOCKER_PROVIDER_PASSWORD_VAR}
 RESULT=$?
 [[ "$RESULT" -ne 0 ]] && fatal "Can't log in to ${DOCKER_PROVIDER_DNS}" && RESULT=1 && exit
@@ -321,33 +327,38 @@ RESULT=$?
 # Perform the required action
 case ${DOCKER_OPERATION} in
     ${DOCKER_OPERATION_BUILD})
-        # Locate the Dockerfile
-        DOCKERFILE="./Dockerfile"
-        if [[ -f "${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile" ]]; then
-            DOCKERFILE="${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile"
-        fi
-
-        # Permit an explicit override relative to the AUTOMATION_BUILD_SRC_DIR
-        if [[ -n "${DOCKER_FILE}" && -f "${AUTOMATION_DATA_DIR}/${DOCKER_FILE}" ]]; then
-            DOCKERFILE="${AUTOMATION_DATA_DIR}/${DOCKER_FILE}"
-        fi
-
-        if [[ -n ${DOCKER_GITHUB_SSH_KEY_FILE} ]]; then
-            if [[ -f "${DOCKER_GITHUB_SSH_KEY_FILE}" ]]; then
-                # Perform the build
-                info "build docker image with SSH_KEY argument"
-                docker build -t "${FULL_DOCKER_IMAGE}" -f "${DOCKERFILE}" "${DOCKER_CONTEXT_DIR}" --build-arg SSH_KEY="$(cat ${DOCKER_GITHUB_SSH_KEY_FILE})"
-                RESULT=$?
-            else
-                fatal "Unable to locate github ssh key file for the docker image" && RESULT=1 && exit
+        if [[ -z "${DOCKER_LOCAL_REPO}" ]]; then
+            # Locate the Dockerfile
+            DOCKERFILE="./Dockerfile"
+            if [[ -f "${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile" ]]; then
+                DOCKERFILE="${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile"
             fi
-        else
-            # Perform the build
-            docker build -t "${FULL_DOCKER_IMAGE}" -f "${DOCKERFILE}" "${DOCKER_CONTEXT_DIR}"
-            RESULT=$?
-        fi
 
-        [[ $RESULT -ne 0 ]] && fatal "Cannot build image ${DOCKER_IMAGE}" && RESULT=1 && exit
+            # Permit an explicit override relative to the AUTOMATION_BUILD_SRC_DIR
+            if [[ -n "${DOCKER_FILE}" && -f "${AUTOMATION_DATA_DIR}/${DOCKER_FILE}" ]]; then
+                DOCKERFILE="${AUTOMATION_DATA_DIR}/${DOCKER_FILE}"
+            fi
+
+            if [[ -n ${DOCKER_GITHUB_SSH_KEY_FILE} ]]; then
+                if [[ -f "${DOCKER_GITHUB_SSH_KEY_FILE}" ]]; then
+                    # Perform the build
+                    info "build docker image with SSH_KEY argument"
+                    docker build -t "${FULL_DOCKER_IMAGE}" -f "${DOCKERFILE}" "${DOCKER_CONTEXT_DIR}" --build-arg SSH_KEY="$(cat ${DOCKER_GITHUB_SSH_KEY_FILE})"
+                    RESULT=$?
+                else
+                    fatal "Unable to locate github ssh key file for the docker image" && RESULT=1 && exit
+                fi
+            else
+                # Perform the build
+                docker build -t "${FULL_DOCKER_IMAGE}" -f "${DOCKERFILE}" "${DOCKER_CONTEXT_DIR}"
+                RESULT=$?
+            fi
+
+            [[ $RESULT -ne 0 ]] && fatal "Cannot build image ${DOCKER_IMAGE}" && RESULT=1 && exit
+        else
+            # Use a local image to create a registry docker image
+            docker tag "${DOCKER_LOCAL_REPO}" "${FULL_DOCKER_IMAGE}"
+        fi
 
         createRepository ${DOCKER_PROVIDER_DNS} ${DOCKER_REPO}
         RESULT=$?
