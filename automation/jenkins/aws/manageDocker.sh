@@ -319,7 +319,6 @@ DOCKER_IMAGE="${DOCKER_REPO}:${DOCKER_TAG}"
 FULL_DOCKER_IMAGE="${DOCKER_PROVIDER_DNS}/${DOCKER_IMAGE}"
 
 # Confirm access to the local registry
-echo "DOCKER REG: ${DOCKER_PROVIDER_DNS} - ${DOCKER_PROVIDER}"
 dockerLogin ${DOCKER_PROVIDER_DNS} ${DOCKER_PROVIDER} ${!DOCKER_PROVIDER_USER_VAR} ${!DOCKER_PROVIDER_PASSWORD_VAR}
 RESULT=$?
 [[ "$RESULT" -ne 0 ]] && fatal "Can't log in to ${DOCKER_PROVIDER_DNS}" && RESULT=1 && exit
@@ -329,7 +328,7 @@ case ${DOCKER_OPERATION} in
     ${DOCKER_OPERATION_BUILD})
         if [[ -z "${DOCKER_LOCAL_REPO}" ]]; then
             # Locate the Dockerfile
-            DOCKERFILE="./Dockerfile"
+            DOCKERFILE="${DOCKERFILE:-"./Dockerfile"}"
             if [[ -f "${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile" ]]; then
                 DOCKERFILE="${AUTOMATION_BUILD_DEVOPS_DIR}/docker/Dockerfile"
             fi
