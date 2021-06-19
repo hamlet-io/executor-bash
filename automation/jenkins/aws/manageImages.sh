@@ -198,124 +198,21 @@ function main() {
                 fi
                 ;;
 
-            lambda)
-                IMAGE_FILENAME="lambda.zip"
-                if [[ -n "${FILES[index]}" ]]; then
-                    pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
-                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
-                    if [[ -f "${USER_IMAGE}" ]]; then
-                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
-                    fi
-                else
-                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
-                    IMAGE_FILE="${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}"
-                fi
-
-                if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/manageLambda.sh -s \
-                            -u "${DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -f "${IMAGE_FILE}" \
-                            -c "${REGISTRY_SCOPE}" || return $?
-                    popd > /dev/null
-                else
-                    fatal "lambda image ${USER_IMAGE:-${IMAGE_FILE}} missing"
-                    return 1
-                fi
-                ;;
-
-            pipeline)
-                IMAGE_FILENAME="pipeline.zip"
-                if [[ -n "${FILES[index]}" ]]; then
-                    pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
-                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
-                    if [[ -f "${USER_IMAGE}" ]]; then
-                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
-                    fi
-                else
-                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
-                    IMAGE_FILE="${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}"
-                fi
-
-                if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/managePipeline.sh -s \
-                            -u "${DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -f "${IMAGE_FILE}" \
-                            -c "${REGISTRY_SCOPE}" || return $?
-                    popd > /dev/null
-                else
-                    fatal "pipeline image ${USER_IMAGE:-${IMAGE_FILE}} missing"
-                    return 1
-                fi
-                ;;
-
-            scripts)
-                IMAGE_FILENAME="scripts.zip"
-                if [[ -n "${FILES[index]}" ]]; then
-                    pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
-                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
-
-                    if [[ -f "${USER_IMAGE}" ]]; then
-                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
-                    fi
-                else
-                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
-                    IMAGE_FILE="${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}"
-                fi
-
-                if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/manageScripts.sh -s \
-                            -u "${DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -f "${IMAGE_FILE}" \
-                            -c "${REGISTRY_SCOPE}" || return $?
-                    popd > /dev/null
-                else
-                    fatal "scripts image ${USER_IMAGE:-${IMAGE_FILE}} missing"
-                    return $?
-                fi
-                ;;
-
-            openapi|swagger)
+            lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
                 IMAGE_FILENAME="${FORMAT,,}.zip"
                 if [[ -n "${FILES[index]}" ]]; then
                     pushd "$(pwd)" > /dev/null
                     USER_IMAGE="${FILES[index]}"
                     IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
+
                     if [[ -f "${USER_IMAGE}" ]]; then
                         cp "${USER_IMAGE}" "${IMAGE_FILE}"
                     fi
-                else
-                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
-                    IMAGE_FILE="${IMAGE_FILE:-${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}}"
-                fi
 
-                if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/manageOpenapi.sh -s \
-                            -y "${FORMAT,,}" \
-                            -f "${IMAGE_FILE}" \
-                            -u "${DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}" || return $?
-                    popd > /dev/null
-                else
-                    fatal "openapi/swagger image ${USER_IMAGE:-${IMAGE_FILE}} missing"
-                    return 1
-                fi
-                ;;
-
-            spa)
-                IMAGE_FILENAME="spa.zip"
-                if [[ -n "${FILES[index]}" ]]; then
-                    pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
-                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
-                    if [[ -f "${USER_IMAGE}" ]]; then
-                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
+                    if [[ -d "${USER_IMAGE}" ]]; then
+                        pushd "${USER_IMAGE}" > /dev/null
+                        zip -r "${IMAGE_FILE}" *
+                        popd > /dev/null
                     fi
                 else
                     pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
@@ -323,41 +220,15 @@ function main() {
                 fi
 
                 if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/manageSpa.sh -s \
+                    ${AUTOMATION_DIR}/manageS3Registry.sh -s \
+                            -y "${FORMAT,,}" -f "${IMAGE_FILENAME}" \
                             -u "${DEPLOYMENT_UNIT}" \
                             -g "${CODE_COMMIT}" \
                             -f "${IMAGE_FILE}" \
                             -c "${REGISTRY_SCOPE}" || return $?
                     popd > /dev/null
                 else
-                    fatal "spa image ${USER_IMAGE:-${IMAGE_FILE}} missing"
-                    return 1
-                fi
-                ;;
-
-            contentnode)
-                IMAGE_FILENAME="contentnode.zip"
-                if [[ -n "${FILES[index]}" ]]; then
-                    pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
-                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
-                    if [[ -f "${USER_IMAGE}" ]]; then
-                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
-                    fi
-                else
-                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
-                    IMAGE_FILE="${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}"
-                fi
-
-                if [[ -f "${IMAGE_FILE}" ]]; then
-                    ${AUTOMATION_DIR}/manageContentNode.sh -s \
-                            -u "${DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -f "${IMAGE_FILE}" \
-                            -c "${REGISTRY_SCOPE}" || return $?
-                    popd > /dev/null
-                else
-                    fatal "contentnode image ${USER_IMAGE:-${IMAGE_FILE}} missing"
+                    fatal "${FORMAT,,} image ${USER_IMAGE:-${IMAGE_FILE}} missing"
                     return 1
                 fi
                 ;;

@@ -539,50 +539,10 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                             -c "${REGISTRY_SCOPE}"
                         RESULT=$?
                         ;;
-                    lambda)
-                        ${AUTOMATION_DIR}/manageLambda.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    pipeline)
-                        ${AUTOMATION_DIR}/managePipeline.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    scripts)
-                        ${AUTOMATION_DIR}/manageScripts.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    openapi|swagger)
-                        ${AUTOMATION_DIR}/manageOpenapi.sh -v \
+                    lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                        ${AUTOMATION_DIR}/manageS3Registry.sh -v \
                             -y "${IMAGE_FORMAT,,}" \
                             -f "${IMAGE_FORMAT,,}.zip" \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    spa)
-                        ${AUTOMATION_DIR}/manageSpa.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    contentnode)
-                        ${AUTOMATION_DIR}/manageContentNode.sh -v \
                             -a "${IMAGE_PROVIDER}" \
                             -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                             -g "${CODE_COMMIT}" \
@@ -628,64 +588,16 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                     -c "${REGISTRY_SCOPE}"
                                 RESULT=$?
                                 ;;
-                            lambda)
-                                ${AUTOMATION_DIR}/manageLambda.sh -p \
-                                    -a "${IMAGE_PROVIDER}" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            pipeline)
-                                ${AUTOMATION_DIR}/managePipeline.sh -p \
-                                    -a "${IMAGE_PROVIDER}" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            scripts)
-                                ${AUTOMATION_DIR}/manageScripts.sh -p \
-                                    -a "${IMAGE_PROVIDER}" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            openapi|swagger)
-                                ${AUTOMATION_DIR}/manageOpenapi.sh -x -p \
-                                    -a "${IMAGE_PROVIDER}" \
+                            lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                                ${AUTOMATION_DIR}/manageS3Registry.sh -v \
                                     -y "${IMAGE_FORMAT,,}" \
                                     -f "${IMAGE_FORMAT,,}.zip" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            spa)
-                                ${AUTOMATION_DIR}/manageSpa.sh -p \
                                     -a "${IMAGE_PROVIDER}" \
                                     -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                     -g "${CODE_COMMIT}" \
                                     -r "${VERIFICATION_TAG}" \
                                     -z "${FROM_IMAGE_PROVIDER}" \
                                     -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            contentnode)
-                                ${AUTOMATION_DIR}/manageContentNode.sh -v \
-                                -a "${IMAGE_PROVIDER}" \
-                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -g "${CODE_COMMIT}" \
-                                -c "${REGISTRY_SCOPE}"
                                 RESULT=$?
                                 ;;
                             *)
