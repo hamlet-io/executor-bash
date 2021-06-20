@@ -31,8 +31,11 @@ DEPLOYMENT_UNIT=First entry in DEPLOYMENT_UNIT_LIST
 CODE_COMMIT=First entry in CODE_COMMIT_LIST
 IMAGE_FORMATS=First entry in IMAGE_FORMAT_LIST
 REGISTRY_SCOPE=First entry in REGISTRY_SCOPE_LIST
+DOCKER_CONTEXT= current working dir
 
 NOTES:
+
+When using DOCKERFILE (-d) you must provide DOCKER_CONTEXT ( -e )
 
 IMAGE_PATHS can either be a diretory which will be zipped to create the image or the required image file
 
@@ -173,12 +176,15 @@ function main() {
                     docker_args+=("-y" "${DOCKER_FILE}")
                 else
 
+                    if [[ -z "${DOCKER_CONTEXT}" ]]; then
+                        fatal "DOCKER_CONTEXT ( -e ) must be set when providing a DOCKERFILE ( -d )"
+                        return 1
+                    fi
+
                     # Override the standard Dockerfile with your own
                     docker_args+=("-y" "${DOCKERFILE}")
+                    docker_args+=("-x" "${DOCKER_CONTEXT}")
 
-                    if [[ -n "${DOCKER_CONTEXT}" ]]; then
-                        docker_args+=("-x" "${DOCKER_CONTEXT}")
-                    fi
                     pushd "$(pwd)" > /dev/null
                 fi
 
