@@ -19,7 +19,7 @@ where
 (o) -e DOCKER_CONTEXT  is the context directory to run the docker build from
 (m) -f IMAGE_FORMATS   is the comma separated list of image formats to manage
 (m) -g CODE_COMMIT     to use when defaulting REGISTRY_REPO
-(o) -i IMAGE_FILES     is list of paths to image files you want to provide to the registry
+(o) -i IMAGE_PATHS     is list of paths to an image you want to provide to the registry
 (o) -t DOCKER_IMAGE    is a docker tag of a built image to provide to the registry instead of a dockerfile
 (m) -u DEPLOYMENT_UNIT is the deployment unit associated with the images
 
@@ -34,10 +34,12 @@ REGISTRY_SCOPE=First entry in REGISTRY_SCOPE_LIST
 
 NOTES:
 
-IMAGE_FILES is optional and instead a fixed filename is used for zip based on the format
+IMAGE_PATHS can either be a diretory which will be zipped to create the image or the required image file
+
+IMAGE_PATHS is optional and instead a fixed filename is used for zip based on the format
     ${AUTOMATION_BUILD_SRC_DIR}/dist/{image_format}.zip
 
-For multiple IMAGE_FORMATS, IMAGE_FILES must be provided in the same order as their corresponding format
+For multiple IMAGE_FORMATS, IMAGE_PATHS must be provided in the same order as their corresponding format
 
 To provide multiple images or formats use a separated list based on the separators used by IMAGE_FORMAT_SEPERATORS
     ${IMAGE_FORMAT_SEPARATORS}
@@ -69,7 +71,7 @@ function options() {
                 usage
                 ;;
             i)
-                IMAGE_FILES="${OPTARG}"
+                IMAGE_PATHS="${OPTARG}"
                 ;;
             t)
                 DOCKER_IMAGE="${OPTARG}"
@@ -101,7 +103,7 @@ function options() {
     exit_on_invalid_environment_variables "DEPLOYMENT_UNIT" "CODE_COMMIT" "IMAGE_FORMATS"
 
     IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra FORMATS <<< "${IMAGE_FORMATS}"
-    IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra FILES <<< "${IMAGE_FILES}"
+    IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra PATHS <<< "${IMAGE_PATHS}"
 }
 
 
@@ -109,10 +111,10 @@ function main() {
 
     options "$@" || return $?
 
-    # Create temp dir
-    if [[ -n "${FILES}" ]]; then
-    pushTempDir "${FUNCNAME[0]}_XXXXXX"
-    image_dir="$(getTopTempDir)"
+    # Create temp dir for user image paths
+    if [[ -n "${PATHS}" ]]; then
+        pushTempDir "${FUNCNAME[0]}_XXXXXX"
+        image_dir="$(getTopTempDir)"
     fi
 
     for index in "${!FORMATS[@]}"; do
@@ -121,9 +123,9 @@ function main() {
 
             dataset)
                 IMAGE_FILENAME="cot_data_file_manifest.json"
-                if [[ -n "${FILES[index]}" ]]; then
+                if [[ -n "${PATHS[index]}" ]]; then
                     pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
+                    USER_IMAGE="${PATHS[index]}"
                     IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
                     if [[ -f "${USER_IMAGE}" ]]; then
                         cp "${USER_IMAGE}" "${IMAGE_FILE}"
@@ -200,12 +202,16 @@ function main() {
 
             lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
                 IMAGE_FILENAME="${FORMAT,,}.zip"
-                if [[ -n "${FILES[index]}" ]]; then
+                if [[ -n "${PATHS[index]}" ]]; then
                     pushd "$(pwd)" > /dev/null
-                    USER_IMAGE="${FILES[index]}"
+                    USER_IMAGE="${PATHS[index]}"
                     IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
 
                     if [[ -f "${USER_IMAGE}" ]]; then
+                        if [[ "$(fileExtension "${USER_IMAGE}")" != "zip" ]]; then
+                            fatal "${FORMAT..} image must be a zip file or a directory - ${USER_IMAGE} does not have zip extension"
+                            return 1
+                        fi
                         cp "${USER_IMAGE}" "${IMAGE_FILE}"
                     fi
 
