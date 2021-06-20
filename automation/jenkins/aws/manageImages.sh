@@ -255,5 +255,5 @@ function main() {
     return 0
 }
 
-main "$@" || { RESULT=$?; exit $?; }
-RESULT=$?
+main "$@"; RESULT=$?
+exit $RESULT
