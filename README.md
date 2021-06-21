@@ -6,7 +6,7 @@ See https://docs.hamlet.io for more info on Hamlet Deploy
 
 ## Installation
 
-The AWS plugin is included as part of the official [hamlet base engine](https://github.com/hamlet-io/hamlet-engine-base/) so it will be included as part of your hamlet installation if you are using the [hamlet cli](https://pypi.org/project/hamlet-cli/)
+The bash executor is included as part of the official [hamlet base engine](https://github.com/hamlet-io/hamlet-engine-base/) so it will be included as part of your hamlet installation if you are using the [hamlet cli](https://pypi.org/project/hamlet-cli/)
 
 ### Alternative Method
 
@@ -19,6 +19,8 @@ git clone https://github.com/hamlet-io/executor-bash.git
 ```
 
 The following environment variables should be set to align with the location of the local clone
+
+To update the executor run a `git pull` from the directory where you have cloned the executor
 
 ##### Mandatory Variables
 
@@ -35,18 +37,9 @@ These options must be set in order for Hamlet Deploy Executor to function correc
 
 The following optional variables will further configure the Hamlet Deploy Executor.
 
-
 | Variable            | Value                                                               |
 |---------------------|---------------------------------------------------------------------|
 | AZURE_EXTENSION_DIR | A filepath to the directory containing extensions to the Azure CLI. |
-
-## Update
-
-No build process is necessary for the Executor Bash. Manual updates are performed by retrieving the latest files from source.
-
-```bash
-git pull
-```
 
 ## Usage
 
