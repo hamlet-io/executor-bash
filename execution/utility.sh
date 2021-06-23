@@ -2891,6 +2891,7 @@ function update_build_reference_from_image {
   local build_reference="$1"; shift
   local image_format="$1"; shift
   local source="$1"; shift
+  local reference_unit="$1"; shift
 
   local settings_dir="$(findGen3ProductSettingsDir "${ROOT_DIR}" "${product}" )"
   local build_dir="$(findGen3ProductBuildsDir "${ROOT_DIR}" "${product}" )"
@@ -2899,10 +2900,14 @@ function update_build_reference_from_image {
   local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
   mkdir -p "${build_unit_path}"
 
-  echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source}\", \"Formats\" : [ \"${image_format}\" ]}" | jq --indent 2 "." > "${build_unit_path}/build.json"
+  build_details="$( echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source}\", \"Formats\" : [ \"${image_format}\" ]}" | jq '.')"
 
-  # refresh settings to include new build file
-  assemble_settings "${GENERATION_DATA_DIR}" "${COMPOSITE_SETTINGS}"
+  if [[ -n "${reference_unit}" ]]; then
+    build_details="$( echo "${build_details}" | jq --arg ref "${reference_unit}" '. + { "Reference" : $ref}' )"
+  fi
+
+  echo "${build_details}" | jq --indent 2 "." > "${build_unit_path}/build.json"
+
 }
 
 function get_image_from_url() {
@@ -3013,7 +3018,6 @@ function get_image_from_container_registry() {
   if [[ -z "${image_tool}" ]]; then
     warning "No image tools available to deploy the image - skipping pull"
   fi
-
 }
 
 # SES Rule Set Activation
