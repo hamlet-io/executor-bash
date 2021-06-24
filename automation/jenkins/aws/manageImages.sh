@@ -37,7 +37,7 @@ NOTES:
 
 When using DOCKERFILE (-d) you must provide DOCKER_CONTEXT ( -e )
 
-IMAGE_PATHS can either be a diretory which will be zipped to create the image or the required image file
+IMAGE_PATHS can either be a directory which will be zipped to create the image or the required image file
 
 IMAGE_PATHS is optional and instead a fixed filename is used for zip based on the format
     ${AUTOMATION_BUILD_SRC_DIR}/dist/{image_format}.zip
