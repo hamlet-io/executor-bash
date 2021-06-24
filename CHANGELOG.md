@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased (2021-06-21)
+## Unreleased (2021-06-24)
 
 #### New Features
 
+* add docker context handling
+* user provided images
 * stack management processing
 * always check caller identity
 * add check for aws account usage
@@ -11,14 +13,22 @@
 * docker based packaging ([#217](https://github.com/hamlet-io/executor-bash/issues/217))
 #### Fixes
 
+* typo
+* exit handling
+* allow for dockerfile override
+* changelog generation
+* update wording and fix install approach
 * replace templates in manage stack
 #### Refactorings
 
+* use paths instead of files for dirs
+* consolidate s3 zip registry files
+* remove assemble settings from image pull
 * remove jenkinsfile
 * Remove build time openapi extension ([#220](https://github.com/hamlet-io/executor-bash/issues/220))
 * dynamic cmdb plugin detection ([#218](https://github.com/hamlet-io/executor-bash/issues/218))
 
-Full set of changes: [`8.1.2...8c3e4f5`](https://github.com/hamlet-io/executor-bash/compare/8.1.2...8c3e4f5)
+Full set of changes: [`8.1.2...667e168`](https://github.com/hamlet-io/executor-bash/compare/8.1.2...667e168)
 
 ## 8.1.2 (2021-05-13)
 
