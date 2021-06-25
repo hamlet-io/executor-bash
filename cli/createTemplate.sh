@@ -461,7 +461,8 @@ function process_template_pass() {
   # Make the temp directory a cmdb so that we can write into it
   args+=("-r" "outputDir=${tmp_dir}")
   args+=("-g" "${tmp_dir}")
-  echo '{}' > "${tmp_dir}/.cmdb"
+  mkdir "${tmp_dir}/.cmdb"
+  echo '{}' > "${tmp_dir}/.cmdb/config.json"
 
   # Setup log outputs
   local generation_log_file_name="${output_filename}.generation-log.json"

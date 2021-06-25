@@ -1699,7 +1699,13 @@ function process_cmdb() {
     local cmdb_repo="$(filePath "${cmdb_git_repo}")"
     debug "Checking repo ${cmdb_repo} ..."
 
+    # Support .cmdb as a directory or a file
     local cmdb_version_file="${cmdb_repo}/.cmdb"
+    if [[ ! -f "${cmdb_version_file}" ]]; then
+      local cmdb_version_file="${cmdb_repo}/.cmdb/config.json"
+      mkdir -p "${cmdb_repo}/.cmdb"
+    fi
+
     local current_version=""
     local pin_version=""
 
