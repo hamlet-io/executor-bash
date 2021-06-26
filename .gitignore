@@ -1,6 +1,4 @@
-*~
-
-.cache
-.build
-
-node_modules
+.vscode
+*testparameters.json
+**/hamlet_tests/*
+**/.hamlet
