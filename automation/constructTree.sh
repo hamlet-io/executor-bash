@@ -11,29 +11,21 @@ PRODUCT_CONFIG_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 ACCOUNT_CONFIG_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 ACCOUNT_INFRASTRUCTURE_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
-GENERATION_BIN_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
-GENERATION_PATTERNS_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
-GENERATION_STARTUP_REFERENCE_DEFAULT="${REFERENCE_MASTER}"
 
 function usage() {
     cat <<EOF
 
 Construct the account directory tree
 
-Usage: $(basename $0) -c CONFIG_REFERENCE -i INFRASTRUCTURE_REFERENCE -b GENERATION_BIN_REFERENCE -p GENERATION_PATTERNS_REFERENCE -s GENERATION_STARTUP_REFERENCE -a -r -n -f
+Usage: $(basename $0)
 
 where
 
 (o) -a                                  if the account directories should not be included
-(o) -b GENERATION_BIN_REFERENCE         is the git reference for the generation framework bin repo
 (o) -c PRODUCT_CONFIG_REFERENCE                 is the git reference for the config repo
-(o) -f                                  if patterns and startup repos required - only bin repo is included by default
     -h                                  shows this text
 (o) -i PRODUCT_INFRASTRUCTURE_REFERENCE         is the git reference for the config repo
-(o) -n                                  initialise repos if not already initialised
-(o) -p GENERATION_PATTERNS_REFERENCE    is the git reference for the generation framework patterns repo
 (o) -r                                  if the product directories should not be included
-(o) -s GENERATION_STARTUP_REFERENCE     is the git reference for the generation framework startup repo
 (o) -x ACCOUNT_CONFIG_REFERENCE         is the git ref for the acccount config repo
 (o) -y ACCOUNT_INFRASTRUCTURE_REFERENCE is the git ref for the acccount infrastructure repo
 (m) mandatory, (o) optional, (d) deprecated
@@ -42,9 +34,8 @@ DEFAULTS:
 
 PRODUCT_CONFIG_REFERENCE = ${PRODUCT_CONFIG_REFERENCE_DEFAULT}
 PRODUCT_INFRASTRUCTURE_REFERENCE = ${PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT}
-GENERATION_BIN_REFERENCE = ${GENERATION_BIN_REFERENCE_DEFAULT}
-GENERATION_PATTERNS_REFERENCE = ${GENERATION_PATTERNS_REFERENCE_DEFAULT}
-GENERATION_STARTUP_REFERENCE = ${GENERATION_STARTUP_REFERENCE_DEFAULT}
+ACCOUNT_CONFIG_REFERENCE = ${ACCOUNT_CONFIG_REFERENCE_DEFAULT}
+ACCOUNT_INFRASTRUCTURE_REFERENCE = ${ACCOUNT_INFRASTRUCTURE_REFERENCE_DEFAULT}
 
 NOTES:
 
@@ -55,19 +46,13 @@ EOF
 }
 
 # Parse options
-while getopts ":ab:c:fhi:np:rs:" opt; do
+while getopts ":ab:c:hi:np:rs:" opt; do
     case $opt in
         a)
             EXCLUDE_ACCOUNT_DIRECTORIES="true"
             ;;
-        b)
-            GENERATION_BIN_REFERENCE="${OPTARG}"
-            ;;
         c)
             PRODUCT_CONFIG_REFERENCE="${OPTARG}"
-            ;;
-        f)
-            INCLUDE_ALL_REPOS="true"
             ;;
         h)
             usage
@@ -75,17 +60,8 @@ while getopts ":ab:c:fhi:np:rs:" opt; do
         i)
             PRODUCT_INFRASTRUCTURE_REFERENCE="${OPTARG}"
             ;;
-        n)
-            INIT_REPOS="true"
-            ;;
-        p)
-            GENERATION_PATTERNS_REFERENCE="${OPTARG}"
-            ;;
         r)
             EXCLUDE_PRODUCT_DIRECTORIES="true"
-            ;;
-        s)
-            GENERATION_STARTUP_REFERENCE="${OPTARG}"
             ;;
         x)
             ACCOUNT_CONFIG_REFERENCE="${OPTARG}"
@@ -107,13 +83,8 @@ PRODUCT_CONFIG_REFERENCE="${PRODUCT_CONFIG_REFERENCE:-$PRODUCT_CONFIG_REFERENCE_
 PRODUCT_INFRASTRUCTURE_REFERENCE="${PRODUCT_INFRASTRUCTURE_REFERENCE:-$PRODUCT_INFRASTRUCTURE_REFERENCE_DEFAULT}"
 ACCOUNT_CONFIG_REFERENCE="${ACCOUNT_CONFIG_REFERENCE:-$ACCOUNT_CONFIG_REFERENCE_DEFAULT}"
 ACCOUNT_INFRASTRUCTURE_REFERENCE="${ACCOUNT_INFRASTRUCTURE_REFERENCE:-$ACCOUNT_INFRASTRUCTURE_REFERENCE_DEFAULT}"
-GENERATION_BIN_REFERENCE="${GENERATION_BIN_REFERENCE:-$GENERATION_BIN_REFERENCE_DEFAULT}"
-GENERATION_PATTERNS_REFERENCE="${GENERATION_PATTERNS_REFERENCE:-$GENERATION_PATTERNS_REFERENCE_DEFAULT}"
-GENERATION_STARTUP_REFERENCE="${GENERATION_STARTUP_REFERENCE:-$GENERATION_STARTUP_REFERENCE_DEFAULT}"
 EXCLUDE_ACCOUNT_DIRECTORIES="${EXCLUDE_ACCOUNT_DIRECTORIES:-false}"
 EXCLUDE_PRODUCT_DIRECTORIES="${EXCLUDE_PRODUCT_DIRECTORIES:-false}"
-INCLUDE_ALL_REPOS="${INCLUDE_ALL_REPOS:-false}"
-INIT_REPOS="${INIT_REPOS:-false}"
 
 # Check for required context
 [[ -z "${ACCOUNT}" ]] && fatal "ACCOUNT not defined" && exit
@@ -343,42 +314,6 @@ if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
 #        mv "${BASE_DIR_TEMP}" "${TENANT_INFRASTRUCTURE_DIR}"
 #    fi
 
-fi
-
-# Pull in the default generation repo if not overridden by product or locally installed
-if [[ -z "${GENERATION_DIR}" ]]; then
-    if [[ -z "${GENERATION_BASE_DIR}" ]]; then
-        GENERATION_BASE_DIR="${BASE_DIR}/bin"
-        PRODUCT_GENERATION_BASE_DIR="$(findDir "${BASE_DIR}" "${PRODUCT}/bin" )"
-        if [[ -n "${PRODUCT_GENERATION_BASE_DIR}" ]]; then
-            mkdir -p "${GENERATION_BASE_DIR}"
-            cp -rp "${PRODUCT_GENERATION_BASE_DIR}" "${GENERATION_BASE_DIR}"
-        else
-            ${AUTOMATION_DIR}/manageRepo.sh -c -l "generation bin" \
-                -n "${GENERATION_BIN_REPO}" -v "${GENERATION_GIT_PROVIDER}" \
-                -d "${GENERATION_BASE_DIR}" -b "${GENERATION_BIN_REFERENCE}"
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
-        fi
-    fi
-    save_context_property GENERATION_DIR "${GENERATION_BASE_DIR}/${ACCOUNT_PROVIDER}"
-fi
-
-# Pull in the patterns repo if not overridden by product or locally installed
-if [[ -z "${GENERATION_PATTERNS_DIR}" ]]; then
-    if [[ "${INCLUDE_ALL_REPOS}" == "true" ]]; then
-        GENERATION_PATTERNS_DIR="${BASE_DIR}/patterns"
-        PRODUCT_GENERATION_PATTERNS_DIR="$(findDir "${BASE_DIR}" "${PRODUCT}/patterns" )"
-        if [[ -n "${PRODUCT_GENERATION_PATTERNS_DIR}" ]]; then
-            mkdir -p "${GENERATION_PATTERNS_DIR}"
-            cp -rp "${PRODUCT_GENERATION_PATTERNS_DIR}" "${GENERATION_PATTERNS_DIR}"
-        else
-            ${AUTOMATION_DIR}/manageRepo.sh -c -l "generation patterns" \
-                -n "${GENERATION_PATTERNS_REPO}" -v "${GENERATION_GIT_PROVIDER}" \
-                -d "${GENERATION_PATTERNS_DIR}" -b "${GENERATION_PATTERNS_REFERENCE}"
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
-        fi
-        save_context_property GENERATION_PATTERNS_DIR "${GENERATION_PATTERNS_DIR}/${ACCOUNT_PROVIDER}"
-    fi
 fi
 
 # Examine the structure and define key directories

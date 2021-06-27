@@ -73,15 +73,8 @@ RESULT=$?
 
 echo "INTEGRATOR_DIR=${INTEGRATOR_DIR}" >> ${AUTOMATION_DATA_DIR}/context.properties
 
-# Pull in the default generation repo
-GENERATION_DIR="${BASE_DIR}/bin"
-git clone https://${GENERATION_GIT_DNS}/${GENERATION_GIT_ORG}/${GENERATION_BIN_REPO} -b ${GENERATION_BIN_REFERENCE} ${GENERATION_DIR}
-RESULT=$?
-[[ ${RESULT} -ne 0 ]] && fatal "Can't fetch the GENERATION repo"
-
 # echo "GENERATION_DIR=${GENERATION_DIR}/${ACCOUNT_PROVIDER}" >> ${AUTOMATION_DATA_DIR}/context.properties
 echo "GENERATION_DIR=${GENERATION_DIR}" >> ${AUTOMATION_DATA_DIR}/context.properties
 
 # All good
 RESULT=0
-
