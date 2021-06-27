@@ -33,7 +33,7 @@ jobs:
       - id: get_tag_name
         name: image tag prefix
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo ::set-output name=TAG_NAME::latest
             echo ::set-output name=PUSH_IMAGE::true
             exit 0
