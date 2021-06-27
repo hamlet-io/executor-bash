@@ -38,6 +38,6 @@ jobs:
             Updates the changelog with the latest updates
             This is raised as a draft and should be merged before before tagging a release
           labels: 'chore'
-          base: 'main'
+          base: 'master'
           branch: create-pull-request/changelog_bump
           draft: true
