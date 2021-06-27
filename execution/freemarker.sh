@@ -119,7 +119,12 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.13.0.jar" \
+ENGINE_WRAPPER_FILE="${ENGINE_WRAPPER_FILE}"
+if [[ -z "${ENGINE_WRAPPER_FILE}" && -f "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.13.0.jar" ]]; then
+    ENGINE_WRAPPER_FILE="${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.13.0.jar"
+fi
+
+java -jar "${ENGINE_WRAPPER_FILE}" \
     -i $TEMPLATE "${TEMPLATEDIRS[@]}" \
     -o $OUTPUT \
     "${VARIABLES[@]}" \
