@@ -46,7 +46,7 @@ EOF
 }
 
 # Parse options
-while getopts ":ab:c:hi:np:rs:" opt; do
+while getopts ":ac:hi:rx:" opt; do
     case $opt in
         a)
             EXCLUDE_ACCOUNT_DIRECTORIES="true"
