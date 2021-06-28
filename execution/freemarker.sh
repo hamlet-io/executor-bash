@@ -19,7 +19,7 @@ where
 (o) -c CMDB           cmdb to be included
 (m) -d TEMPLATEDIR    is a directory containing templates
 (o) -g CMDB=PATH      defines a cmdb and the corresponding path
-(o) -g PATH           finds all cmdbs under PATH based on a .cmdb marker file
+(o) -g PATH           finds all cmdbs under PATH based on a .cmdb marker file or directory
     -h                shows this text
 (o) -l LOGLEVEL       required log level
 (m) -o OUTPUT         is the path of the resulting document
@@ -38,7 +38,7 @@ NOTES:
 3. Values containing spaces need to be quoted to ensure they are passed in as a single argument
 4. -r and -v are equivalent except that -r will not check if the provided value
    is a valid filename
-5. For a cmdb located via a .cmdb marker file, cmdb name = the containing directory name
+5. For a cmdb located via a .cmdb marker file or directory, cmdb name = the containing directory name
 
 EOF
     exit
@@ -119,7 +119,13 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-java -jar "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.15.1.jar" \
+
+ENGINE_WRAPPER_FILE="${ENGINE_WRAPPER_FILE}"
+if [[ -z "${ENGINE_WRAPPER_FILE}" && -f "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.15.1.jar" ]]; then
+    ENGINE_WRAPPER_FILE="${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.15.1.jar"
+fi
+
+java -jar "${ENGINE_WRAPPER_FILE}" \
     -i $TEMPLATE "${TEMPLATEDIRS[@]}" \
     -o $OUTPUT \
     "${VARIABLES[@]}" \
