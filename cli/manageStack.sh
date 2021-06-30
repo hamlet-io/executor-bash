@@ -301,10 +301,8 @@ function process_stack() {
             if [[ "$( echo "${change_set_state}" | jq -r '.StatusReason')" == \
                   "The submitted information didn't contain changes. Submit different information to create a change set." ]]; then
 
-              # Refresh the state if we can't find it
-              if [[ ! -f "${STACK}" ]]; then
-                wait_for_stack_execution > /dev/null
-              fi
+              # Refresh the state to make sure everything is up to date
+              wait_for_stack_execution > /dev/null
 
               info "No updates needed for existing stack ${STACK_NAME}"
               return 0
