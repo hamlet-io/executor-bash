@@ -27,7 +27,7 @@ jobs:
 
       - name: add build details
         run: |
-          pip install --pre hamlet-cli
+          pip install hamlet-cli
           hamlet engine add-engine-source-build
 
       - id: get_tag_name
