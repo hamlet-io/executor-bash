@@ -5,7 +5,7 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_SENTRY_CLI_VERSION="1.46.0"
+DEFAULT_SENTRY_CLI_VERSION="1.66.0"
 DEFAULT_RUN_SETUP="false"
 DEFAULT_SENTRY_URL_PREFIX="~/"
 DEFAULT_DEPLOYMENT_GROUP="application"
@@ -31,13 +31,14 @@ Usage: $(basename $0) -m SENTRY_SOURCE_MAP_S3_URL -r SENTRY_RELEASE -s -u DEPLOY
 
 where
 
+(o) -a APP_TYPE                     the app framework being used
 (m) -u DEPLOYMENT_UNIT              deployment unit for a build blueprint
 (o) -g DEPLOYMENT_GROUP             the deployment group the unit belongs to
     -h                              shows this text
 (o) -m SENTRY_SOURCE_MAP_S3_URL     s3 link to sourcemap files
 (o) -p SENTRY_URL_PREFIX            prefix for sourcemap files
 (o) -r SENTRY_RELEASE               sentry release name
-(o) -s RUN_SETUP              		  run setup installation to prepare
+(o) -s RUN_SETUP              		run setup installation to prepare
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -45,6 +46,9 @@ DEFAULTS:
 DEPLOYMENT_GROUP = ${DEFAULT_DEPLOYMENT_GROUP}
 
 NOTES:
+    Available options for APP_TYPE:
+        - react-native - Updates the bundle files to align with the required format
+
 
 EOF
     exit
@@ -53,8 +57,11 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":hg:m:p:r:su:" opt; do
+    while getopts ":a:hg:m:p:r:su:" opt; do
         case $opt in
+            a)
+                APP_TYPE="${OPTARG}"
+                ;;
             g)
                 DEPLOYMENT_GROUP="${OPTARG}"
                 ;;
@@ -163,8 +170,32 @@ function main() {
 
   info "Creating a new release ${SENTRY_RELEASE}"
   sentry-cli releases new "${SENTRY_RELEASE}" || return $?
+
   info "Uploading source maps for the release ${SENTRY_RELEASE}"
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite --url-prefix "${SENTRY_URL_PREFIX}" || return $?
+
+  upload_args=()
+
+  case "${APP_TYPE}" in
+    "react-native")
+        if [[ -f "${SOURCE_MAP_PATH}/android-*.js" ]]; then
+            mv "${SOURCE_MAP_PATH}/android-*.js" "${SOURCE_MAP_PATH}/index.android.bundle"
+        fi
+
+        if [[ -f "${SOURCE_MAP_PATH}/ios-*.js" ]]; then
+            mv "${SOURCE_MAP_PATH}/ios-*.js" "${SOURCE_MAP_PATH}/main.jsbundle"
+        fi
+
+        upload_args+=("--strip-common-prefix")
+    ;;
+
+  esac
+
+  if [[ -n "${SENTRY_URL_PREFIX}" ]]; then
+    upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
+  fi
+
+  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite "${docker_args[@]}" || return $?
+
   info "Finalising the release ${SENTRY_RELEASE}"
   sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
 
