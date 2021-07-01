@@ -177,14 +177,25 @@ function main() {
 
   case "${APP_TYPE}" in
     "react-native")
-        if [[ -f "${SOURCE_MAP_PATH}/**/android-*.js" ]]; then
-            mv "${SOURCE_MAP_PATH}/**/android-*.js" "${SOURCE_MAP_PATH}/index.android.bundle"
-            mv "${SOURCE_MAP_PATH}/**/android-*.map" "${SOURCE_MAP_PATH}/index.android.bundle.map"
+
+        android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "android-*.js" )"
+        if [[ -n "${android_bundle}" ]]; then
+            mv "${android_bundle}" "${SOURCE_MAP_PATH}/index.android.bundle"
         fi
 
-        if [[ -f "${SOURCE_MAP_PATH}/**/ios-*.js" ]]; then
-            mv "${SOURCE_MAP_PATH}/**/ios-*.js" "${SOURCE_MAP_PATH}/main.jsbundle"
-            mv "${SOURCE_MAP_PATH}/**/ios-*.map" "${SOURCE_MAP_PATH}/main.jsbundle.map"
+        android_map="$( find "${SOURCE_MAP_PATH}" -type f -name "android-*.map" )"
+        if [[ -n "${android_map}" ]]; then
+            mv "${android_map}" "${SOURCE_MAP_PATH}/index.android.bundle.map"
+        fi
+
+        ios_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "ios-*.js" )"
+        if [[ -n "${ios_bundle}" ]]; then
+            mv "${ios_bundle}" "${SOURCE_MAP_PATH}/main.jsbundle"
+        fi
+
+        ios_map="$( find "${SOURCE_MAP_PATH}" -type f -name "ios-*.map" )"
+        if [[ -n "${ios_map}" ]]; then
+            mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
 
         upload_args+=("--strip-common-prefix")
