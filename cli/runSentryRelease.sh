@@ -207,7 +207,7 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite "${docker_args[@]}" || return $?
+  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite "${upload_args[@]}" || return $?
 
   info "Finalising the release ${SENTRY_RELEASE}"
   sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
