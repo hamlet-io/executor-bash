@@ -179,10 +179,12 @@ function main() {
     "react-native")
         if [[ -f "${SOURCE_MAP_PATH}/android-*.js" ]]; then
             mv "${SOURCE_MAP_PATH}/android-*.js" "${SOURCE_MAP_PATH}/index.android.bundle"
+            mv "${SOURCE_MAP_PATH}/android-*.map" "${SOURCE_MAP_PATH}/index.android.bundle.map"
         fi
 
         if [[ -f "${SOURCE_MAP_PATH}/ios-*.js" ]]; then
             mv "${SOURCE_MAP_PATH}/ios-*.js" "${SOURCE_MAP_PATH}/main.jsbundle"
+            mv "${SOURCE_MAP_PATH}/ios-*.map" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
 
         upload_args+=("--strip-common-prefix")
