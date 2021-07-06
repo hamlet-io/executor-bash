@@ -83,6 +83,44 @@ case "${ACCOUNT_PROVIDER}" in
                     rm ${TEMP_CREDENTIAL_FILE}
                 fi
             fi
+
+            # Set the profile for IAM access if AWS credentials not in the environment
+            if [[ -z "${!AWS_CRED_AUTOMATION_USER_VAR}" ]]; then
+                if [[ -n "${ACCOUNT}" ]]; then
+                    aws configure list --profile "${ACCOUNT}" > /dev/null 2>&1
+                    if [[ $? -eq 0 ]]; then
+                        export AWS_DEFAULT_PROFILE="${ACCOUNT}"
+                    fi
+                fi
+                if [[ -n "${!AWS_CRED_AWS_ACCOUNT_ID_VAR}" ]]; then
+                    aws configure list --profile "${!AWS_CRED_AWS_ACCOUNT_ID_VAR}" > /dev/null 2>&1
+                    if [[ $? -eq 0 ]]; then
+                        export AWS_DEFAULT_PROFILE="${!AWS_CRED_AWS_ACCOUNT_ID_VAR}"
+                    fi
+                fi
+
+                if [[ -n "${AWS_DEFAULT_PROFILE}" && -n "$( aws configure get role_arn )" ]]; then
+                    TEMP_CREDENTIAL_FILE="${AUTOMATION_DATA_DIR}/temp_aws_credentials.json"
+                    unset AWS_SESSION_TOKEN
+
+                    aws sts assume-role --role-arn "$( aws configure get role_arn )" \
+                        --role-session-name "$(echo $GIT_USER | tr -cd '[[:alnum:]]' )" \
+                        --duration-seconds "${AUTOMATION_ROLE_VALIDITY}" \
+                        --output json > ${TEMP_CREDENTIAL_FILE} ||
+
+                        aws sts assume-role \
+                            --role-arn "$( aws configure get role_arn )" \
+                            --role-session-name "$(echo $GIT_USER | tr -cd '[[:alnum:]]' )" \
+                            --output json > ${TEMP_CREDENTIAL_FILE}
+
+                    unset AWS_ACCESS_KEY_ID
+                    unset AWS_SECRET_ACCESS_KEY
+                    AWS_CRED_TEMP_AWS_ACCESS_KEY_ID=$(jq -r '.Credentials.AccessKeyId' < ${TEMP_CREDENTIAL_FILE})
+                    AWS_CRED_TEMP_AWS_SECRET_ACCESS_KEY=$(jq -r '.Credentials.SecretAccessKey' < ${TEMP_CREDENTIAL_FILE})
+                    AWS_CRED_TEMP_AWS_SESSION_TOKEN=$(jq -r '.Credentials.SessionToken' < ${TEMP_CREDENTIAL_FILE})
+                    rm ${TEMP_CREDENTIAL_FILE}
+                fi
+            fi
         fi
         ;;
 
