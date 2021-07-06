@@ -845,6 +845,51 @@ function getStepTypesFromContractStage() {
   echo "$( echo "${contractStage}" | jq -r --arg seperator "${seperator}" '[ .Steps[].Type ] | join($seperator)' || return $?)"
 }
 
+# -- Environment Config handling
+# handles environment variable configuration with qualification support
+
+function find_env_config() {
+  local namespace="${1^^}"; shift
+  local config_key="${1^^}"; shift
+  local level1="${1^^}"; shift
+  local level2="${1^^}"; shift
+  local default="${1}"; shift
+
+  selected_variable_name="${base_variable_name}"
+
+  # Variables to check
+  base_variable_name="${namespace}_${config_key}"
+  level1_variable_name="${namespace}_${level1}_${level2}_${config_key}"
+  level2_variable_name="${nampspace}_${level1}_${config_key}"
+
+  # Two level definition
+  if [[ (-n "${level2}") && (-n "${!level2_variable_name}") ]]; then
+      selected_variable_name="${level2_variable_name}"
+  else
+      # One level definition
+      if [[ (-n "${level1_variable_name}") && (-n "${!level1_variable_name}") ]]; then
+          selected_variable_name="${level1_variable_name}"
+      else
+          # Base config value
+          if [[ (-n "${base_variable_name}") && (-n "${!base_variable_name}") ]]; then
+            selected_variable_name="${base_variable_name}"
+          fi
+      fi
+  fi
+
+  if [[ (-n "${selected_variable_name}") && (-n "${!selected_variable_name}") ]]; then
+      # Value found
+      local config_value="${!selected_variable_name}"
+  else
+      # Use the default
+      local selected_variable_name=""
+      local config_value="${default}"
+  fi
+
+  # make the variable available aoutside of this scope
+  eval "${namespace}_${config_key}"="${config_value}"
+}
+
 # -- KMS --
 function decrypt_kms_string() {
   local region="$1"; shift
