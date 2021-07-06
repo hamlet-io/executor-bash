@@ -11,6 +11,9 @@
 . "${GENERATION_BASE_DIR}/execution/utility.sh"
 . "${GENERATION_BASE_DIR}/execution/contextTree.sh"
 
+# Set hamlet local store
+export HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
+
 # -- Repositories --
 
 function save_repo() {
