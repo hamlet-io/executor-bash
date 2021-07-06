@@ -352,7 +352,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                     IMAGE_FORMAT_LOWER=${IMAGE_FORMAT,,}
                     case ${IMAGE_FORMAT_LOWER} in
                         docker)
-                            ${AUTOMATION_DIR}/manage${IMAGE_FORMAT_LOWER^}.sh -k \
+                            ${AUTOMATION_DIR}/manageDocker.sh -k \
                                 -a "${IMAGE_PROVIDER}" \
                                 -s "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
@@ -361,22 +361,12 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                             RESULT=$?
                             [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
-                        lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot)
-                            ${AUTOMATION_DIR}/manage${IMAGE_FORMAT_LOWER^}.sh -k \
+                        lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot|openapi|swagger)
+                            ${AUTOMATION_DIR}/manageS3Registry.sh -k \
                                 -a "${IMAGE_PROVIDER}" \
                                 -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -g "${CODE_COMMIT}" \
-                                -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
-                            RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
-                            ;;
-                        openapi|swagger)
-                            ${AUTOMATION_DIR}/manageOpenapi.sh -k \
-                                -a "${IMAGE_PROVIDER}" \
                                 -y "${IMAGE_FORMAT_LOWER}" \
                                 -f "${IMAGE_FORMAT_LOWER}.zip" \
-                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                 -g "${CODE_COMMIT}" \
                                 -r "${ACCEPTANCE_TAG}" \
                                 -c "${REGISTRY_SCOPE}"
