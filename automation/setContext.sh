@@ -262,7 +262,6 @@ function main() {
 
 
   ### Context from automation provider ###
-
   # TODO(rossmurr4y): seperate out azure pipelines
   case "${AUTOMATION_PROVIDER}" in
     jenkins)
@@ -325,6 +324,7 @@ function main() {
       # Job identifier
       AUTOMATION_JOB_IDENTIFIER="${BUILD_NUMBER}"
       ;;
+
     azurepipelines)
       save_context_property GIT_USER "${GIT_USER:-$BUILD_USER}"
       save_context_property GIT_EMAIL "${GIT_EMAIL:-$BUILD_USER_EMAIL}"
@@ -340,7 +340,15 @@ function main() {
 
       save_context_property AUTOMATION_BUILD_SRC_DIR "${WORKSPACE}"
       save_context_property AUTOMATION_BUILD_DEVOPS_DIR "${WORKSPACE}"
-    ;;
+      ;;
+
+    hamletcli)
+        GIT_USER="${GIT_USER:-"$(git config --get user.name)"}"
+        GIT_EMAIL="${GIT_EMAIL:-"$(git config --get user.email)"}"
+
+        save_context_property GIT_USER  "${GIT_USER}"
+        save_context_property GIT_EMAIL "${GIT_EMAIL}"
+        ;;
   esac
 
   # Parse options
@@ -474,18 +482,6 @@ function main() {
       defineRegistryProviderSettings "${REGISTRY_TYPE}" "PRODUCT" "" "${PRODUCT}" "${ENVIRONMENT}" "${ACCOUNT}"
   done
 
-
-  ### Generation framework details ###
-
-  # - git provider
-  defineGitProviderSettings "GENERATION" ""  "${PRODUCT}" "${ENVIRONMENT}" "codeontap"
-
-  # - repos
-  defineRepoSettings "GENERATION" "BIN"      "${PRODUCT}" "${ENVIRONMENT}" "gen3.git"
-  defineRepoSettings "GENERATION" "PATTERNS" "${PRODUCT}" "${ENVIRONMENT}" "gen3-patterns.git"
-  defineRepoSettings "GENERATION" "STARTUP"  "${PRODUCT}" "${ENVIRONMENT}" "gen3-startup.git"
-
-
   ### Application deployment unit details ###
 
   # Determine the deployment unit list and optional corresponding metadata
@@ -511,7 +507,7 @@ function main() {
 
           # Capture any provided git commit
           case ${AUTOMATION_PROVIDER} in
-              jenkins | azurepipelines)
+              jenkins|azurepipelines|hamletcli)
                     [[ -n "${GIT_COMMIT}" ]] && COMMIT_PART="${GIT_COMMIT}"
                     ;;
           esac
@@ -559,7 +555,7 @@ function main() {
 
   # For builds, need to capture any provided git commit even if no deployment units defined at this point
   case ${AUTOMATION_PROVIDER} in
-      jenkins | azurepipelines)
+      jenkins|azurepipelines|hamletcli)
           [[ ( -n "${GIT_COMMIT}" ) && ( -z "${CODE_COMMIT_ARRAY[0]}" ) ]] && CODE_COMMIT_ARRAY[0]="${GIT_COMMIT}"
           ;;
   esac

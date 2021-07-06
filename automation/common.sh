@@ -73,7 +73,7 @@ function save_context_property() {
   fi
 
   case "${AUTOMATION_PROVIDER}" in
-    jenkins)
+    jenkins|hamletcli)
       echo "${name}=${property_value}" >> "${file}"
       ;;
     azurepipelines)
