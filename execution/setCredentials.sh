@@ -16,8 +16,6 @@ if [[ "${ACCOUNT_PROVIDER}" == 'aws' ]]; then
     if [[ -n "${CHECK_AWS_SESSION_TOKEN}" ]]; then export AWS_SESSION_TOKEN="${CHECK_AWS_SESSION_TOKEN}"; fi
 
     # Set the profile for IAM access if AWS credentials not in the environment
-    # We would normally redirect to /dev/null but this triggers an "unknown encoding"
-    # bug in python
     if [[ ((-z "${AWS_ACCESS_KEY_ID}") || (-z "${AWS_SECRET_ACCESS_KEY}")) ]]; then
         if [[ -n "${ACCOUNT}" ]]; then
             aws configure list --profile "${ACCOUNT}" > /dev/null 2>&1
