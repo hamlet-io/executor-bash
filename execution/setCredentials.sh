@@ -340,4 +340,8 @@ case "${ACCOUNT_PROVIDER}" in
         fi
 
         ;;
+    *)
+        fatal "Unkown account provider ${ACCOUNT_PROVIDER}"
+        exit 128
+        ;;
 esac
