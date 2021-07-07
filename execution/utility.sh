@@ -857,21 +857,25 @@ function find_env_config() {
 
   selected_variable_name="${base_variable_name}"
 
+  if [[ -n "${namespace}" ]]; then
+    namespace="${namespace}_"
+  fi
+
   # Variables to check
-  base_variable_name="${namespace}_${config_key}"
-  level1_variable_name="${namespace}_${level1}_${level2}_${config_key}"
-  level2_variable_name="${nampspace}_${level1}_${config_key}"
+  base_variable_name="${namespace}${config_key}"
+  level1_variable_name="${namespace}${level1}_${config_key}"
+  level2_variable_name="${nampspace}${level1}_${level2}_${config_key}"
 
   # Two level definition
   if [[ (-n "${level2}") && (-n "${!level2_variable_name}") ]]; then
       selected_variable_name="${level2_variable_name}"
   else
       # One level definition
-      if [[ (-n "${level1_variable_name}") && (-n "${!level1_variable_name}") ]]; then
+      if [[ (-n "${level1}") && (-n "${!level1_variable_name}") ]]; then
           selected_variable_name="${level1_variable_name}"
       else
           # Base config value
-          if [[ (-n "${base_variable_name}") && (-n "${!base_variable_name}") ]]; then
+          if [[ -n "${!base_variable_name}" ]]; then
             selected_variable_name="${base_variable_name}"
           fi
       fi
@@ -887,7 +891,7 @@ function find_env_config() {
   fi
 
   # make the variable available aoutside of this scope
-  eval "${namespace}_${config_key}"="${config_value}"
+  eval "${namespace}${config_key}"="${config_value}"
 }
 
 # -- KMS --

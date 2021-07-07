@@ -68,6 +68,9 @@ case "${ACCOUNT_PROVIDER}" in
 
         if [[ -z "${HAMLET_AWS_ACCOUNT_ID}" ]]; then
             find_env_config "HAMLET" "AWS_ACCOUNT_ID" "${CRED_ACCOUNT}"
+            find_env_config "" "AWS_ACCOUNT_ID" "${CRED_ACCOUNT}"
+
+            HAMLET_AWS_ACCOUNT_ID="${HAMLET_AWS_ACCOUNT_ID:-${AWS_ACCOUNT_ID}}"
         fi
 
         if [[ -z "${HAMET_AWS_AUTH_ROLE}" ]]; then
