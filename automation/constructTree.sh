@@ -325,7 +325,7 @@ if [[ "${USE_EXISITNG_TREE}" == "false" ]]; then
 fi
 
 if [[ "${USE_EXISTING_TREE}" == "true" ]]; then
-    if [[ -n "${ROOT_DIR}" && -d "${ROOT_DIR}" ]]; then
+    if [[ -z "${ROOT_DIR}" || ! (-d "${ROOT_DIR}") ]]; then
         fatal "ROOT_DIR: ${ROOT_DIR} - could not be found for existing tree"
         exit
     fi
