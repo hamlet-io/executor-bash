@@ -102,6 +102,15 @@ function options() {
     IMAGE_FORMATS="${IMAGE_FORMATS:-${IMAGE_FORMATS_ARRAY[0]}}"
     REGISTRY_SCOPE="${REGISTRY_SCOPE:-${REGISTRY_SCOPE_ARRAY[0]}}"
 
+    # Handle older naming conventions for docker file locations
+    if [[ -n "${DOCKER_CONTEXT_DIR}" ]]; then
+        DOCKER_CONTEXT="${DOCKER_CONTEXT_DIR}"
+    fi
+
+    if [[ -n "${DOCKER_FILE}" ]]; then
+        DOCKERFILE="${DOCKER_FILE#"${DOCKER_CONTEXT_DIR}"}"
+    fi
+
     # Ensure mandatory arguments have been provided
     exit_on_invalid_environment_variables "DEPLOYMENT_UNIT" "CODE_COMMIT" "IMAGE_FORMATS"
 
