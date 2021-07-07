@@ -94,7 +94,7 @@ USE_EXISTING_TREE="${USE_EXISTING_TREE:-false}"
 # Check for required context
 [[ -z "${ACCOUNT}" ]] && fatal "ACCOUNT not defined" && exit
 
-if [[ "${USE_EXISITNG_TREE}" == "false" ]]; then
+if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
 
     # Save for later steps
     save_context_property PRODUCT_CONFIG_REFERENCE "${PRODUCT_CONFIG_REFERENCE}"
