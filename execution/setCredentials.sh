@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 
-# Set up the access
-#
+# Set up access to cloud providers
 # This script is designed to be sourced into other scripts
-#
-# $1 = account to be accessed
 
+# $1 = account to be accessed
 # this is used to hanlde sourcing or invoking of this script
 (return 0 2>/dev/null) && CRED_ACCOUNT="${ACCOUNT}" || CRED_ACCOUNT="${1^^}"
 
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 
-
+# -- AWS - config helper functions
 function set_aws_profile_role_arn {
     account_id="${1}"; shift
     role="${1}"; shift
@@ -63,6 +61,7 @@ case "${ACCOUNT_PROVIDER}" in
 
         ## Allow the older methods to set the source and then use default
         if [[ -z "${HAMLET_AWS_AUTH_SOURCE}" ]]; then
+            find_env_config "HAMLET" "AWS_AUTH_SOURCE" "${CRED_ACCOUNT}"
             HAMLET_AWS_AUTH_SOURCE="${HAMLET_AWS_AUTH_SOURCE:-"ENV"}"
         fi
 
@@ -82,8 +81,10 @@ case "${ACCOUNT_PROVIDER}" in
         # Set the session name for auditing
         export AWS_ROLE_SESSION_NAME="hamlet_${GIT_USER:-"${CRED_ACCOUNT}"}"
 
+        info "using AWS auth source: ${HAMLET_AWS_AUTH_SOURCE}"
+
         hamlet_aws_profile=""
-        use_hamlet_aws_config="true"
+        profile_name="${HAMLET_AWS_AUTH_SOURCE,,}:${HAMLET_AWS_ACCOUNT_ID}"
 
         case "${HAMLET_AWS_AUTH_SOURCE^^}" in
 
@@ -98,13 +99,12 @@ case "${ACCOUNT_PROVIDER}" in
                     aws configure set "profile.source:env.aws_session_token" "${AWS_SESSION_TOKEN}"
                 fi
 
-                aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.source_profile" "source:env"
-                set_aws_profile_role_arn "${HAMLET_AWS_ACCOUNT_ID}" "${HAMLET_AWS_AUTH_ROLE}"
-                set_aws_mfa_token_serial "${HAMLET_AWS_ACCOUNT_ID}" "${HAMLET_AWS_AUTH_MFA_SERIAL}"
+                aws configure set "profile.${profile_name}.source_profile" "source:env"
+                set_aws_profile_role_arn "${profile_name}" "${HAMLET_AWS_AUTH_ROLE}"
+                set_aws_mfa_token_serial "${profile_name}" "${HAMLET_AWS_AUTH_MFA_SERIAL}"
 
-                hamlet_aws_profile="${HAMLET_AWS_ACCOUNT_ID}"
+                hamlet_aws_profile="${profile_name}"
                 ;;
-
 
             "USER")
                 export AWS_CONFIG_FILE="${hamlet_aws_config}"
@@ -123,13 +123,12 @@ case "${ACCOUNT_PROVIDER}" in
                     aws configure set "profile.source:user:${HAMLET_AWS_AUTH_USER}.session_token" "${!user_access_key_id_var}"
                 fi
 
-                aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.source_profile" "source:user:${HAMLET_AWS_AUTH_USER}"
+                aws configure set "profile.${profile_name}.source_profile" "source:user:${HAMLET_AWS_AUTH_USER}"
 
-                set_aws_profile_role_arn "${HAMLET_AWS_ACCOUNT_ID}" "${HAMLET_AWS_AUTH_ROLE}"
-                set_aws_mfa_token_serial "${HAMLET_AWS_ACCOUNT_ID}" "${HAMLET_AWS_AUTH_MFA_SERIAL}"
+                set_aws_profile_role_arn "${profile_name}" "${HAMLET_AWS_AUTH_ROLE}"
+                set_aws_mfa_token_serial "${profile_name}" "${HAMLET_AWS_AUTH_MFA_SERIAL}"
 
-                hamlet_aws_profile="${HAMLET_AWS_ACCOUNT_ID}"
-
+                hamlet_aws_profile="${profile_name}"
                 ;;
 
             "INSTANCE"|"INSTANCE:EC2"|"INSTANCE:ECS")
@@ -143,30 +142,37 @@ case "${ACCOUNT_PROVIDER}" in
                     if [[ -n "${ECS_CONTAINER_METADATA_URI_V4}" || -n "${ECS_CONTAINER_METADATA_URI}"
                             || -n "$(curl -m 1 --silent http://169.254.170.2/v2/metadata )" ]]; then
 
-                        aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.credential_source" "EcsContainer"
-
+                        aws configure set "profile.${profile_name}.credential_source" "EcsContainer"
                     else
                         # EC2 metadata endpoint
                         metadata_token="$(curl -m 1 --silent -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)"
                         if [[ -n "$( curl -m 1 --silent -H "X-aws-ec2-metadata-token: $metadata_token" -v http://169.254.169.254/latest/meta-data/ 2>/dev/null )" ]]; then
-                            aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.credential_source" "Ec2InstanceMetadata"
+
+                            aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
+
                         fi
+                    fi
+
+                    if [[ -z "$(aws configure get "profile.${profile_name}.credential_source")" ]]; then
+                        fatal "Could not determine an instance credential source to use"
+                        fatal "Check that you are running on AWS or explicitly set the Instance type ( INSTANCE:ECS or INSTANCE:EC2)"
+                        exit 128
                     fi
 
                 # Explicit overrides instead of discovery
                 elif [[ "${HAMLET_AWS_AUTH_SOURCE^^}" == "INSTANCE:ECS" ]]; then
-                    aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.credential_source" "EcsContainer"
+                    aws configure set "profile.${profile_name}.credential_source" "EcsContainer"
+
                 elif [[ "${HAMLET_AWS_AUTH_SOURCE^^}" == "INSTANCE:EC2" ]]; then
-                    aws configure set "profile.${HAMLET_AWS_ACCOUNT_ID}.credential_source" "Ec2InstanceMetadata"
+                    aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
                 fi
 
-                set_aws_profile_role_arn "${HAMLET_AWS_ACCOUNT_ID}" "${HAMLET_AWS_AUTH_ROLE}"
-                hamlet_aws_profile="${HAMLET_AWS_ACCOUNT_ID}"
+                set_aws_profile_role_arn "${profile_name}" "${HAMLET_AWS_AUTH_ROLE}"
+                hamlet_aws_profile="${profile_name}"
                 ;;
 
             "CONFIG")
 
-                use_hamlet_aws_config="false"
                 if [[ -n "${HAMLET_AWS_ACCOUNT_ID}" ]]; then
                     aws configure list --profile "${HAMLET_AWS_ACCOUNT_ID}" > /dev/null 2>&1
                     if [[ $? -eq 0 ]]; then
@@ -180,10 +186,19 @@ case "${ACCOUNT_PROVIDER}" in
                         fi
                     fi
                 fi
+
+                if [[ -z "${hamlet_aws_profile}" ]]; then
+                    warn "Could not find a profile in local aws config"
+                    warn "Excepted one of these profiles:"
+                    warn "  - ${HAMLET_AWS_ACCOUNT_ID}"
+                    warn "  - ${CRED_ACCOUNT}"
+                    warn "using default profile or AWS_PROFILE if set"
+                fi
                 ;;
 
             *)
                 fatal "Invalid HAMLET_AWS_AUTH_SOURCE - ${HAMLET_AWS_AUTH_SOURCE}"
+                fatal "Possible sources are - ENV | USER | INSTANCE | CONFIG"
                 exit 128
                 ;;
         esac
@@ -228,7 +243,6 @@ case "${ACCOUNT_PROVIDER}" in
                 exit 128
             fi
         fi
-
         ;;
 
     azure)
