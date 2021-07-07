@@ -108,7 +108,7 @@ function options() {
     fi
 
     if [[ -n "${DOCKER_FILE}" ]]; then
-        DOCKERFILE="${DOCKER_FILE#"${DOCKER_CONTEXT_DIR}"}"
+        DOCKERFILE="${DOCKER_FILE}"
     fi
 
     # Ensure mandatory arguments have been provided
