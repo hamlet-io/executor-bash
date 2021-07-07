@@ -47,7 +47,7 @@ EOF
 }
 
 # Parse options
-while getopts ":ac:ef:hi:rx:" opt; do
+while getopts ":ac:ehi:rx:" opt; do
     case $opt in
         a)
             EXCLUDE_ACCOUNT_DIRECTORIES="true"
@@ -326,7 +326,7 @@ fi
 
 if [[ "${USE_EXISTING_TREE}" == "true" ]]; then
     if [[ -n "${ROOT_DIR}" && -d "${ROOT_DIR}" ]]; then
-        fatal "ROOT_DIR: ${ROOT_DIR} - could not be found for exsting tree"
+        fatal "ROOT_DIR: ${ROOT_DIR} - could not be found for existing tree"
         exit
     fi
     BASE_DIR="${ROOT_DIR}"
