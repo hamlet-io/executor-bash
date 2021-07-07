@@ -3,9 +3,10 @@
 # Set up access to cloud providers
 # This script is designed to be sourced into other scripts
 
-# $1 = account to be accessed
-# this is used to hanlde sourcing or invoking of this script
-(return 0 2>/dev/null) && CRED_ACCOUNT="${ACCOUNT}" || CRED_ACCOUNT="${1^^}"
+# CRED_ACCOUNT is the input parameter to this script
+# -- If sourced then the environment variable needs to be provided
+# -- If invoked then the first parameter is used as the CRED_ACCOUNT
+(return 0 2>/dev/null) && CRED_ACCOUNT="${CRED_ACCOUNT:-${ACCOUNT}}" || CRED_ACCOUNT="${1^^}"
 
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
@@ -81,7 +82,7 @@ case "${ACCOUNT_PROVIDER}" in
         # Set the session name for auditing
         export AWS_ROLE_SESSION_NAME="hamlet_${GIT_USER:-"${CRED_ACCOUNT}"}"
 
-        info "using AWS auth source: ${HAMLET_AWS_AUTH_SOURCE}"
+        info "Using AWS auth source: ${HAMLET_AWS_AUTH_SOURCE}"
 
         hamlet_aws_profile=""
         profile_name="${HAMLET_AWS_AUTH_SOURCE,,}:${HAMLET_AWS_ACCOUNT_ID}"
@@ -248,74 +249,95 @@ case "${ACCOUNT_PROVIDER}" in
     azure)
 
         az_login_args=()
-
-        # -- Only show output unless debugging --
-        if willLog "${LOG_LEVEL_DEBUG}"  ]]; then
+        # -- Only show errors unless debugging --
+        if willLog "${LOG_LEVEL_DEBUG}"; then
             az_login_args+=("--output" "json" )
         else
             az_login_args+=("--output" "none" )
         fi
 
-        # find the method - default to prompt based login
-        AZ_AUTOMATION_AUTH_METHOD_VAR="${CRED_ACCOUNT}_AZ_AUTH_METHOD"
-        if [[ -z "${!AZ_AUTOMATION_AUTH_METHOD_VAR}" ]]; then AZ_AUTOMATION_AUTH_METHOD_VAR="AZ_AUTH_METHOD"; fi
-        AZ_AUTH_METHOD="${!AZ_AUTOMATION_AUTH_METHOD_VAR:-interactive}"
+        find_env_config "HAMLET" "AZ_AUTH_METHOD" "${CRED_ACCOUNT}"
+        find_env_config "" "AZ_AUTOMATION_AUTH_METHOD" "${CRED_ACCOUNT}"
+
+        HAMLET_AZ_AUTH_METHOD="${HAMLET_AZ_AUTH_METHOD:-${AZ_AUTOMATION_AUTH_METHOD:-"INTERACTIVE"}}"
 
         # lookup the AZ Account
-        AZ_ACCOUNT_ID_VAR="${CRED_ACCOUNT}_AZ_ACCOUNT_ID"
-        if [[ -n "${!AZ_ACCOUNT_ID_VAR}" ]]; then
-            AZ_ACCOUNT_ID="${!AZ_ACCOUNT_ID_VAR}"
+        if [[ -n "${PROVIDERID}" ]]; then
+            HAMLET_AZ_ACCOUNT_ID="${PROVIDERID}"
         fi
 
-        # Set the tenant if required - By defeault it uses the Tenant Id
-        AZ_ACCOUNT_TENANT_OVERRIDE_VAR="${CRED_ACCOUNT}_AZ_TENANT_ID"
-        if [[ -n "${!AZ_ACCOUNT_TENANT_OVERRIDE_VAR}" ]]; then
-            AZ_TENANT_ID="${!AZ_ACCOUNT_TENANT_OVERRIDE_VAR}"
+        if [[ -n "${HAMLET_AZ_ACCOUNT_ID}" ]]; then
+
+            find_env_config "HAMLET" "AZ_ACCOUNT_ID" "${CRED_ACCOUNT}"
+            find_env_config "" "AZ_ACCOUNT_ID" "${CRED_ACCOUNT}"
+
+            HAMLET_AZ_ACCOUNT_ID="${HAMLET_AZ_ACCOUNT_ID:-${AZ_ACCOUNT_ID}}"
+
         fi
 
-        if [[ -n "${AZ_TENANT_ID}" ]]; then
-            az_login_args+=("--tenant" "${AZ_TENANT_ID}")
+        find_env_config "HAMLET" "AZ_TENANT_ID" "${CRED_ACCOUNT}"
+        find_env_config "" "AZ_TENANT_ID" "${CRED_ACCOUNT}"
+
+        HAMLET_AZ_TENANT_ID="${HAMLET_AZ_TENANT_ID:-${AZ_TENANT_ID}}"
+
+        if [[ -n "${HAMLET_AZ_PASS}" ]]; then
+            az_login_args+=("--tenant" "${HAMLET_AZ_PASS}")
         fi
 
-        case "${AZ_AUTH_METHOD}" in
-            service)
 
-                #Account specific creds
-                AZ_CRED_OVERRIDE_USERNAME_VAR="${CRED_ACCOUNT}_AZ_USERNAME"
-                AZ_CRED_OVERRIDE_PASS_VAR="${CRED_ACCOUNT}_AZ_PASS"
+        info "Using Azure auth method: ${HAMLET_AZ_AUTH_METHOD}"
+        case "${HAMLET_AZ_AUTH_METHOD^^}" in
+            SERVICE)
 
-                if [[ ( -n "${!AZ_CRED_OVERRIDE_USERNAME_VAR}") ]]; then
-                    AZ_CRED_USERNAME="${!AZ_CRED_OVERRIDE_USERNAME_VAR}"
-                    AZ_CRED_PASS="${!AZ_CRED_OVERRIDE_PASS_VAR}"
-                else
-                    # Tenant wide credentials
-                    AZ_CRED_AUTOMATION_USERNAME_VAR="AZ_USERNAME"
-                    AZ_CRED_AUTOTMATION_PASS_VAR="AZ_PASS"
-                    if [[ -n "${!AZ_CRED_AUTOMATION_USERNAME_VAR}" ]]; then
-                        AZ_CRED_USERNAME="${!AZ_CRED_AUTOMATION_USERNAME_VAR}"
-                        AZ_CRED_PASS="${!AZ_CRED_AUTOTMATION_PASS_VAR}"
-                    fi
-                fi
+                find_env_config "HAMLET" "AZ_USERNAME" "${CRED_ACCOUNT}"
+                find_env_config "" "AZ_USERNAME" "${CRED_ACCOUNT}"
 
-                if [[ (-z "${AZ_CRED_USERNAME}") || ( -z "${AZ_CRED_PASS}") || ( -z "${AZ_TENANT_ID}") ]]; then
-                    fatal "Azure Service prinicpal login missing information - requires environment - AZ_USERNAME | AZ_PASS | AZ_TENANT_ID"
+                HAMLET_AZ_USERNAME="${HAMLET_AZ_USERNAME:-${AZ_USERNAME}}"
+
+                find_env_config "HAMLET" "AZ_PASS" "${CRED_ACCOUNT}"
+                find_env_config "" "AZ_PASS" "${CRED_ACCOUNT}"
+
+                HAMLET_AZ_PASS="${HAMLET_AZ_PASS:-${AZ_PASS}}"
+
+
+                if [[ (-z "${HAMLET_AZ_USERNAME}") || ( -z "${HAMLET_AZ_PASS}") || ( -z "${HAMLET_AZ_TENANT_ID}") ]]; then
+                    fatal "Azure Service prinicpal login missing information - requires environment - HAMLET_AZ_USERNAME | HAMLET_AZ_PASS | HAMLET_AZ_TENANT_ID"
                     exit 255
                 fi
 
-                az login --service-principal --username "${AZ_CRED_USERNAME}" --password "${AZ_CRED_PASS}" ${az_login_args[@]}
+                az login --service-principal --username "${HAMLET_AZ_USERNAME}" --password "${HAMLET_AZ_PASS}" ${az_login_args[@]}
                 ;;
 
-            managed)
+            MANAGED)
                 az login --identity "${az_login_args[@]}"
                 ;;
 
-            interactive)
-                az login "${az_login_args[@]}"
+            INTERACTIVE)
+                if [[ -n "$(az account list --query '[*].id' --output tsv 2> /dev/null )" ]]; then
+                    username="$( az account list --query '[0].user.name' --output tsv)"
+
+                    info "Already logged in as ${username:-"unkown"}"
+                    info "   - To use a different user run az logout"
+                else
+                    az login "${az_login_args[@]}"
+                fi
                 ;;
 
-            none)
-                info "Skipping Login to Azure - AZ_AUTH_METHOD = ${AZ_AUTH_METHOD}"
+            NONE)
+                warn "Skipping Login to Azure this won't allow you to access Azure"
+                ;;
+
+            *)
+                fatal "Invalid HAMLET_AZ_AUTH_METHOD - ${HAMLET_AZ_AUTH_METHOD}"
+                fatal "Possible methods are - SERVICE | MANAGED | INTERACTIVE | NONE"
+                exit 128
                 ;;
         esac
+
+        if [[ "${HAMLET_AZ_AUTH_METHOD^^}" != "NONE" ]]; then
+            # Set the current subscription to use
+            az account set --subscription "${HAMLET_AZ_ACCOUNT_ID}" "${az_login_args[@]}" > /dev/null || { fatal "Could not login to subscription ${CRED_ACCOUNT} ${HAMLET_AZ_AUTH_METHOD}"; exit 128; }
+        fi
+
         ;;
 esac
