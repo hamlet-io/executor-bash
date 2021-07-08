@@ -579,7 +579,7 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 RESULT=$?
                                 ;;
                             lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
-                                ${AUTOMATION_DIR}/manageS3Registry.sh -v \
+                                ${AUTOMATION_DIR}/manageS3Registry.sh -p \
                                     -y "${IMAGE_FORMAT,,}" \
                                     -f "${IMAGE_FORMAT,,}.zip" \
                                     -a "${IMAGE_PROVIDER}" \
