@@ -180,48 +180,6 @@ function defineRegistryProviderAttributes() {
     done
 }
 
-PROVIDER_IDS=()
-PROVIDER_AWS_ACCESS_KEY_IDS=()
-PROVIDER_AWS_SECRET_ACCESS_KEYS=()
-PROVIDER_AWS_SESSION_TOKENS=()
-
-# Set credentials for S3 access
-# $1 = provider
-function setCredentials() {
-
-    # Key variables
-    local SC_PROVIDER="${1^^}"
-
-    # Check if credentials already obtained
-    for INDEX in $(seq 0 $((${#PROVIDER_IDS[@]}-1 )) ); do
-        if [[ "${PROVIDER_IDS[$INDEX]}" == "${SC_PROVIDER}" ]]; then
-            # Use cached credentials
-            export AWS_ACCESS_KEY_ID="${PROVIDER_AWS_ACCESS_KEY_IDS[$INDEX]}"
-            export AWS_SECRET_ACCESS_KEY="${PROVIDER_AWS_SECRET_ACCESS_KEYS[$INDEX]}"
-            export AWS_SESSION_TOKEN="${PROVIDER_AWS_SESSION_TOKENS[$INDEX]}"
-            [[ -z "${AWS_SESSION_TOKEN}" ]] && unset AWS_SESSION_TOKEN
-            return 0
-        fi
-    done
-
-    # New registry - set up the AWS credentials
-    . ${AUTOMATION_DIR}/setCredentials.sh "${SC_PROVIDER}"
-
-    # Define the credentials
-    export AWS_ACCESS_KEY_ID="${AWS_CRED_TEMP_AWS_ACCESS_KEY_ID:-${!AWS_CRED_AWS_ACCESS_KEY_ID_VAR}}"
-    export AWS_SECRET_ACCESS_KEY="${AWS_CRED_TEMP_AWS_SECRET_ACCESS_KEY:-${!AWS_CRED_AWS_SECRET_ACCESS_KEY_VAR}}"
-    export AWS_SESSION_TOKEN="${AWS_CRED_TEMP_AWS_SESSION_TOKEN}"
-    [[ -z "${AWS_SESSION_TOKEN}" ]] && unset AWS_SESSION_TOKEN
-
-    # Cache the redentials
-    PROVIDER_IDS+=("${SC_PROVIDER}")
-    PROVIDER_AWS_ACCESS_KEY_IDS+=("${AWS_ACCESS_KEY_ID}")
-    PROVIDER_AWS_SECRET_ACCESS_KEYS+=("${AWS_SECRET_ACCESS_KEY}")
-    PROVIDER_AWS_SESSION_TOKENS+=("${AWS_SESSION_TOKEN}")
-    return 0
-
-}
-
 # Copy files to the registry
 # $1 = file to copy
 # $2 = name to save it as
@@ -366,7 +324,7 @@ FULL_REGISTRY_IMAGE_PATH="s3://${REGISTRY_PROVIDER_DNS}/${REGISTRY_TYPE}/${REGIS
 FULL_TAGGED_REGISTRY_IMAGE="s3://${REGISTRY_PROVIDER_DNS}/${TAGGED_REGISTRY_IMAGE}"
 
 # Set up credentials for registry access
-setCredentials "${REGISTRY_PROVIDER}"
+. ${AUTOMATION_DIR}/setCredentials.sh "${REGISTRY_PROVIDER}"
 
 # Confirm access to the local registry
 aws --region "${REGISTRY_PROVIDER_REGION}" s3 ls "s3://${REGISTRY_PROVIDER_DNS}/${REGISTRY_TYPE}" >/dev/null 2>&1
@@ -434,7 +392,7 @@ case ${REGISTRY_OPERATION} in
         IMAGE_FILE="./temp_${BASE_REGISTRY_FILENAME}"
 
         # Get access to the remote registry
-        setCredentials "${REMOTE_REGISTRY_PROVIDER}"
+        . ${AUTOMATION_DIR}/setCredentials.sh "${REMOTE_REGISTRY_PROVIDER}"
 
         # Confirm image is present
         aws --region "${REMOTE_REGISTRY_PROVIDER_REGION}" s3 ls "${FULL_REMOTE_TAGGED_REGISTRY_IMAGE}" >/dev/null 2>&1
@@ -450,7 +408,7 @@ case ${REGISTRY_OPERATION} in
         fi
 
         # Now copy to local rgistry
-        setCredentials "${REGISTRY_PROVIDER}"
+        . ${AUTOMATION_DIR}/setCredentials.sh "${REGISTRY_PROVIDER}"
 
         copyToRegistry "${IMAGE_FILE}" "${BASE_REGISTRY_FILENAME}"
         if [[ -n "${REGISTRY_ADDITIONAL_DIRECTORY}" ]]; then
