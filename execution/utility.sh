@@ -847,24 +847,23 @@ function getStepTypesFromContractStage() {
 
 # -- Environment Config handling
 # handles environment variable configuration with qualification support
-
 function find_env_config() {
+  local result_variable_name="${1}"; shift
   local namespace="${1^^}"; shift
   local config_key="${1^^}"; shift
   local level1="${1^^}"; shift
   local level2="${1^^}"; shift
-  local default="${1}"; shift
 
-  selected_variable_name="${base_variable_name}"
+  local selected_variable_name=""
 
   if [[ -n "${namespace}" ]]; then
     namespace="${namespace}_"
   fi
 
   # Variables to check
-  base_variable_name="${namespace}${config_key}"
-  level1_variable_name="${namespace}${level1}_${config_key}"
-  level2_variable_name="${nampspace}${level1}_${level2}_${config_key}"
+  local base_variable_name="${namespace}${config_key}"
+  local level1_variable_name="${namespace}${level1}_${config_key}"
+  local level2_variable_name="${nampspace}${level1}_${level2}_${config_key}"
 
   # Two level definition
   if [[ (-n "${level2}") && (-n "${!level2_variable_name}") ]]; then
@@ -885,13 +884,11 @@ function find_env_config() {
       # Value found
       local config_value="${!selected_variable_name}"
   else
-      # Use the default
-      local selected_variable_name=""
-      local config_value="${default}"
+      local config_value=""
   fi
 
   # make the variable available aoutside of this scope
-  eval "${namespace}${config_key}"="${config_value}"
+  eval "${result_variable_name}"="${config_value}"
 }
 
 # -- KMS --
