@@ -37,7 +37,13 @@ function set_aws_mfa_token_serial {
 case "${ACCOUNT_PROVIDER}" in
     aws)
 
-        # Overrides for other auth sources
+        # Capture settings that have been set by the user
+        # Then we can use them if required
+        local_aws_user_profile="${local_aws_user_profile:-${AWS_PROFILE:-"__"}}"
+        local_aws_user_config="${local_aws_user_config:-${AWS_CONFIG_FILE:-"__"}}"
+        local_aws_user_creds="${local_aws_user_creds:-${AWS_SHARED_CREDENTIALS_FILE:-"__"}}"
+
+        # Overrides for other auth configuration
         if [[ "${AWS_AUTOMATION_USER}" == "ROLE" ]]; then
             HAMLET_AWS_AUTH_SOURCE="INSTANCE"
         fi
@@ -75,7 +81,7 @@ case "${ACCOUNT_PROVIDER}" in
         # Set the session name for auditing
         export AWS_ROLE_SESSION_NAME="hamlet_${GIT_USER:-"${CRED_ACCOUNT}"}"
 
-        info "Using AWS auth source: ${local_aws_auth_source} - ${CRED_ACCOUNT}"
+        debug "Using AWS auth source: ${local_aws_auth_source} - ${CRED_ACCOUNT} - ${local_aws_account_id}"
 
         hamlet_aws_profile=""
         profile_name="${local_aws_auth_source,,}:${local_aws_account_id}"
@@ -167,6 +173,14 @@ case "${ACCOUNT_PROVIDER}" in
 
             "CONFIG")
 
+                if [[ "${local_aws_user_config}" != "__" ]]; then
+                    export AWS_CONFIG_FILE="${local_aws_user_config}"
+                fi
+
+                if [[ "${local_aws_user_creds}" != "__" ]]; then
+                    export AWS_SHARED_CREDENTIALS_FILE="${local_aws_user_creds}"
+                fi
+
                 if [[ -n "${local_aws_account_id}" ]]; then
                     aws configure list --profile "${local_aws_account_id}" > /dev/null 2>&1
                     if [[ $? -eq 0 ]]; then
@@ -187,21 +201,30 @@ case "${ACCOUNT_PROVIDER}" in
                     warn "  - ${local_aws_account_id}"
                     warn "  - ${CRED_ACCOUNT}"
                     warn "using default profile or AWS_PROFILE if set"
+
+                    if [[ "${local_aws_user_profile}" != "__" ]]; then
+                        hamlet_aws_profile="${local_aws_user_profile}"
+                    fi
                 fi
                 ;;
 
             "NONE")
+                unset AWS_CONFIG_FILE
+                unset AWS_SHARED_CREDENTIALS_FILE
                 warn "Skipping login to AWS this won't allow you to access AWS but will continue"
                 ;;
 
             *)
                 fatal "Invalid HAMLET_AWS_AUTH_SOURCE - ${local_aws_auth_source}"
-                fatal "Possible sources are - ENV | USER | INSTANCE | CONFIG"
+                fatal "Possible sources are - ENV | USER | INSTANCE | CONFIG | NONE"
                 exit 128
                 ;;
         esac
 
-        if [[ -n "${hamlet_aws_profile}" ]]; then
+        # Unset to allow for default handling and will be reset as required
+        unset AWS_PROFILE
+
+        if [[ -n "${hamlet_aws_profile}"  ]]; then
             export AWS_PROFILE="${hamlet_aws_profile}"
 
             if [[ -n "${AUTOMATION_PROVIDER}" ]]; then
@@ -275,7 +298,7 @@ case "${ACCOUNT_PROVIDER}" in
             az_login_args+=("--tenant" "${local_az_tenant_id}")
         fi
 
-        info "Using Azure auth method: ${local_az_auth_method}"
+        debug "Using Azure auth method: ${local_az_auth_method} - ${CRED_ACCOUNT} - ${local_az_account_id}"
         case "${local_az_auth_method^^}" in
             SERVICE)
 
