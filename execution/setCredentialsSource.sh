@@ -1,0 +1,330 @@
+#!/usr/bin/env bash
+
+# Set up access to cloud providers
+# This script is designed to be sourced into other scripts
+
+# CRED_ACCOUNT is the input parameter to this script
+# The script must be called with an argument of the CRED_ACCOUNT
+CRED_ACCOUNT="${1^^}"
+
+[[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
+[[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
+
+# -- AWS - config helper functions
+function set_aws_profile_role_arn {
+    local account_id="${1}"; shift
+    local role="${1}"; shift
+
+    if [[ -n "${role}" ]]; then
+        if [[ "${role}" == arn:*:* ]]; then
+            aws configure set "profile.${account_id}.role_arn" "${role}"
+        else
+            aws configure set "profile.${account_id}.role_arn" "arn:aws:iam::${account_id}:role/${role}"
+        fi
+    fi
+}
+
+function set_aws_mfa_token_serial {
+    local account_id="${1}"; shift
+    local token_serial="${1}"; shift
+
+    if [[ -n "${token_serial}" ]]; then
+        aws configure set "profile.${account_id}.mfa_serial" "${token_serial}"
+    fi
+}
+
+
+case "${ACCOUNT_PROVIDER}" in
+    aws)
+
+        # Overrides for other auth sources
+        if [[ "${AWS_AUTOMATION_USER}" == "ROLE" ]]; then
+            HAMLET_AWS_AUTH_SOURCE="INSTANCE"
+        fi
+
+        if [[ -n "${AWS_AUTOMATION_USER}" && "${AWS_AUTOMATION_USER}" != "ROLE" ]]; then
+            HAMLET_AWS_AUTH_SOURCE="USER"
+            HAMLET_AWS_AUTH_USER="${AWS_AUTOMATION_USER}"
+        fi
+
+        if [[ -n "${AWS_AUTOMATION_ROLE}" ]]; then
+            HAMLET_AWS_AUTH_ROLE="${AWS_AUTOMATION_ROLE}"
+        fi
+
+        if [[ ( -f "${HOME}/.aws/config" || -n "${AWS_CONFIG_FILE}" ) && -z "${HAMLET_AWS_AUTH_SOURCE}" ]]; then
+            HAMLET_AWS_AUTH_SOURCE="CONFIG"
+        fi
+
+        find_env_config "local_aws_auth_source" "HAMLET" "AWS_AUTH_SOURCE" "${CRED_ACCOUNT}"
+        local_aws_auth_source="${local_aws_auth_source:-"ENV"}"
+
+        find_env_config "local_aws_account_id" "HAMLET" "AWS_ACCOUNT_ID" "${CRED_ACCOUNT}"
+        find_env_config "local_legacy_aws_account_id" "" "AWS_ACCOUNT_ID" "${CRED_ACCOUNT}"
+
+        local_aws_account_id="${local_aws_account_id:-${local_legacy_aws_account_id:-${PROVIDERID}}}"
+
+        if [[ -z "${HAMET_AWS_AUTH_ROLE}" ]]; then
+            find_env_config "local_aws_auth_role" "HAMLET" "AWS_AUTH_ROLE" "${CRED_ACCOUNT}"
+        fi
+
+        find_env_config "local_aws_auth_mfa_serial" "HAMLET" "AWS_AUTH_MFA_SERIAL" "${CRED_ACCOUNT}"
+
+        hamlet_aws_config="${HAMLET_HOME_DIR}/.aws/config"
+        hamlet_aws_credentials="${HAMLET_HOME_DIR}/.aws/credentials"
+
+        # Set the session name for auditing
+        export AWS_ROLE_SESSION_NAME="hamlet_${GIT_USER:-"${CRED_ACCOUNT}"}"
+
+        info "Using AWS auth source: ${local_aws_auth_source} - ${CRED_ACCOUNT}"
+
+        hamlet_aws_profile=""
+        profile_name="${local_aws_auth_source,,}:${local_aws_account_id}"
+
+        case "${local_aws_auth_source^^}" in
+
+            "ENV")
+                export AWS_CONFIG_FILE="${hamlet_aws_config}"
+                export AWS_SHARED_CREDENTIALS_FILE="${hamlet_aws_credentials}"
+
+                aws configure set "profile.source:env.aws_access_key_id" "${AWS_ACCESS_KEY_ID}"
+                aws configure set "profile.source:env.aws_secret_access_key" "${AWS_SECRET_ACCESS_KEY}"
+
+                if [[ -n "${AWS_SESSION_TOKEN}" ]]; then
+                    aws configure set "profile.source:env.aws_session_token" "${AWS_SESSION_TOKEN}"
+                fi
+
+                aws configure set "profile.${profile_name}.source_profile" "source:env"
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+
+                hamlet_aws_profile="${profile_name}"
+                ;;
+
+            "USER")
+                export AWS_CONFIG_FILE="${hamlet_aws_config}"
+                export AWS_SHARED_CREDENTIALS_FILE="${hamlet_aws_credentials}"
+
+                find_env_config "local_aws_auth_user" "HAMLET" "AWS_AUTH_USER" "${CRED_ACCOUNT}"
+
+                user_access_key_id_var="${local_aws_auth_user^^}_AWS_ACCESS_KEY_ID"
+                user_secret_access_key_var="${local_aws_auth_user^^}_AWS_SECRET_ACCESS_KEY"
+                user_session_token_var="${local_aws_auth_user^^}_AWS_SESSION_TOKEN"
+
+                aws configure set "profile.source:user:${local_aws_auth_user}.aws_access_key_id" "${!user_access_key_id_var}"
+                aws configure set "profile.source:user:${local_aws_auth_user}.aws_secret_access_key" "${!user_secret_access_key_var}"
+
+                if [[ -n "${!user_session_token_var}" ]]; then
+                    aws configure set "profile.source:user:${local_aws_auth_user}.session_token" "${!user_access_key_id_var}"
+                fi
+
+                aws configure set "profile.${profile_name}.source_profile" "source:user:${local_aws_auth_user}"
+
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+
+                hamlet_aws_profile="${profile_name}"
+                ;;
+
+            "INSTANCE"|"INSTANCE:EC2"|"INSTANCE:ECS")
+
+                export AWS_CONFIG_FILE="${hamlet_aws_config}"
+                export AWS_SHARED_CREDENTIALS_FILE="${hamlet_aws_credentials}"
+
+                if [[ "${local_aws_auth_source^^}" == "INSTANCE" ]]; then
+
+                    ## ECS metadata uri potential endpoints
+                    if [[ -n "${ECS_CONTAINER_METADATA_URI_V4}" || -n "${ECS_CONTAINER_METADATA_URI}"
+                            || -n "$(curl -m 1 --silent http://169.254.170.2/v2/metadata )" ]]; then
+
+                        aws configure set "profile.${profile_name}.credential_source" "EcsContainer"
+                    else
+                        # EC2 metadata endpoint
+                        metadata_token="$(curl -m 1 --silent -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)"
+                        if [[ -n "$( curl -m 1 --silent -H "X-aws-ec2-metadata-token: $metadata_token" -v http://169.254.169.254/latest/meta-data/ 2>/dev/null )" ]]; then
+
+                            aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
+
+                        fi
+                    fi
+
+                    if [[ -z "$(aws configure get "profile.${profile_name}.credential_source")" ]]; then
+                        fatal "Could not determine an instance credential source to use"
+                        fatal "Check that you are running on AWS or explicitly set the Instance type ( INSTANCE:ECS or INSTANCE:EC2)"
+                        exit 128
+                    fi
+
+                # Explicit overrides instead of discovery
+                elif [[ "${local_aws_auth_source^^}" == "INSTANCE:ECS" ]]; then
+                    aws configure set "profile.${profile_name}.credential_source" "EcsContainer"
+
+                elif [[ "${local_aws_auth_source^^}" == "INSTANCE:EC2" ]]; then
+                    aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
+                fi
+
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                hamlet_aws_profile="${profile_name}"
+                ;;
+
+            "CONFIG")
+
+                if [[ -n "${local_aws_account_id}" ]]; then
+                    aws configure list --profile "${local_aws_account_id}" > /dev/null 2>&1
+                    if [[ $? -eq 0 ]]; then
+                        hamlet_aws_profile="${local_aws_account_id}"
+                    fi
+                else
+                    if [[ -n "${CRED_ACCOUNT}" ]]; then
+                        aws configure list --profile "${CRED_ACCOUNT}" > /dev/null 2>&1
+                        if [[ $? -eq 0 ]]; then
+                            hamlet_aws_profile="${CRED_ACCOUNT}"
+                        fi
+                    fi
+                fi
+
+                if [[ -z "${hamlet_aws_profile}" ]]; then
+                    warn "Could not find a profile in local aws config"
+                    warn "Excepted one of these profiles:"
+                    warn "  - ${local_aws_account_id}"
+                    warn "  - ${CRED_ACCOUNT}"
+                    warn "using default profile or AWS_PROFILE if set"
+                fi
+                ;;
+
+            *)
+                fatal "Invalid HAMLET_AWS_AUTH_SOURCE - ${local_aws_auth_source}"
+                fatal "Possible sources are - ENV | USER | INSTANCE | CONFIG"
+                exit 128
+                ;;
+        esac
+
+        if [[ -n "${hamlet_aws_profile}" ]]; then
+            export AWS_PROFILE="${hamlet_aws_profile}"
+
+            if [[ -n "${AUTOMATION_PROVIDER}" ]]; then
+                save_context_property AWS_PROFILE "${hamlet_aws_profile}"
+            fi
+
+            # workaround for https://github.com/aws/aws-cli/issues/3304
+            unset AWS_ACCESS_KEY_ID
+            unset AWS_SECRET_ACCESS_KEY
+            unset AWS_SESSION_TOKEN
+
+            if [[ -n "${AUTOMATION_PROVIDER}" ]]; then
+                save_context_property AWS_ACCESS_KEY_ID ""
+                save_context_property AWS_SECRET_ACCESS_KEY ""
+                save_context_property AWS_SESSION_TOKEN ""
+            fi
+        fi
+
+        if [[ -n "${AWS_CONFIG_FILE}" ]]; then
+            if [[ -n "${AUTOMATION_PROVIDER}" ]]; then
+                save_context_property AWS_CONFIG_FILE "${AWS_CONFIG_FILE}"
+            fi
+        fi
+
+        if [[ -n "${AWS_SHARED_CREDENTIALS_FILE}" ]]; then
+            if [[ -n "${AUTOMATION_PROVIDER}" ]]; then
+                save_context_property AWS_SHARED_CREDENTIALS_FILE "${AWS_SHARED_CREDENTIALS_FILE}"
+            fi
+        fi
+
+        # Validate that the determined configuration will provide access to the account
+        profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
+        if [[ -n "${local_aws_account_id}" ]]; then
+            if [[ "${profile_account}" != "${local_aws_account_id}" ]]; then
+                fatal "The provided credentials don't provide access to the account requested - ${CRED_ACCOUNT} ${local_aws_account_id}"
+                fatal "Check your aws credentials configuration  and try again"
+                exit 128
+            fi
+        fi
+        ;;
+
+    azure)
+
+        az_login_args=()
+        # -- Only show errors unless debugging --
+        if willLog "${LOG_LEVEL_DEBUG}"; then
+            az_login_args+=("--output" "json" )
+        else
+            az_login_args+=("--output" "none" )
+        fi
+
+        find_env_config "local_az_auth_method" "HAMLET" "AZ_AUTH_METHOD" "${CRED_ACCOUNT}"
+        find_env_config "local_legacy_az_auth_method" "" "AZ_AUTOMATION_AUTH_METHOD" "${CRED_ACCOUNT}"
+
+        local_az_auth_method="${local_az_auth_method:-${local_legacy_az_auth_method:-"INTERACTIVE"}}"
+
+        find_env_config "local_az_account_id" "HAMLET" "AZ_ACCOUNT_ID" "${CRED_ACCOUNT}"
+        find_env_config "local_legacy_az_accound_id" "" "AZ_ACCOUNT_ID" "${CRED_ACCOUNT}"
+
+        local_az_account_id="${local_az_account_id:-${local_legacy_az_accound_id:-${PROVIDERID}}}"
+
+
+        find_env_config "local_az_tenant_id" "HAMLET" "AZ_TENANT_ID" "${CRED_ACCOUNT}"
+        find_env_config "local_legacy_az_tentant_id" "" "AZ_TENANT_ID" "${CRED_ACCOUNT}"
+
+        local_az_tenant_id="${local_az_tenant_id:-${local_legacy_az_tentant_id}}"
+
+        if [[ -n "${local_az_tenant_id}" ]]; then
+            az_login_args+=("--tenant" "${local_az_tenant_id}")
+        fi
+
+        info "Using Azure auth method: ${local_az_auth_method}"
+        case "${local_az_auth_method^^}" in
+            SERVICE)
+
+                find_env_config "local_az_username" "HAMLET" "AZ_USERNAME" "${CRED_ACCOUNT}"
+                find_env_config "local_legacy_az_username" "" "AZ_USERNAME" "${CRED_ACCOUNT}"
+
+                local_az_username="${local_az_username:-${local_legacy_az_username}}"
+
+                find_env_config "local_az_pass" "HAMLET" "AZ_PASS" "${CRED_ACCOUNT}"
+                find_env_config "local_legacy_az_pass" "" "AZ_PASS" "${CRED_ACCOUNT}"
+
+                local_az_pass="${local_az_pass:-${local_legacy_az_pass}}"
+
+                if [[ (-z "${local_az_username}") || ( -z "${local_az_pass}") || ( -z "${local_az_tenant_id}") ]]; then
+                    fatal "Azure Service prinicpal login missing information - requires environment - HAMLET_AZ_USERNAME | HAMLET_AZ_PASS | HAMLET_AZ_TENANT_ID"
+                    exit 255
+                fi
+
+                az login --service-principal --username "${local_az_username}" --password "${local_az_pass}" ${az_login_args[@]}
+                ;;
+
+            MANAGED)
+                az login --identity "${az_login_args[@]}"
+                ;;
+
+            INTERACTIVE)
+                if [[ -n "$(az account list --query '[*].id' --output tsv 2> /dev/null )" ]]; then
+                    username="$( az account list --query '[0].user.name' --output tsv)"
+
+                    info "Already logged in as ${username:-"unkown"}"
+                    info "   - To use a different user run az logout"
+                else
+                    az login "${az_login_args[@]}"
+                fi
+                ;;
+
+            NONE)
+                warn "Skipping Login to Azure this won't allow you to access Azure"
+                ;;
+
+            *)
+                fatal "Invalid HAMLET_AZ_AUTH_METHOD - ${local_az_auth_method}"
+                fatal "Possible methods are - SERVICE | MANAGED | INTERACTIVE | NONE"
+                exit 128
+                ;;
+        esac
+
+        if [[ "${local_az_auth_method^^}" != "NONE" ]]; then
+            # Set the current subscription to use
+            az account set --subscription "${local_az_account_id}" "${az_login_args[@]}" > /dev/null || { fatal "Could not login to subscription ${CRED_ACCOUNT} ${local_az_auth_method}"; exit 128; }
+        fi
+
+        ;;
+    *)
+        fatal "Unkown account provider ${ACCOUNT_PROVIDER}"
+        exit 128
+        ;;
+esac
