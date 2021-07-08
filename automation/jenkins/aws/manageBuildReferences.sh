@@ -497,7 +497,14 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
             # Most likely it is the first time this unit has been mentioned and no format was
             # included as part of the prepare operation.
             [[ "${IMAGE_FORMATS}" == "?" ]] &&
-                        fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit. Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time." && RESULT=1 && exit
+                {
+                    fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit"
+                    fatal "Valid image formats are ${REGISTRY_TYPES_LIST}"
+                    fatal "Automation scripts: Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time."
+                    fatal "hamlet cli: provide the --image-format option"
+                    RESULT=1
+                    exit
+                }
 
             for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
                 IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"

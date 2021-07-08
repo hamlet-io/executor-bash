@@ -157,6 +157,9 @@ function defineGitProviderSettings() {
 }
 
 REGISTRY_TYPES=("dataset" "docker" "lambda" "pipeline" "scripts" "swagger" "openapi" "spa" "contentnode" "rdssnapshot" )
+
+save_context_property "REGISTRY_TYPES_LIST"  "$(listFromArray "REGISTRY_TYPES" ",")"
+
 REGISTRY_PROVIDERS=()
 function defineRegistryProviderSettings() {
     # Define key values about use of a docker provider
