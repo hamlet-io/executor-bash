@@ -1,1 +1,1 @@
-../../../execution/setCredentials.sh
+../../../execution/setCredentialsSource.sh
