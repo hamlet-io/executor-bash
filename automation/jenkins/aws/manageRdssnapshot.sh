@@ -158,48 +158,6 @@ function defineRegistryProviderAttributes() {
     done
 }
 
-PROVIDER_IDS=()
-PROVIDER_AWS_ACCESS_KEY_IDS=()
-PROVIDER_AWS_SECRET_ACCESS_KEYS=()
-PROVIDER_AWS_SESSION_TOKENS=()
-
-# Set credentials for S3 access
-# $1 = provider
-function setCredentials() {
-
-    # Key variables
-    local SC_PROVIDER="${1^^}"
-
-    # Check if credentials already obtained
-    for INDEX in $(seq 0 $((${#PROVIDER_IDS[@]}-1 )) ); do
-        if [[ "${PROVIDER_IDS[$INDEX]}" == "${SC_PROVIDER}" ]]; then
-            # Use cached credentials
-            export AWS_ACCESS_KEY_ID="${PROVIDER_AWS_ACCESS_KEY_IDS[$INDEX]}"
-            export AWS_SECRET_ACCESS_KEY="${PROVIDER_AWS_SECRET_ACCESS_KEYS[$INDEX]}"
-            export AWS_SESSION_TOKEN="${PROVIDER_AWS_SESSION_TOKENS[$INDEX]}"
-            [[ -z "${AWS_SESSION_TOKEN}" ]] && unset AWS_SESSION_TOKEN
-            return 0
-        fi
-    done
-
-    # New registry - set up the AWS credentials
-    . ${AUTOMATION_DIR}/setCredentials.sh "${SC_PROVIDER}"
-
-    # Define the credentials
-    export AWS_ACCESS_KEY_ID="${AWS_CRED_TEMP_AWS_ACCESS_KEY_ID:-${!AWS_CRED_AWS_ACCESS_KEY_ID_VAR}}"
-    export AWS_SECRET_ACCESS_KEY="${AWS_CRED_TEMP_AWS_SECRET_ACCESS_KEY:-${!AWS_CRED_AWS_SECRET_ACCESS_KEY_VAR}}"
-    export AWS_SESSION_TOKEN="${AWS_CRED_TEMP_AWS_SESSION_TOKEN}"
-    [[ -z "${AWS_SESSION_TOKEN}" ]] && unset AWS_SESSION_TOKEN
-
-    # Cache the redentials
-    PROVIDER_IDS+=("${SC_PROVIDER}")
-    PROVIDER_AWS_ACCESS_KEY_IDS+=("${AWS_ACCESS_KEY_ID}")
-    PROVIDER_AWS_SECRET_ACCESS_KEYS+=("${AWS_SECRET_ACCESS_KEY}")
-    PROVIDER_AWS_SESSION_TOKENS+=("${AWS_SESSION_TOKEN}")
-    return 0
-
-}
-
 # Apply local registry defaults
 SNAPSHOT_TYPE="${SNAPSHOT_TYPE:-${SNAPSHOT_TYPE_DEFAULT}}"
 SNAPSHOT_PROVIDER_VAR="PRODUCT_${SNAPSHOT_TYPE^^}_PROVIDER"
@@ -276,7 +234,7 @@ fi
 REMOTE_SNAPSHOT_IMAGE="${REMOTE_SNAPSHOT_PROVIDER_PREFIX}-${SNAPSHOT_TYPE}-${SNAPSHOT_REPO}"
 
 # Set up credentials for registry access
-setCredentials "${SNAPSHOT_PROVIDER}"
+. ${AUTOMATION_DIR}/setCredentials.sh "${SNAPSHOT_PROVIDER}"
 SNAPSHOT_PROVIDER_AWS_ACCOUNT_ID_VAR="${SNAPSHOT_PROVIDER^^}_AWS_ACCOUNT_ID"
 
 # Confirm access to the local registry
@@ -342,7 +300,7 @@ case ${SNAPSHOT_OPERATION} in
 
     ${SNAPSHOT_OPERATION_PULL})
         # Get access to the remote registry
-        setCredentials "${REMOTE_SNAPSHOT_PROVIDER}"
+        . ${AUTOMATION_DIR}/setCredentials.sh "${REMOTE_SNAPSHOT_PROVIDER}"
 
         # Confirm image is present
         SNAPSHOT_SNAPSHOT_ARN="$(aws --region "${SNAPSHOT_PROVIDER_REGION}" rds describe-db-snapshots --db-snapshot-identifier "${SNAPSHOT_IMAGE}" --query "DBSnapshots[0].DBSnapshotArn" --output text )"
@@ -353,7 +311,8 @@ case ${SNAPSHOT_OPERATION} in
         else
 
             # Now see if its available in the local registry
-            setCredentials "${SNAPSHOT_PROVIDER}"
+            . ${AUTOMATION_DIR}/setCredentials.sh "${SNAPSHOT_PROVIDER}"
+
             aws --region "${SNAPSHOT_PROVIDER_REGION}" rds describe-db-snapshots --db-snapshot-identifier "${SNAPSHOT_IMAGE}" >/dev/null 2>&1
             RESULT=$?
             if [[ "$RESULT" -eq 0 ]]; then
@@ -361,7 +320,7 @@ case ${SNAPSHOT_OPERATION} in
                 exit 0
             else
                 # share the snapshot from the remote registry to the local registry
-                setCredentials "${REMOTE_SNAPSHOT_PROVIDER}"
+                . ${AUTOMATION_DIR}/setCredentials.sh "${REMOTE_SNAPSHOT_PROVIDER}"
                 aws --region "${REMOTE_SNAPSHOT_PROVIDER_REGION}" rds modify-db-snapshot-attribute --db-snapshot-identifier "${REMOTE_SNAPSHOT_IMAGE}" --attribute-name restore --values-to-add "${!SNAPSHOT_PROVIDER_AWS_ACCOUNT_ID_VAR}" >/dev/null 2>&1
 
                 RESULT=$?
@@ -371,7 +330,7 @@ case ${SNAPSHOT_OPERATION} in
                 fi
 
                 # now copy the snapshot to the local registry so we have our own copy
-                setCredentials "${SNAPSHOT_PROVIDER}"
+                . ${AUTOMATION_DIR}/setCredentials.sh "${SNAPSHOT_PROVIDER}"
 
                 # A build will create a new snapshot we just need to bring it into the registry
                 LOCAL_SNAPSHOT_IMAGE_ARN="$(aws --region "${SNAPSHOT_PROVIDER_REGION}" rds copy-db-snapshot --source-db-snapshot-identifier "${SNAPSHOT_SNAPSHOT_ARN}" --target-db-snapshot-identifier "${SNAPSHOT_IMAGE}" --query 'DBSnapshot.DBSnapshotArn' --tags Key=RegistrySnapshot,Value="true" --no-copy-tags --output text || exit $?)"

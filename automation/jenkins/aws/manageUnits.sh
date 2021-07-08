@@ -105,11 +105,6 @@ function main() {
       info "${DRYRUN}Getting credentials for account ${account} ...\n"
 
       . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-      export ACCOUNT_AWS_ACCESS_KEY_ID_VAR="${AWS_CRED_AWS_ACCESS_KEY_ID_VAR}"
-      export ACCOUNT_AWS_SECRET_ACCESS_KEY_VAR="${AWS_CRED_AWS_SECRET_ACCESS_KEY_VAR}"
-      export ACCOUNT_TEMP_AWS_ACCESS_KEY_ID="${AWS_CRED_TEMP_AWS_ACCESS_KEY_ID}"
-      export ACCOUNT_TEMP_AWS_SECRET_ACCESS_KEY="${AWS_CRED_TEMP_AWS_SECRET_ACCESS_KEY}"
-      export ACCOUNT_TEMP_AWS_SESSION_TOKEN="${AWS_CRED_TEMP_AWS_SESSION_TOKEN}"
     fi
 
     for level in "${levels_required[@]}"; do
