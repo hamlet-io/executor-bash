@@ -190,6 +190,10 @@ case "${ACCOUNT_PROVIDER}" in
                 fi
                 ;;
 
+            "NONE")
+                warn "Skipping login to AWS this won't allow you to access AWS but will continue"
+                ;;
+
             *)
                 fatal "Invalid HAMLET_AWS_AUTH_SOURCE - ${local_aws_auth_source}"
                 fatal "Possible sources are - ENV | USER | INSTANCE | CONFIG"
@@ -228,13 +232,15 @@ case "${ACCOUNT_PROVIDER}" in
             fi
         fi
 
-        # Validate that the determined configuration will provide access to the account
-        profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
-        if [[ -n "${local_aws_account_id}" ]]; then
-            if [[ "${profile_account}" != "${local_aws_account_id}" ]]; then
-                fatal "The provided credentials don't provide access to the account requested - ${CRED_ACCOUNT} ${local_aws_account_id}"
-                fatal "Check your aws credentials configuration  and try again"
-                exit 128
+        if [[ "${local_aws_auth_source}" != "NONE" ]]; then
+            # Validate that the determined configuration will provide access to the account
+            profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
+            if [[ -n "${local_aws_account_id}" ]]; then
+                if [[ "${profile_account}" != "${local_aws_account_id}" ]]; then
+                    fatal "The provided credentials don't provide access to the account requested - ${CRED_ACCOUNT} ${local_aws_account_id}"
+                    fatal "Check your aws credentials configuration  and try again"
+                    exit 128
+                fi
             fi
         fi
         ;;
