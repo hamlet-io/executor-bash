@@ -222,6 +222,14 @@ DEPLOYMENT_GROUP = ${DEFAULT_DEPLOYMENT_GROUP}
 NOTES:
 RELEASE_CHANNEL default is environment
 
+OUTPUTS:
+  context.properties
+    - EXPO_OTA_URL - The base URL of the OTA producde from this task
+    - EXPO_ARCHIVE_S3_URL - Path to the built OTA based on build rerference
+    - BUILD_REFERENCE - The build reference for the current job
+    - DEPLOYMENT_UNIT - The deployment unit the publish was run for
+    - DEPLOYMENT_GROUP - The deployment group the deployment unit belongs to
+
 EOF
     exit
 }
@@ -433,6 +441,16 @@ function main() {
         OTA_VERSION="${EXPO_SDK_VERSION}"
     fi
 
+
+  # Defin an archive based on build references to allow for source map replays and troubleshooting
+  EXPO_ARCHIVE_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/archive/${BUILD_REFERENCE}/"
+
+  # Make details available for downstream jobs
+  save_context_property "EXPO_ARCHIVE_S3_URL" "${EXPO_ARCHIVE_S3_URL}"
+  save_context_property "BUILD_REFERENCE" "${BUILD_REFERENCE}"
+  save_context_property "DEPLOYMENT_UNIT" "${DEPLOYMENT_UNIT}"
+  save_context_property "DEPLOYMENT_GROUP" "${DEPLOYMENT_GROUP}"
+
   # Determine Binary Build status
   EXPO_CURRENT_OTA_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${OTA_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
   arrayFromList EXPO_CURRENT_OTA_FILES "${EXPO_CURRENT_OTA_BUILD}"
@@ -456,11 +474,6 @@ function main() {
   if [[ -z "${EXPO_CURRENT_OTA_BUILD}" || "${FORCE_BINARY_BUILD}" == "true" || "${EXPO_CURRENT_APP_VERSION}" != "${EXPO_APP_VERSION}" ]]; then
     BUILD_BINARY="true"
   fi
-
-  # variable for sentry source map upload
-  SENTRY_SOURCE_MAP_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  echo "SENTRY_SOURCE_MAP_S3_URL=${SENTRY_SOURCE_MAP_S3_URL}" >> ${AUTOMATION_DATA_DIR}/chain.properties
-  echo "SENTRY_URL_PREFIX=~/${PUBLIC_PREFIX}" >> ${AUTOMATION_DATA_DIR}/chain.properties
 
   # Update the app.json with build context information - Also ensure we always have a unique IOS build number
   # filter out the credentials used for the build process
@@ -518,6 +531,9 @@ function main() {
 
   info "Copying OTA to CDN"
   aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}" || return $?
+
+  info "Creating archive copy based on build reference ${BUILD_REFERENCE}"
+  aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "${EXPO_ARCHIVE_S3_URL}" || return $?
 
    DETAILED_HTML_BINARY_MESSAGE="<h4>Expo Binary Builds</h4>"
    if [[ "${BUILD_BINARY}" == "false" ]]; then
@@ -837,7 +853,8 @@ function main() {
     DETAIL_MESSAGE="${DETAIL_MESSAGE} *Expo Publish Complete* - More details available <${PUBLIC_URL}/reports/build-report.html|Here>"
   fi
 
-  echo "DETAIL_MESSAGE=${DETAIL_MESSAGE}" >> ${AUTOMATION_DATA_DIR}/context.properties
+  save_context_property EXPO_OTA_URL "${EXPO_VERSION_PUBLIC_URL}"
+  save_context_property DETAIL_MESSAGE "${DETAIL_MESSAGE}"
 
   # All good
   return 0

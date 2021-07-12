@@ -891,6 +891,97 @@ function find_env_config() {
   eval "${result_variable_name}"="${config_value}"
 }
 
+
+# -- Context properties file --
+function save_context_property() {
+  local name="$1"; shift
+  local value="$1"; shift
+  local file="${1}"; shift
+
+  if [[ -z "${file}" && -n "${AUTOMATION_DATA_DIR}" ]]; then
+    file="${AUTOMATION_DATA_DIR}/context.properties"
+  fi
+
+  if [[ -z "${file}" ]]; then
+    debug "Saving context property to ${context_temp_file} - AUTOMATION_DATA_DIR not defined"
+    file="$( getTempFile "XXXXXX")"
+  fi
+
+  if [[ -n "${value}" ]]; then
+    local property_value="${value}"
+  else
+    if namedef_supported; then
+      local -n property_value="${name}"
+    else
+      eval "local property_value=\"\${${name}}\""
+    fi
+  fi
+
+  case "${AUTOMATION_PROVIDER}" in
+    jenkins|hamletcli)
+      echo "${name}=${property_value}" >> "${file}"
+      ;;
+    azurepipelines)
+      # remove trailing whitespace from any var about to be set
+      property_value_nospace=$(echo "${property_value}" | sed -e 's/[[:space:]]*$//')
+      export ${name}="${property_value_nospace}"
+      set +x
+      echo "##vso[task.setvariable variable=${name}]${property_value_nospace}"
+      set -x
+      ;;
+  esac
+}
+
+function save_chain_property() {
+  local name="$1"; shift
+  local value="$1"; shift
+
+  if [[ -n "${AUTOMATION_DATA_DIR}" ]]; then
+    file="${AUTOMATION_DATA_DIR}/chain.properties"
+  else
+    context_temp_file=getTempFile "XXXXXX"
+    debug "Saving context property to ${context_temp_file} - AUTOMATION_DATA_DIR not defined"
+    file="${context_temp_file}"
+  fi
+
+  save_context_property "${name}" "${value}" "${file}"
+
+}
+
+function define_context_property() {
+  local name="${1^^}"; shift
+  local value="$1"; shift
+  local capitalisation="$1,,"; shift
+
+  case "${capitalisation}" in
+    lower)
+      value="${value,,}"
+      ;;
+    upper)
+      value="${value^^}"
+      ;;
+  esac
+
+  declare -g ${name}="${value}"
+  save_context_property "${name}" "${value}"
+}
+
+function save_gen3_dirs_in_context() {
+  local prefix="$1"; shift
+
+  local directories=(ROOT_DIR \
+    TENANT_DIR TENANT_INFRASTRUCTURE_DIR \
+    ACCOUNT_DIR ACCOUNT_INFRASTRUCTURE_DIR ACCOUNT_SETTINGS_DIR ACCOUNT_OPERATIONS_DIR \
+    PRODUCT_DIR PRODUCT_INFRASTRUCTURE_DIR PRODUCT_SETTINGS_DIR PRODUCT_SOLUTIONS_DIR PRODUCT_OPERATIONS_DIR \
+    SEGMENT_SETTINGS_DIR SEGMENT_BUILDS_DIR SEGMENT_SHARED_BUILDS_DIR SEGMENT_SOLUTIONS_DIR)
+
+  for directory in "${directories[@]}"; do
+    save_context_property "${directory}" "$(getGen3Env "${directory}" "${prefix}")"
+  done
+
+  return 0
+}
+
 # -- KMS --
 function decrypt_kms_string() {
   local region="$1"; shift
