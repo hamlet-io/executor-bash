@@ -898,7 +898,7 @@ function save_context_property() {
   local value="$1"; shift
   local file="${1}"; shift
 
-  if [[ -z "${file}" && -n "${AUTOMATION_DATA_DIR}"  ]; then
+  if [[ -z "${file}" && -n "${AUTOMATION_DATA_DIR}" ]]; then
     file="${AUTOMATION_DATA_DIR}/context.properties"
   fi
 
@@ -936,7 +936,7 @@ function save_chain_property() {
   local name="$1"; shift
   local value="$1"; shift
 
-  if [[ -n "${AUTOMATION_DATA_DIR}"  ]; then
+  if [[ -n "${AUTOMATION_DATA_DIR}" ]]; then
     file="${AUTOMATION_DATA_DIR}/chain.properties"
   else
     context_temp_file=getTempFile "XXXXXX"
