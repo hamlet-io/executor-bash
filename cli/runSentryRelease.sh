@@ -179,6 +179,7 @@ function main() {
     "react-native")
 
         android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "android-*.js" )"
+        echo "Found file in ${android_budle} under ${SOURCE_MAP_PATH}"
         if [[ -n "${android_bundle}" ]]; then
             mv "${android_bundle}" "${SOURCE_MAP_PATH}/index.android.bundle"
         fi
