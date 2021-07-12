@@ -207,8 +207,10 @@ function main() {
 
         android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle" )"
         if [[ -n "${android_bundle}" ]]; then
-            cp $(dirname "${ios_bundandroid_bundlele}")/index.android.* "${react_source_maps}"
+            cp $(dirname "${android_bundle}")/index.android* "${react_source_maps}"
         fi
+
+        tree "${react_source_maps}"
 
         SOURCE_MAP_PATH="${react_source_maps}"
     ;;
