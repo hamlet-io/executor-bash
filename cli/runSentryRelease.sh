@@ -215,6 +215,8 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
+  echo "USING URL PREFIX ${SENTRY_URL_PREFIX}"
+
   pushd "${SOURCE_MAP_PATH}"
   sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
   popd
