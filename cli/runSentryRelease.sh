@@ -5,20 +5,9 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_SENTRY_CLI_VERSION="1.66.0"
-DEFAULT_RUN_SETUP="false"
+DEFAULT_SENTRY_CLI_VERSION="1.67.1"
 DEFAULT_SENTRY_URL_PREFIX="~/"
 DEFAULT_DEPLOYMENT_GROUP="application"
-
-function env_setup() {
-
-    # yarn install
-    yarn global add \
-        @sentry/cli@"${SENTRY_CLI_VERSION}" || return $?
-
-	# make sure yarn global bin is on path
-    export PATH="$(yarn global bin):$PATH"
-}
 
 function usage() {
     cat <<EOF
@@ -38,7 +27,6 @@ where
 (o) -m SENTRY_SOURCE_MAP_S3_URL     s3 link to sourcemap files
 (o) -p SENTRY_URL_PREFIX            prefix for sourcemap files
 (o) -r SENTRY_RELEASE               sentry release name
-(o) -s RUN_SETUP              		run setup installation to prepare
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -57,7 +45,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":a:hg:m:p:r:su:" opt; do
+    while getopts ":a:hg:m:p:r:u:" opt; do
         case $opt in
             a)
                 APP_TYPE="${OPTARG}"
@@ -70,15 +58,15 @@ function options() {
                 ;;
             m)
                 SENTRY_SOURCE_MAP_S3_URL="${OPTARG}"
+                sentry_source_map_s3_url_override="true"
                 ;;
             p)
                 SENTRY_URL_PREFIX="${OPTARG}"
+                sentry_url_override="true"
                 ;;
             r)
                 SENTRY_RELEASE="${OPTARG}"
-                ;;
-            s)
-                RUN_SETUP="true"
+                sentry_release_override="true"
                 ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
@@ -94,7 +82,6 @@ function options() {
 
     #Defaults
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
-    RUN_SETUP="${RUN_SETUP:-${DEFAULT_RUN_SETUP}}"
     SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION:-${DEFAULT_SENTRY_CLI_VERSION}}"
     SENTRY_URL_PREFIX="${SENTRY_URL_PREFIX:-${DEFAULT_SENTRY_URL_PREFIX}}"
 
@@ -105,16 +92,15 @@ function main() {
 
   options "$@" || return $?
 
-  if [[ "${RUN_SETUP}" == "true" ]]; then
-    env_setup || return $?
-  fi
-
   # Ensure mandatory arguments have been provided
   [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory
 
   # Get the generation context so we can run template generation
   . "${GENERATION_BASE_DIR}/execution/setContext.sh"
   . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+
+  npm_tool_cache="$(getTempDir "cote_npm_XXX")"
+  npx_base_args="--quiet --cache ${npm_tool_cache}"
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
@@ -139,16 +125,17 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # attempting to read sentry configuration parameter from the configuration file if it is not passed as an argument
   # configuration file for expo builds contains .AppConfig element
   # Note: for the expo builds SENTRY_SOURCE_MAP_S3_URL and SENTRY_URL_PREFIX are passed as arguments
   # because the sources and maps are uploaded to the OTA_ARTEFACT_BUCKET considering expo sdk version, which is set in app.json
   # there is no point duplicate expo sdk version as a setting in CMDB and it doesn't make sense to checkout the code to read it at this stage
-  [[ -z "${SENTRY_SOURCE_MAP_S3_URL}" ]] && SENTRY_SOURCE_MAP_S3_URL="$( jq -r '.SENTRY_SOURCE_MAP_S3_URL' <"${CONFIG_FILE}" )"
-  [[ -z "${SENTRY_URL_PREFIX}" ]] && SENTRY_URL_PREFIX="$( jq -r '.SENTRY_URL_PREFIX' <"${CONFIG_FILE}" )"
-  [[ -z "${SENTRY_RELEASE}" ]] && SENTRY_RELEASE="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_RELEASE else .SENTRY_RELEASE end' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_URL_PREFIX}" && "${sentry_url_override}" != "true" ]] && SENTRY_URL_PREFIX="$( jq -r '.SENTRY_URL_PREFIX' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_RELEASE}" && "${sentry_release_override}" != "true" ]] && SENTRY_RELEASE="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_RELEASE else .SENTRY_RELEASE end' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_SOURCE_MAP_S3_URL}" && "${sentry_source_map_s3_url_override}" != "true" ]] && SENTRY_SOURCE_MAP_S3_URL="$( jq -r '.SENTRY_SOURCE_MAP_S3_URL' <"${CONFIG_FILE}" )"
+
   [[ -z "${SENTRY_PROJECT}" ]] && SENTRY_PROJECT="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_PROJECT else .SENTRY_PROJECT end' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_URL}" ]] && SENTRY_URL="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_URL else .SENTRY_URL end' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_ORG}" ]] && SENTRY_ORG="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_ORG else .SENTRY_ORG end' <"${CONFIG_FILE}" )"
@@ -166,10 +153,10 @@ function main() {
   export SENTRY_ORG=$SENTRY_ORG
 
   info "Getting source code from from ${SENTRY_SOURCE_MAP_S3_URL}"
-  aws --region "${AWS_REGION}" s3 cp --recursive "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --recursive --only-show-errors "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
 
   info "Creating a new release ${SENTRY_RELEASE}"
-  sentry-cli releases new "${SENTRY_RELEASE}" || return $?
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases new "${SENTRY_RELEASE}" || return $?
 
   info "Uploading source maps for the release ${SENTRY_RELEASE}"
 
@@ -198,7 +185,19 @@ function main() {
             mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
 
-        upload_args+=("--strip-common-prefix")
+        # move the files into a dedicated diretory to ensure we upload them as the root
+        react_source_maps="$(getTempDir "cote_inf_XXX")"
+
+        find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_source_maps}" \;
+        find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_source_maps}" \;
+
+        # enfore the react native requirements around paths and url prefix
+        SOURCE_MAP_PATH="${react_source_maps}"
+
+        if [[ "${SENTRY_URL_PREFIX}" != "~/" ]]; then
+            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with ~/ to algin with react native requirements"
+            SENTRY_URL_PREFIX="~/"
+        fi
     ;;
 
   esac
@@ -207,10 +206,12 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite "${upload_args[@]}" || return $?
+  pushd "${SOURCE_MAP_PATH}" > /dev/null
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
+  popd
 
   info "Finalising the release ${SENTRY_RELEASE}"
-  sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
 
   DETAIL_MESSAGE="${DETAIL_MESSAGE} Source map files uploaded for the release ${SENTRY_RELEASE}."
   echo "DETAIL_MESSAGE=${DETAIL_MESSAGE}" >> ${AUTOMATION_DATA_DIR}/context.properties
