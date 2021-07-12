@@ -201,8 +201,8 @@ function main() {
         # move the files into a dedicated diretory to ensure we upload them as the root
         react_source_maps="$(getTempDir "cote_inf_XXX")"
 
-        find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_soure_maps}" \;
-        find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_soure_maps}" \;
+        find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_source_maps}" \;
+        find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_source_maps}" \;
 
         tree "${react_source_maps}"
 
