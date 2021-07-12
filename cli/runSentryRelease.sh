@@ -216,7 +216,7 @@ function main() {
   fi
 
   pushd "${SOURCE_MAP_PATH}"
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite --validate "${upload_args[@]}" || return $?
+  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
   popd
 
   info "Finalising the release ${SENTRY_RELEASE}"
