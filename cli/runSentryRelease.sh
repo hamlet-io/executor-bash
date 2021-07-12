@@ -13,8 +13,7 @@ DEFAULT_DEPLOYMENT_GROUP="application"
 function env_setup() {
 
     # yarn install
-    yarn global add \
-        @sentry/cli@"${SENTRY_CLI_VERSION}" || return $?
+    yarn global add @sentry/cli@"${SENTRY_CLI_VERSION}" || return $?
 
 	# make sure yarn global bin is on path
     export PATH="$(yarn global bin):$PATH"
@@ -204,9 +203,13 @@ function main() {
         find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_source_maps}" \;
         find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_source_maps}" \;
 
-        tree "${react_source_maps}"
-
+        # enfore the react native requirements around paths and url prefix
         SOURCE_MAP_PATH="${react_source_maps}"
+
+        if [[ "${SENTRY_URL_PREFIX}" != "~/" ]]; then
+            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with ~/ to algin with react native"
+            SENTRY_URL_PREFIX="~/"
+        fi
     ;;
 
   esac
@@ -215,9 +218,7 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
-  echo "USING URL PREFIX ${SENTRY_URL_PREFIX}"
-
-  pushd "${SOURCE_MAP_PATH}"
+  pushd "${SOURCE_MAP_PATH}" > /dev/null
   sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
   popd
 
