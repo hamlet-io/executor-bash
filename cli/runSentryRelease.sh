@@ -198,17 +198,11 @@ function main() {
             mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
 
-        ios_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle" )"
-
+        # move the files into a dedicated diretory to ensure we upload them as the root
         react_source_maps="$(getTempDir "cote_inf_XXX")"
-        if [[ -n "${ios_bundle}" ]]; then
-            cp $(dirname "${ios_bundle}")/main.jsbundle* "${react_source_maps}"
-        fi
 
-        android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle" )"
-        if [[ -n "${android_bundle}" ]]; then
-            cp $(dirname "${android_bundle}")/index.android* "${react_source_maps}"
-        fi
+        find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_soure_maps}" \;
+        find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_soure_maps}" \;
 
         tree "${react_source_maps}"
 
