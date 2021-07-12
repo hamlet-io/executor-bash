@@ -179,7 +179,6 @@ function main() {
     "react-native")
 
         android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "android-*.js" )"
-        echo "Found file in ${android_budle} under ${SOURCE_MAP_PATH}"
         if [[ -n "${android_bundle}" ]]; then
             mv "${android_bundle}" "${SOURCE_MAP_PATH}/index.android.bundle"
         fi
@@ -198,6 +197,20 @@ function main() {
         if [[ -n "${ios_map}" ]]; then
             mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
+
+        ios_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle" )"
+
+        react_source_maps="$(getTempDir "cote_inf_XXX")"
+        if [[ -n "${ios_bundle}" ]]; then
+            cp $(dirname "${ios_bundle}")/main.jsbundle* "${react_source_maps}"
+        fi
+
+        android_bundle="$( find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle" )"
+        if [[ -n "${android_bundle}" ]]; then
+            cp $(dirname "${ios_bundandroid_bundlele}")/index.android.* "${react_source_maps}"
+        fi
+
+        SOURCE_MAP_PATH="${react_source_maps}"
     ;;
 
   esac
