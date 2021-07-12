@@ -12,24 +12,25 @@ CRED_ACCOUNT="${1^^}"
 
 # -- AWS - config helper functions
 function set_aws_profile_role_arn {
+    local profile_name="${1}"; shift
     local account_id="${1}"; shift
     local role="${1}"; shift
 
     if [[ -n "${role}" ]]; then
         if [[ "${role}" == arn:*:* ]]; then
-            aws configure set "profile.${account_id}.role_arn" "${role}"
+            aws configure set "profile.${profile_name}.role_arn" "${role}"
         else
-            aws configure set "profile.${account_id}.role_arn" "arn:aws:iam::${account_id}:role/${role}"
+            aws configure set "profile.${profile_name}.role_arn" "arn:aws:iam::${account_id}:role/${role}"
         fi
     fi
 }
 
 function set_aws_mfa_token_serial {
-    local account_id="${1}"; shift
+    local profile_name="${1}"; shift
     local token_serial="${1}"; shift
 
     if [[ -n "${token_serial}" ]]; then
-        aws configure set "profile.${account_id}.mfa_serial" "${token_serial}"
+        aws configure set "profile.${profile_name}.mfa_serial" "${token_serial}"
     fi
 }
 
@@ -100,7 +101,7 @@ case "${ACCOUNT_PROVIDER}" in
                 fi
 
                 aws configure set "profile.${profile_name}.source_profile" "source:env"
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
                 set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
 
                 hamlet_aws_profile="${profile_name}"
@@ -125,7 +126,7 @@ case "${ACCOUNT_PROVIDER}" in
 
                 aws configure set "profile.${profile_name}.source_profile" "source:user:${local_aws_auth_user}"
 
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
                 set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
 
                 hamlet_aws_profile="${profile_name}"
@@ -167,7 +168,7 @@ case "${ACCOUNT_PROVIDER}" in
                     aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
                 fi
 
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_auth_role}"
+                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
                 hamlet_aws_profile="${profile_name}"
                 ;;
 
