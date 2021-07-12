@@ -97,7 +97,7 @@ function main() {
   . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
 
   npm_tool_cache="$(getTempDir "cote_npm_XXX")"
-  npx_base_args="--quiet --ignore-existing --cache ${npm_tool_cache}"
+  npx_base_args="--quiet --cache ${npm_tool_cache}"
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
