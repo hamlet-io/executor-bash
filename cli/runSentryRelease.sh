@@ -58,12 +58,15 @@ function options() {
                 ;;
             m)
                 SENTRY_SOURCE_MAP_S3_URL="${OPTARG}"
+                sentry_source_map_s3_url_override="true"
                 ;;
             p)
                 SENTRY_URL_PREFIX="${OPTARG}"
+                sentry_url_override="true"
                 ;;
             r)
                 SENTRY_RELEASE="${OPTARG}"
+                sentry_release_override="true"
                 ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
@@ -129,9 +132,10 @@ function main() {
   # Note: for the expo builds SENTRY_SOURCE_MAP_S3_URL and SENTRY_URL_PREFIX are passed as arguments
   # because the sources and maps are uploaded to the OTA_ARTEFACT_BUCKET considering expo sdk version, which is set in app.json
   # there is no point duplicate expo sdk version as a setting in CMDB and it doesn't make sense to checkout the code to read it at this stage
-  [[ -z "${SENTRY_SOURCE_MAP_S3_URL}" ]] && SENTRY_SOURCE_MAP_S3_URL="$( jq -r '.SENTRY_SOURCE_MAP_S3_URL' <"${CONFIG_FILE}" )"
-  [[ -z "${SENTRY_URL_PREFIX}" ]] && SENTRY_URL_PREFIX="$( jq -r '.SENTRY_URL_PREFIX' <"${CONFIG_FILE}" )"
-  [[ -z "${SENTRY_RELEASE}" ]] && SENTRY_RELEASE="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_RELEASE else .SENTRY_RELEASE end' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_URL_PREFIX}" && "${sentry_url_override}" != "true" ]] && SENTRY_URL_PREFIX="$( jq -r '.SENTRY_URL_PREFIX' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_RELEASE}" && "${sentry_release_override}" != "true" ]] && SENTRY_RELEASE="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_RELEASE else .SENTRY_RELEASE end' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_SOURCE_MAP_S3_URL}" && "${sentry_source_map_s3_url_override}" != "true" ]] && SENTRY_SOURCE_MAP_S3_URL="$( jq -r '.SENTRY_SOURCE_MAP_S3_URL' <"${CONFIG_FILE}" )"
+
   [[ -z "${SENTRY_PROJECT}" ]] && SENTRY_PROJECT="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_PROJECT else .SENTRY_PROJECT end' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_URL}" ]] && SENTRY_URL="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_URL else .SENTRY_URL end' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_ORG}" ]] && SENTRY_ORG="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_ORG else .SENTRY_ORG end' <"${CONFIG_FILE}" )"
@@ -191,7 +195,7 @@ function main() {
         SOURCE_MAP_PATH="${react_source_maps}"
 
         if [[ "${SENTRY_URL_PREFIX}" != "~/" ]]; then
-            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with ~/ to algin with react native"
+            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with ~/ to algin with react native requirements"
             SENTRY_URL_PREFIX="~/"
         fi
     ;;
