@@ -1138,6 +1138,11 @@ function get_cloudformation_stack_output() {
   local stackName="$1"; shift
   local resourceId="$1"; shift
   local attributeType="$1"; shift
+  local mode="$1"; shift
+
+  if [[ -z "${mode}" ]]; then
+    mode="enable"
+  fi
 
   if [[ -z "${attributeType}" || "${attributeType}" == "ref" ]]; then
     stackOutputKey="${resourceId}"
@@ -1145,7 +1150,11 @@ function get_cloudformation_stack_output() {
     stackOutputKey="${resourceId}X${attributeType}"
   fi
 
-  stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
+  if [[ "${mode}" -eq "disable" ]]; then
+    stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" "UPDATE_IN_PROGRESS" "DELETE_IN_PROGRESS" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
+  else
+    stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
+  fi
   if [[ -n "${stack_id}" ]]; then
     aws --region "${region}" cloudformation describe-stacks --stack-name "${stackName}" --query "Stacks[*].Outputs[?OutputKey == '${stackOutputKey}'].OutputValue" --output text || return $?
   fi
@@ -2410,8 +2419,10 @@ function manage_waf_logging() {
   done
   loggingDestinationArns="$(listFromArray loggingDestinationArns )"
 
-  wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" || return $?)"
-  wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
+  wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" "${action}" || return $?)"
+  if [[ -n "${wafACLLogicalId}" ]]; then
+    wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
+  fi
 
   if [[ "${action}" == "enable" ]]; then
     info "Enabling WAF Logging - WAF Arn: ${wafACLArn}"
