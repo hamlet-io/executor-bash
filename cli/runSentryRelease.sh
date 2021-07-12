@@ -5,7 +5,7 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_SENTRY_CLI_VERSION="1.66.0"
+DEFAULT_SENTRY_CLI_VERSION="1.67.1"
 DEFAULT_RUN_SETUP="false"
 DEFAULT_SENTRY_URL_PREFIX="~/"
 DEFAULT_DEPLOYMENT_GROUP="application"
@@ -198,7 +198,7 @@ function main() {
             mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
 
-        upload_args+=("--strip-common-prefix")
+        upload_args+=("--strip-prefix ${SOURCE_MAP_PATH}")
     ;;
 
   esac
@@ -207,7 +207,7 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite "${upload_args[@]}" || return $?
+  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite --validate "${upload_args[@]}" || return $?
 
   info "Finalising the release ${SENTRY_RELEASE}"
   sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
