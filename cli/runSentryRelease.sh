@@ -6,18 +6,8 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 
 #Defaults
 DEFAULT_SENTRY_CLI_VERSION="1.67.1"
-DEFAULT_RUN_SETUP="false"
 DEFAULT_SENTRY_URL_PREFIX="~/"
 DEFAULT_DEPLOYMENT_GROUP="application"
-
-function env_setup() {
-
-    # yarn install
-    yarn global add @sentry/cli@"${SENTRY_CLI_VERSION}" || return $?
-
-	# make sure yarn global bin is on path
-    export PATH="$(yarn global bin):$PATH"
-}
 
 function usage() {
     cat <<EOF
@@ -37,7 +27,6 @@ where
 (o) -m SENTRY_SOURCE_MAP_S3_URL     s3 link to sourcemap files
 (o) -p SENTRY_URL_PREFIX            prefix for sourcemap files
 (o) -r SENTRY_RELEASE               sentry release name
-(o) -s RUN_SETUP              		run setup installation to prepare
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -56,7 +45,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":a:hg:m:p:r:su:" opt; do
+    while getopts ":a:hg:m:p:r:u:" opt; do
         case $opt in
             a)
                 APP_TYPE="${OPTARG}"
@@ -76,9 +65,6 @@ function options() {
             r)
                 SENTRY_RELEASE="${OPTARG}"
                 ;;
-            s)
-                RUN_SETUP="true"
-                ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
                 ;;
@@ -93,7 +79,6 @@ function options() {
 
     #Defaults
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
-    RUN_SETUP="${RUN_SETUP:-${DEFAULT_RUN_SETUP}}"
     SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION:-${DEFAULT_SENTRY_CLI_VERSION}}"
     SENTRY_URL_PREFIX="${SENTRY_URL_PREFIX:-${DEFAULT_SENTRY_URL_PREFIX}}"
 
@@ -104,16 +89,15 @@ function main() {
 
   options "$@" || return $?
 
-  if [[ "${RUN_SETUP}" == "true" ]]; then
-    env_setup || return $?
-  fi
-
   # Ensure mandatory arguments have been provided
   [[ -z "${DEPLOYMENT_UNIT}" ]] && fatalMandatory
 
   # Get the generation context so we can run template generation
   . "${GENERATION_BASE_DIR}/execution/setContext.sh"
   . "${GENERATION_BASE_DIR}/execution/setCredentials.sh"
+
+  npm_tool_cache="$(getTempDir "cote_npm_XXX")"
+  npx_base_args="--quiet --ignore-existing --cache ${npm_tool_cache}"
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
@@ -138,7 +122,7 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --quiet "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # attempting to read sentry configuration parameter from the configuration file if it is not passed as an argument
   # configuration file for expo builds contains .AppConfig element
@@ -165,10 +149,10 @@ function main() {
   export SENTRY_ORG=$SENTRY_ORG
 
   info "Getting source code from from ${SENTRY_SOURCE_MAP_S3_URL}"
-  aws --region "${AWS_REGION}" s3 cp --recursive "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --recursive --quiet "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
 
   info "Creating a new release ${SENTRY_RELEASE}"
-  sentry-cli releases new "${SENTRY_RELEASE}" || return $?
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases new "${SENTRY_RELEASE}" || return $?
 
   info "Uploading source maps for the release ${SENTRY_RELEASE}"
 
@@ -219,11 +203,11 @@ function main() {
   fi
 
   pushd "${SOURCE_MAP_PATH}" > /dev/null
-  sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps ./ --rewrite --validate "${upload_args[@]}" || return $?
   popd
 
   info "Finalising the release ${SENTRY_RELEASE}"
-  sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
+  npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
 
   DETAIL_MESSAGE="${DETAIL_MESSAGE} Source map files uploaded for the release ${SENTRY_RELEASE}."
   echo "DETAIL_MESSAGE=${DETAIL_MESSAGE}" >> ${AUTOMATION_DATA_DIR}/context.properties
