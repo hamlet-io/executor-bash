@@ -122,7 +122,7 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp --quiet "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # attempting to read sentry configuration parameter from the configuration file if it is not passed as an argument
   # configuration file for expo builds contains .AppConfig element
@@ -149,7 +149,7 @@ function main() {
   export SENTRY_ORG=$SENTRY_ORG
 
   info "Getting source code from from ${SENTRY_SOURCE_MAP_S3_URL}"
-  aws --region "${AWS_REGION}" s3 cp --recursive --quiet "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
+  aws --region "${AWS_REGION}" s3 cp --recursive --only-show-errors "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
 
   info "Creating a new release ${SENTRY_RELEASE}"
   npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases new "${SENTRY_RELEASE}" || return $?
