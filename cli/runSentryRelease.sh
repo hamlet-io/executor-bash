@@ -197,8 +197,6 @@ function main() {
         if [[ -n "${ios_map}" ]]; then
             mv "${ios_map}" "${SOURCE_MAP_PATH}/main.jsbundle.map"
         fi
-
-        upload_args+=("--strip-prefix ${SOURCE_MAP_PATH}")
     ;;
 
   esac
@@ -207,7 +205,9 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
+  pushd "${SOURCE_MAP_PATH}"
   sentry-cli releases files "${SENTRY_RELEASE}" upload-sourcemaps "${SOURCE_MAP_PATH}" --rewrite --validate "${upload_args[@]}" || return $?
+  popd
 
   info "Finalising the release ${SENTRY_RELEASE}"
   sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
