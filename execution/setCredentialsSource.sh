@@ -10,6 +10,9 @@ CRED_ACCOUNT="${1^^}"
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 
+# Make sure we have utilities available
+. ${GENERATION_BASE_DIR}/execution/utility.sh
+
 # -- AWS - config helper functions
 function set_aws_profile_role_arn {
     local profile_name="${1}"; shift
