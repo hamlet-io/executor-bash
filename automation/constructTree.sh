@@ -341,10 +341,5 @@ RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 # locate the AWS account number to account id mappings
 export GENERATION_DATA_DIR="${BASE_DIR}"
 
-# Check the cmdb doesn't need upgrading
-debug "Checking if cmdb upgrade needed ..."
-upgrade_cmdb "${BASE_DIR}" ||
-    { RESULT=$?; fatal "CMDB upgrade failed."; exit; }
-
 # Remember directories for future steps
 save_gen3_dirs_in_context

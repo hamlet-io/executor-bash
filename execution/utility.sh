@@ -561,7 +561,9 @@ function getTempDir() {
     mktemp -d "$(getOSTempRootDir)/${template}"
 }
 
-export tmp_dir_stack=()
+# Initial the temporary directory stack but only if it
+# isn't already in use
+arrayIsEmpty "tmp_dir_stack" && export tmp_dir_stack=()
 
 function pushTempDir() {
   local template="$1"; shift
@@ -903,8 +905,8 @@ function save_context_property() {
   fi
 
   if [[ -z "${file}" ]]; then
-    debug "Saving context property to ${context_temp_file} - AUTOMATION_DATA_DIR not defined"
     file="$( getTempFile "XXXXXX")"
+    debug "Saving context property to ${file} - AUTOMATION_DATA_DIR not defined"
   fi
 
   if [[ -n "${value}" ]]; then

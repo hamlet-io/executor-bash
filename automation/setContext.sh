@@ -156,10 +156,6 @@ function defineGitProviderSettings() {
         "API_DNS" "${DGPD_PROVIDER}" "${DGPD_PROVIDER_TYPE}" "value" "api.${NAME_VALUE}"
 }
 
-REGISTRY_TYPES=("dataset" "docker" "lambda" "pipeline" "scripts" "swagger" "openapi" "spa" "contentnode" "rdssnapshot" )
-
-save_context_property "REGISTRY_TYPES_LIST"  "$(listFromArray "REGISTRY_TYPES" ",")"
-
 REGISTRY_PROVIDERS=()
 function defineRegistryProviderSettings() {
     # Define key values about use of a docker provider
@@ -737,6 +733,9 @@ function main() {
   save_context_property AUTOMATION_JOB_IDENTIFIER
   save_context_property AUTOMATION_RELEASE_IDENTIFIER
   save_context_property AUTOMATION_DEPLOYMENT_IDENTIFIER
+
+  REGISTRY_TYPES=("dataset" "docker" "lambda" "pipeline" "scripts" "swagger" "openapi" "spa" "contentnode" "rdssnapshot" )
+  save_context_property "REGISTRY_TYPES_LIST"  "$(listFromArray "REGISTRY_TYPES" ",")"
 
   # All good
   RESULT=0
