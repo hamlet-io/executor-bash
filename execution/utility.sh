@@ -1151,7 +1151,7 @@ function get_cloudformation_stack_output() {
   fi
 
   if [[ "${mode}" -eq "disable" ]]; then
-    stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" "UPDATE_IN_PROGRESS" "DELETE_IN_PROGRESS" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
+    stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" "UPDATE_IN_PROGRESS" "DELETE_IN_PROGRESS" "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
   else
     stack_id="$(aws --region "${region}" cloudformation list-stacks --stack-status-filter "CREATE_COMPLETE" "UPDATE_COMPLETE" --query "StackSummaries[?StackName == '$stackName'].StackId" --output text || return $?)"
   fi
@@ -2424,21 +2424,25 @@ function manage_waf_logging() {
     wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
   fi
 
-  if [[ "${action}" == "enable" ]]; then
-    info "Enabling WAF Logging - WAF Arn: ${wafACLArn}"
+  if [[ -z "${wafACLArn}" ]]; then
+    info "No valid WAF ARN - bypassing"
+  else
+    if [[ "${action}" == "enable" ]]; then
+      info "Enabling WAF Logging - WAF Arn: ${wafACLArn}"
 
-    loggingConfiguration="ResourceArn=${wafACLArn},LogDestinationConfigs=${loggingDestinationArns}"
-    aws --region "${region}" $wafCommand put-logging-configuration --logging-configuration "${loggingConfiguration}" || return $?
-  fi
+      loggingConfiguration="ResourceArn=${wafACLArn},LogDestinationConfigs=${loggingDestinationArns}"
+      aws --region "${region}" $wafCommand put-logging-configuration --logging-configuration "${loggingConfiguration}" || return $?
+    fi
 
-  if [[ "${action}" == "disable" ]]; then
+    if [[ "${action}" == "disable" ]]; then
 
-    info "Checking WAF Logging state..."
-    loggingEnabledArn="$(aws --region "${region}" $wafCommand list-logging-configurations --limit 100 --query "LoggingConfigurations[?ResourceArn == '$wafACLArn' ].ResourceArn" --output text || return $? )"
+      info "Checking WAF Logging state..."
+      loggingEnabledArn="$(aws --region "${region}" $wafCommand list-logging-configurations --limit 100 --query "LoggingConfigurations[?ResourceArn == '$wafACLArn' ].ResourceArn" --output text || return $? )"
 
-    if [[ -n "${loggingEnabledArn}" ]];  then
-      info "Disabling WAF Logging - WAF Arn: ${wafACLArn}"
-      aws --region "${region}" $wafCommand delete-logging-configuration --resource-arn "${wafACLArn}" || return $?
+      if [[ -n "${loggingEnabledArn}" ]];  then
+        info "Disabling WAF Logging - WAF Arn: ${wafACLArn}"
+        aws --region "${region}" $wafCommand delete-logging-configuration --resource-arn "${wafACLArn}" || return $?
+      fi
     fi
   fi
 }
