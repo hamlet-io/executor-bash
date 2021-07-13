@@ -226,7 +226,7 @@ function createRepository() {
             local registry_region="$(cut -d '.' -f 4 <<< "${registry}")"
             local registry_account="$(cut -d '.' -f 1 <<< "${registry}")"
 
-            if [[ -z "$(aws --profile "${registry_account}" --region ap-southeast-2 ecr describe-repositories --registry-id "${registry_account}" --query "repositories[?repositoryName=='${repository}'].repositoryName" --output text || return $?)" ]]; then
+            if [[ -z "$(aws --region "${registry_region}" ecr describe-repositories --registry-id "${registry_account}" --query "repositories[?repositoryName=='${repository}'].repositoryName" --output text || return $?)" ]]; then
                 # Not there yet so create it
                 aws --region ${registry_region} ecr create-repository --repository-name "${repository}" || return $?
             fi
