@@ -70,16 +70,17 @@ if [[ (-f "environment.json") ]]; then
     cd ../../../config
 fi
 
-if [[ -f "account.json" ]]; then
+if [[ -f "${current_dir}/account.json" ]]; then
     # account directory
     # We check it before checking for a product as the account directory
     # also acts as a product directory for shared infrastructure
     # An account directory may also have no product information e.g.
     # in the case of production environments in dedicated accounts.
     export LOCATION="${LOCATION:-account}"
+    [[ -z "${ACCOUNT}" ]] && export ACCOUNT="$(cd ..; fileName "$(pwd)")"
 fi
 
-if [[ -f "product.json" ]]; then
+if [[ -f "${current_dir}/product.json" ]]; then
     # product directory
     if [[ "${LOCATION}" == "account" ]]; then
         export LOCATION="account|product"
@@ -91,13 +92,7 @@ if [[ -f "product.json" ]]; then
       export PRODUCT="$(cd ..; fileName "$(pwd)")"
 fi
 
-if [[ -f "integrator.json" ]]; then
-    export LOCATION="${LOCATION:-integrator}"
-    export INTEGRATOR="$(fileName "$(pwd)")"
-fi
-
-if [[ (-f "root.json") ||
-        ((-d config) && (-d infrastructure)) ]]; then
+if [[ (-f "${current_dir}/root.json") || ((-d config) && (-d infrastructure)) ]]; then
     export LOCATION="${LOCATION:-root}"
 fi
 
