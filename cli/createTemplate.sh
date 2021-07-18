@@ -157,17 +157,19 @@ function options() {
     else
       debug "Using CMDB composites"
 
-      case "${DEPLOYMENT_GROUP}" in
-        account)
-          [[ -z "${ACCOUNT_DIR}" ]] &&
-            fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
-          ;;
+      if [[ -n "${DEPLOYMENT_GROUP}" ]]; then
+        case "${DEPLOYMENT_GROUP}" in
+          account)
+            [[ -z "${ACCOUNT_DIR}" ]] &&
+              fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
+            ;;
 
-        *)
-          [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
-            fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
-          ;;
-      esac
+          *)
+            [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
+              fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
+            ;;
+        esac
+      fi
 
       # Assemble settings
       export COMPOSITE_SETTINGS="${CACHE_DIR}/composite_settings.json"
