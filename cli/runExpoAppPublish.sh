@@ -442,11 +442,13 @@ function main() {
     fi
 
 
-  # Defin an archive based on build references to allow for source map replays and troubleshooting
+  # Define an archive based on build references to allow for source map replays and troubleshooting
   EXPO_ARCHIVE_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/archive/${BUILD_REFERENCE}/"
 
   # Make details available for downstream jobs
-  save_context_property "EXPO_ARCHIVE_S3_URL" "${EXPO_ARCHIVE_S3_URL}"
+  save_context_property "EXPO_ARCHIVE_S3_URL" "${EXPO_ARCHIVE_S3_URL}/bundles"
+  # Set prefix for expo-managed applications
+  save_context_property "EXPO_SENTRY_URL_PREFIX" "~/${PUBLIC_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}/bundles"
   save_context_property "BUILD_REFERENCE" "${BUILD_REFERENCE}"
   save_context_property "DEPLOYMENT_UNIT" "${DEPLOYMENT_UNIT}"
   save_context_property "DEPLOYMENT_GROUP" "${DEPLOYMENT_GROUP}"
