@@ -70,7 +70,12 @@ if [[ (-f "environment.json") ]]; then
     cd ../../../config
 fi
 
-if [[ -f "${current_dir}/account.json" ]]; then
+# handle the different structure for account and product sections of the CMDB
+if [[ "$(pwd)" == "${infrastructure_dir}" && -d "../config" ]]; then
+    cd ../config
+fi
+
+if [[ -f "account.json" ]]; then
     # account directory
     # We check it before checking for a product as the account directory
     # also acts as a product directory for shared infrastructure
@@ -80,7 +85,7 @@ if [[ -f "${current_dir}/account.json" ]]; then
     [[ -z "${ACCOUNT}" ]] && export ACCOUNT="$(cd ..; fileName "$(pwd)")"
 fi
 
-if [[ -f "${current_dir}/product.json" ]]; then
+if [[ -f "product.json" ]]; then
     # product directory
     if [[ "${LOCATION}" == "account" ]]; then
         export LOCATION="account|product"
@@ -92,7 +97,7 @@ if [[ -f "${current_dir}/product.json" ]]; then
       export PRODUCT="$(cd ..; fileName "$(pwd)")"
 fi
 
-if [[ (-f "${current_dir}/root.json") || ((-d config) && (-d infrastructure)) ]]; then
+if [[ (-f "root.json") || ((-d config) && (-d infrastructure)) ]]; then
     export LOCATION="${LOCATION:-root}"
 fi
 
