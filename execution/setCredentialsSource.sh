@@ -96,18 +96,24 @@ case "${ACCOUNT_PROVIDER}" in
                 export AWS_CONFIG_FILE="${hamlet_aws_config}"
                 export AWS_SHARED_CREDENTIALS_FILE="${hamlet_aws_credentials}"
 
-                aws configure set "profile.source:env.aws_access_key_id" "${AWS_ACCESS_KEY_ID}"
-                aws configure set "profile.source:env.aws_secret_access_key" "${AWS_SECRET_ACCESS_KEY}"
+                hamlet_aws_profile="source:env"
+
+                aws configure set "profile.${hamlet_aws_profile}.aws_access_key_id" "${AWS_ACCESS_KEY_ID}"
+                aws configure set "profile.${hamlet_aws_profile}.aws_secret_access_key" "${AWS_SECRET_ACCESS_KEY}"
 
                 if [[ -n "${AWS_SESSION_TOKEN}" ]]; then
-                    aws configure set "profile.source:env.aws_session_token" "${AWS_SESSION_TOKEN}"
+                    aws configure set "profile.${hamlet_aws_profile}.aws_session_token" "${AWS_SESSION_TOKEN}"
                 fi
 
-                aws configure set "profile.${profile_name}.source_profile" "source:env"
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
-                set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+                set_aws_mfa_token_serial "${hamlet_aws_profile}" "${local_aws_auth_mfa_serial}"
 
-                hamlet_aws_profile="${profile_name}"
+                if [[ -n "${local_aws_auth_role}" ]]; then
+                    aws configure set "profile.${profile_name}.source_profile" "${hamlet_aws_profile}"
+                    set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
+                    set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+
+                    hamlet_aws_profile="${profile_name}"
+                fi
                 ;;
 
             "USER")
@@ -116,23 +122,29 @@ case "${ACCOUNT_PROVIDER}" in
 
                 find_env_config "local_aws_auth_user" "HAMLET" "AWS_AUTH_USER" "${CRED_ACCOUNT}"
 
+                hamlet_aws_profile="source:user:${local_aws_auth_user}"
+
                 user_access_key_id_var="${local_aws_auth_user^^}_AWS_ACCESS_KEY_ID"
                 user_secret_access_key_var="${local_aws_auth_user^^}_AWS_SECRET_ACCESS_KEY"
                 user_session_token_var="${local_aws_auth_user^^}_AWS_SESSION_TOKEN"
 
-                aws configure set "profile.source:user:${local_aws_auth_user}.aws_access_key_id" "${!user_access_key_id_var}"
-                aws configure set "profile.source:user:${local_aws_auth_user}.aws_secret_access_key" "${!user_secret_access_key_var}"
+                aws configure set "profile.${hamlet_aws_profile}.aws_access_key_id" "${!user_access_key_id_var}"
+                aws configure set "profile.${hamlet_aws_profile}.aws_secret_access_key" "${!user_secret_access_key_var}"
 
                 if [[ -n "${!user_session_token_var}" ]]; then
-                    aws configure set "profile.source:user:${local_aws_auth_user}.session_token" "${!user_access_key_id_var}"
+                    aws configure set "profile.${hamlet_aws_profile}.session_token" "${!user_access_key_id_var}"
                 fi
 
-                aws configure set "profile.${profile_name}.source_profile" "source:user:${local_aws_auth_user}"
+                set_aws_mfa_token_serial "${hamlet_aws_profile}" "${local_aws_auth_mfa_serial}"
 
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
-                set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+                if [[ -n "${local_aws_auth_role}" ]]; then
+                    aws configure set "profile.${profile_name}.source_profile" "${hamlet_aws_profile}"
 
-                hamlet_aws_profile="${profile_name}"
+                    set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
+                    set_aws_mfa_token_serial "${profile_name}" "${local_aws_auth_mfa_serial}"
+
+                    hamlet_aws_profile="${profile_name}"
+                fi
                 ;;
 
             "INSTANCE"|"INSTANCE:EC2"|"INSTANCE:ECS")
@@ -171,7 +183,10 @@ case "${ACCOUNT_PROVIDER}" in
                     aws configure set "profile.${profile_name}.credential_source" "Ec2InstanceMetadata"
                 fi
 
-                set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
+                if [[ -n "${local_aws_auth_role}" ]]; then
+                    set_aws_profile_role_arn "${profile_name}" "${local_aws_account_id}" "${local_aws_auth_role}"
+                fi
+
                 hamlet_aws_profile="${profile_name}"
                 ;;
 
@@ -260,12 +275,16 @@ case "${ACCOUNT_PROVIDER}" in
         fi
 
         if [[ "${local_aws_auth_source}" != "NONE" ]]; then
-            # Validate that the determined configuration will provide access to the account
-            profile_account="$(aws sts get-caller-identity --query 'Account' --output text)"
+            profile_account="$(aws sts get-caller-identity --query 'Account' --output text || exit $?)"
             if [[ -n "${local_aws_account_id}" ]]; then
                 if [[ "${profile_account}" != "${local_aws_account_id}" ]]; then
-                    fatal "The provided credentials don't provide access to the account requested - ${CRED_ACCOUNT} ${local_aws_account_id}"
-                    fatal "Check your aws credentials configuration  and try again"
+                    fatal "The provided credentials don't provide access to the account requested"
+                    fatal "  - Hamlet Account Id: ${CRED_ACCOUNT}"
+                    fatal "  - AWS Account Id: ${local_aws_account_id}"
+                    fatal "  - HAMLET_AWS_AUTH_SOURCE: ${local_aws_auth_source}"
+                    fatal "  - HAMLET_AWS_AUTH_ROLE: ${local_aws_aith_role}"
+                    fatal "Check your aws credentials configuration and try again"
+                    fatal "Make sure to set HAMLET_AWS_AUTH_ROLE if you need to switch role to access the account"
                     exit 128
                 fi
             fi
