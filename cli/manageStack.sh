@@ -177,7 +177,7 @@ function wait_for_stack_execution() {
       esac
 
       # Watch for roll backs
-      if echo "${stack_status}" | egrep --quiet "*ROLLBACK_COMPLETE"; then
+      if [[ "${stack_status}" == *ROLLBACK_COMPLETE ]]; then
         echo ""
         warning "Stack ${STACK_NAME} could not complete and a rollback was performed"
         get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
@@ -187,7 +187,7 @@ function wait_for_stack_execution() {
       fi
 
       # Watch for failures
-      if echo "${stack_status}" | egrep --quiet "*FAILED"; then
+      if [[ "${stack_status}" == *FAILED ]]; then
         echo ""
         fatal "Stack ${STACK_NAME} failed, fix stack before retrying"
         get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
@@ -198,7 +198,7 @@ function wait_for_stack_execution() {
       # Finished if complete
       # If the initial create was not saved for any reason, the stack may have a status of CREATE_COMPLETE
       # even though the current operation is an UPDATE
-      if echo "${stack_status}" | egrep --quiet "^(CREATE|UPDATE)_COMPLETE$"; then
+      if [[ "${stack_status}" =~ ^(CREATE|UPDATE)_COMPLETE$ ]]; then
         echo ""
         info "Stack ${STACK_NAME} completed with status ${stack_status}"
         [[ -n "${change_set_state}" ]] && echo "${change_set_state}" > "${CHANGE}"
@@ -207,7 +207,7 @@ function wait_for_stack_execution() {
       fi
 
       # Abort if not still in progress
-      if ! echo "${stack_status}" | egrep --quiet "*_IN_PROGRESS"; then
+      if [[ ! "${stack_status}" == *_IN_PROGRESS ]]; then
         echo ""
         info "Stack ${STACK_NAME} in an unexpected state with status ${stack_status}"
         get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
