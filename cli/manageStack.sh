@@ -195,9 +195,13 @@ function wait_for_stack_execution() {
         break
       fi
 
-      # Finished if complete
-      # If the initial create was not saved for any reason, the stack may have a status of CREATE_COMPLETE
-      # even though the current operation is an UPDATE
+      if [[ "${stack_status}" == "DELETE_COMPLETE" ]]; then
+        echo ""
+        info "Stack ${STACK_NAME} delete completed with status ${stack_status}"
+        break
+      fi
+
+      # Update State and break if the stack operation was completed
       if [[ "${stack_status}" =~ ^(CREATE|UPDATE)_COMPLETE$ ]]; then
         echo ""
         info "Stack ${STACK_NAME} completed with status ${stack_status}"
