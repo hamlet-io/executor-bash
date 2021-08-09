@@ -63,6 +63,8 @@ DEFAULT_EXPO_VERSION="4.1.6"
 DEFAULT_TURTLE_VERSION="0.20.7"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
+DEFAULT_ENVIRONMENT_BADGE="false"
+
 DEFAULT_RUN_SETUP="false"
 DEFAULT_FORCE_BINARY_BUILD="false"
 DEFAULT_SUBMIT_BINARY="false"
@@ -204,6 +206,7 @@ where
 (o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
 (o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
 (o) -l BUILD_LOGS             show the build logs for binary builds
+(o) -e ENVIRONMENT_BADGE      add a badge to the app icons with the environment
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -237,10 +240,13 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":b:fg:hk:lmn:sq:t:u:v:" opt; do
+    while getopts ":b:efg:hk:lmn:sq:t:u:v:" opt; do
         case $opt in
             b)
                 BINARY_BUILD_PROCESS="${OPTARG}"
+                ;;
+            f)
+                ENVIRONMENT_BADGE="true"
                 ;;
             f)
                 FORCE_BINARY_BUILD="true"
@@ -296,6 +302,7 @@ function options() {
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
     KMS_PREFIX="${KMS_PREFIX:-${DEFAULT_KMS_PREFIX}}"
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
+    ENVIRONMENT_BADGE="${ENVIRONMENT_BADGE:-${DEFAULT_ENVIRONMENT_BADGE}}"
 
 }
 
@@ -354,6 +361,8 @@ function main() {
   CONFIG_BUCKET="$( jq -r '.Occurrence.State.Attributes.CONFIG_BUCKET' < "${BUILD_BLUEPRINT}" )"
   CONFIG_KEY="$( jq -r '.Occurrence.State.Attributes.CONFIG_FILE' < "${BUILD_BLUEPRINT}" )"
   CONFIG_FILE="${OPS_PATH}/config.json"
+
+  ENVIRONMENT="$( jq -r '.Occurrence.Core.Environment.Name' < "${BUILD_BLUEPRINT}" )"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
   aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
@@ -612,6 +621,18 @@ function main() {
 
             "fastlane")
                 echo "Using fastlane to build the binary image"
+
+                # Adds a shield to the App icons with the environment for the app
+                if [[ "${ENVIRONMENT_BADGE}" == "true" ]]; then
+
+                    badge_args=("${ENVIRONMENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South")
+
+                    # iOS is the default pattern to match
+                    badge "${docker_args[@]}" --shield_geometry "+0+5%"
+                    # Andoird search path
+                    badge "${docker_args[@]}" --shield_geometry "+0+20%" --glob "/**/src/main/res/mipmap-*/ic_launcher*.png"
+
+                fi
 
                 if [[ "${build_format}" == "ios" ]]; then
                     FASTLANE_KEYCHAIN_PATH="${OPS_PATH}/${BUILD_NUMBER}.keychain"
