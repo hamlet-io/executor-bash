@@ -336,6 +336,9 @@ function main() {
   cleanup_bundler ||
   { fatal "Can't shut down previous instance of the bundler"; return 1; }
 
+  # Set data dir for builds
+  DATA_DIR="${AUTOMATION_DATA_DIR:-$(getTempDir "cote_expo_XXXXX")}"
+
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
   ${GENERATION_DIR}/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" > /dev/null
@@ -347,10 +350,10 @@ function main() {
   fi
 
   # Make sure we are in the build source directory
-  BINARY_PATH="${AUTOMATION_DATA_DIR}/binary"
-  SRC_PATH="${AUTOMATION_DATA_DIR}/src"
-  OPS_PATH="${AUTOMATION_DATA_DIR}/ops"
-  REPORTS_PATH="${AUTOMATION_DATA_DIR}/reports"
+  BINARY_PATH="${DATA_DIR}/binary"
+  SRC_PATH="${DATA_DIR}/src"
+  OPS_PATH="${DATA_DIR}/ops"
+  REPORTS_PATH="${DATA_DIR}/reports"
 
   mkdir -p "${BINARY_PATH}"
   mkdir -p "${SRC_PATH}"
@@ -468,14 +471,14 @@ function main() {
   if [[ -n "${EXPO_CURRENT_OTA_BUILD}" ]]; then
     for sdk_file in "${EXPO_CURRENT_OTA_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
-            aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${AUTOMATION_DATA_DIR}/current-app-manifest.json"
+            aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${DATA_DIR}/current-app-manifest.json"
             break
         fi
     done
 
-    if [[ -f "${AUTOMATION_DATA_DIR}/current-app-manifest.json" ]]; then
-        EXPO_CURRENT_APP_VERSION="$(jq -r '.version' < "${AUTOMATION_DATA_DIR}/current-app-manifest.json" )"
-        EXPO_CURRENT_APP_REVISION_ID="$(jq -r '.revisionId' < "${AUTOMATION_DATA_DIR}/current-app-manifest.json" )"
+    if [[ -f "${DATA_DIR}/current-app-manifest.json" ]]; then
+        EXPO_CURRENT_APP_VERSION="$(jq -r '.version' < "${DATA_DIR}/current-app-manifest.json" )"
+        EXPO_CURRENT_APP_REVISION_ID="$(jq -r '.revisionId' < "${DATA_DIR}/current-app-manifest.json" )"
     fi
   fi
 
