@@ -195,18 +195,19 @@ Usage: $(basename $0) -u DEPLOYMENT_UNIT -i INPUT_PAYLOAD -l INCLUDE_LOG_TAIL
 
 where
 
-    -h                        shows this text
-(m) -u DEPLOYMENT_UNIT        is the mobile app deployment unit
-(o) -g DEPLOYMENT_GROUP      is the group the deployment unit belongs to
-(o) -s RUN_SETUP              run setup installation to prepare
-(o) -t BINARY_EXPIRATION      how long presigned urls are active for once created ( seconds )
-(o) -f FORCE_BINARY_BUILD     force the build of binary images
-(o) -n NODE_PACKAGE_MANAGER   Set the node package manager for app installation
-(o) -m SUBMIT_BINARY          submit the binary for testing
-(o) -b BINARY_BUILD_PROCESS   sets the build process to create the binary
-(o) -v APP_VERSION_SOURCE     sets what to use for the app version ( cmdb | manifest)
-(o) -l BUILD_LOGS             show the build logs for binary builds
-(o) -e ENVIRONMENT_BADGE      add a badge to the app icons with the environment
+    -h                              shows this text
+(m) -u DEPLOYMENT_UNIT              is the mobile app deployment unit
+(o) -g DEPLOYMENT_GROUP             is the group the deployment unit belongs to
+(o) -s RUN_SETUP                    run setup installation to prepare
+(o) -t BINARY_EXPIRATION            how long presigned urls are active for once created ( seconds )
+(o) -f FORCE_BINARY_BUILD           force the build of binary images
+(o) -n NODE_PACKAGE_MANAGER         Set the node package manager for app installation
+(o) -m SUBMIT_BINARY                submit the binary for testing
+(o) -b BINARY_BUILD_PROCESS         sets the build process to create the binary
+(o) -v APP_VERSION_SOURCE           sets what to use for the app version ( cmdb | manifest)
+(o) -l BUILD_LOGS                   show the build logs for binary builds
+(o) -e ENVIRONMENT_BADGE            add a badge to the app icons with the environment
+(o) -d ENVIRONMENT_BADGE_CONTENT    override the environment content with your own
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -240,12 +241,15 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":b:efg:hk:lmn:sq:t:u:v:" opt; do
+    while getopts ":b:d:efg:hk:lmn:sq:t:u:v:" opt; do
         case $opt in
             b)
                 BINARY_BUILD_PROCESS="${OPTARG}"
                 ;;
-            f)
+            d)
+                ENVIRONMENT_BADGE_CONTENT="${OPTARG}"
+                ;;
+            e)
                 ENVIRONMENT_BADGE="true"
                 ;;
             f)
@@ -337,7 +341,7 @@ function main() {
   { fatal "Can't shut down previous instance of the bundler"; return 1; }
 
   # Set data dir for builds
-  DATA_DIR="${AUTOMATION_DATA_DIR:-$(getTempDir "cote_expo_XXXXX")}"
+  WORKSPACE_DIR="${AUTOMATION_DATA_DIR:-$(getTempDir "cote_expo_XXXXX")}"
 
   # Generate a build blueprint so that we can find out the source S3 bucket
   info "Generating blueprint to find details..."
@@ -350,10 +354,14 @@ function main() {
   fi
 
   # Make sure we are in the build source directory
-  BINARY_PATH="${DATA_DIR}/binary"
-  SRC_PATH="${DATA_DIR}/src"
-  OPS_PATH="${DATA_DIR}/ops"
-  REPORTS_PATH="${DATA_DIR}/reports"
+  BINARY_PATH="${WORKSPACE_DIR}/binary"
+  SRC_PATH="${WORKSPACE_DIR}/src"
+  OPS_PATH="${WORKSPACE_DIR}/ops"
+  REPORTS_PATH="${WORKSPACE_DIR}/reports"
+
+  if [ "$(ls -A $SRC_PATH)" ]; then
+    rm -rf "${SRC_PATH}"
+  fi
 
   mkdir -p "${BINARY_PATH}"
   mkdir -p "${SRC_PATH}"
@@ -366,6 +374,10 @@ function main() {
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   ENVIRONMENT="$( jq -r '.Occurrence.Core.Environment.Name' < "${BUILD_BLUEPRINT}" )"
+
+  # handle local region config
+  placement_region="$(jq -r '.Occurrence.State.ResourceGroups.default.Placement.Region | select (.!=null)' < "${BUILD_BLUEPRINT}" )"
+  AWS_REGION="${AWS_REGION:-${placement_region}}"
 
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
   aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
@@ -471,14 +483,14 @@ function main() {
   if [[ -n "${EXPO_CURRENT_OTA_BUILD}" ]]; then
     for sdk_file in "${EXPO_CURRENT_OTA_FILES[@]}" ; do
         if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
-            aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${DATA_DIR}/current-app-manifest.json"
+            aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${WORKSPACE_DIR}/current-app-manifest.json"
             break
         fi
     done
 
-    if [[ -f "${DATA_DIR}/current-app-manifest.json" ]]; then
-        EXPO_CURRENT_APP_VERSION="$(jq -r '.version' < "${DATA_DIR}/current-app-manifest.json" )"
-        EXPO_CURRENT_APP_REVISION_ID="$(jq -r '.revisionId' < "${DATA_DIR}/current-app-manifest.json" )"
+    if [[ -f "${WORKSPACE_DIR}/current-app-manifest.json" ]]; then
+        EXPO_CURRENT_APP_VERSION="$(jq -r '.version' < "${WORKSPACE_DIR}/current-app-manifest.json" )"
+        EXPO_CURRENT_APP_REVISION_ID="$(jq -r '.revisionId' < "${WORKSPACE_DIR}/current-app-manifest.json" )"
     fi
   fi
 
@@ -519,7 +531,7 @@ function main() {
   # Create base OTA
   info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  npx ${npx_base_args} --package expo-cli@"${EXPO_VERSION}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+  yes | npx ${npx_base_args} --package expo-cli@"${EXPO_VERSION}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -616,10 +628,10 @@ function main() {
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
                 fi
-                npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
+                yes | npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
-                npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
+                yes | npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
                 ;;
 
             "fastlane")
@@ -628,7 +640,10 @@ function main() {
                 # Adds a shield to the App icons with the environment for the app
                 if [[ "${ENVIRONMENT_BADGE}" == "true" ]]; then
 
-                    badge_args=("${ENVIRONMENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South")
+                    which badge || { fatal "badge not installed - run gem install badge to install"; return 128 }
+
+                    BADGE_CONTENT="${ENVIRONMENT_BADGE_CONTENT:-${ENVIRONMENT}}"
+                    badge_args=("${BADGE_CONTENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South" "--shield_parameters" "style=flat")
 
                     # iOS is the default pattern to match
                     badge "${docker_args[@]}" --shield_geometry "+0+5%"
