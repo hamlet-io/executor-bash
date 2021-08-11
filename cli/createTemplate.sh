@@ -298,8 +298,10 @@ function get_openapi_definition_file() {
   # Name definitions based on the component
   local definition_file="${cf_dir}/$( get_openapi_definition_filename "${name}" "${accountId}" "${region}" )"
 
-  local openapi_file="${openapi_file_dir}/${registry}-extended-base.json"
+  local openapi_file="${openapi_file_dir}/${registry}.json"
+  local openapi_extended_file="${openapi_file_dir}/${registry}-extended-base.json"
   local legacy_openapi_file="${openapi_file_dir}/${registry}-${region}-${accountNumber}.json"
+
   local openapi_definition=
 
   [[ -s "${openapi_zip}" ]] ||
@@ -318,8 +320,9 @@ function get_openapi_definition_file() {
   #      "Value" : ... (existing file contents)
   #    }
   # }
-  [[ -f "${openapi_file}"        ]] && openapi_definition="${openapi_file}"
-  [[ -f "${legacy_openapi_file}" ]] && openapi_definition="${legacy_openapi_file}"
+  [[ -f "${openapi_file}"           ]] && openapi_definition="${openapi_file}"
+  [[ -f "${openapi_extended_file}"  ]] && openapi_definition="${openapi_extended_file}"
+  [[ -f "${legacy_openapi_file}"    ]] && openapi_definition="${legacy_openapi_file}"
 
   [[ -n "${openapi_definition}" ]] ||
       { fatal "Unable to locate ${registry} file in ${openapi_zip}"; popTempDir; return 1; }
