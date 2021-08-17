@@ -86,7 +86,7 @@ DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION="false"
 tmpdir="$(getTempDir "cote_inf_XXX")"
 npm_tool_cache="$(getTempDir "cote_npm_XXX")"
 
-npx_base_args="--quiet --ignore-existing --cache ${npm_tool_cache}"
+npx_base_args="--quiet --cache ${npm_tool_cache}"
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -337,8 +337,7 @@ function main() {
   check_for_invalid_environment_variables "DEPLOYMENT_UNIT" || return $?
 
   # Make sure the previous bundler has been stopped
-  cleanup_bundler ||
-  { fatal "Can't shut down previous instance of the bundler"; return 1; }
+  cleanup_bundler || ( fatal "Can't shut down previous instance of the bundler"; return 1; )
 
   # Set data dir for builds
   WORKSPACE_DIR="${AUTOMATION_DATA_DIR:-$(getTempDir "cote_expo_XXXXX")}"
@@ -640,7 +639,7 @@ function main() {
                 # Adds a shield to the App icons with the environment for the app
                 if [[ "${ENVIRONMENT_BADGE}" == "true" ]]; then
 
-                    which badge || { fatal "badge not installed - run gem install badge to install"; return 128 }
+                    which badge || (fatal "badge not installed - run gem install badge to install"; return 128)
 
                     BADGE_CONTENT="${ENVIRONMENT_BADGE_CONTENT:-${ENVIRONMENT}}"
                     badge_args=("${BADGE_CONTENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South" "--shield_parameters" "style=flat")
