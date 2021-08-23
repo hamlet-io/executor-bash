@@ -1140,11 +1140,6 @@ function get_cloudformation_stack_output() {
   local stackName="$1"; shift
   local resourceId="$1"; shift
   local attributeType="$1"; shift
-  local mode="$1"; shift
-
-  if [[ -z "${mode}" ]]; then
-    mode="enable"
-  fi
 
   if [[ -z "${attributeType}" || "${attributeType}" == "ref" ]]; then
     stackOutputKey="${resourceId}"
@@ -2426,7 +2421,7 @@ function manage_waf_logging() {
     return 0
   fi
 
-  wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" "${action}" || return $?)"
+  wafACLLogicalId="$(get_cloudformation_stack_output ${region} "${STACK_NAME}" "${wafACLId}" "ref" || return $?)"
   if [[ -n "${wafACLLogicalId}" ]]; then
     wafACLArn="$( aws --region ${region} $wafCommand get-web-acl --web-acl-id ${wafACLLogicalId} --query WebACL.WebACLArn --output text )"
   fi
