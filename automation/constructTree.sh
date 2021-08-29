@@ -325,6 +325,68 @@ if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
 fi
 
 if [[ "${USE_EXISTING_TREE}" == "true" ]]; then
+
+    if [[ -z "${ROOT_DIR}" ]]; then
+        export ROOT_DIR="$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")"
+    fi
+
+    current_dir="$(pwd)"
+    pushd "${current_dir}" >/dev/null
+
+    solutions_ancestor_dir="$(findAncestorDir "solutions" "${current_dir}")"
+    solutionsv2_ancestor_dir="$(findAncestorDir "solutionsv2" "${current_dir}")"
+    if [[ (-z "${solutions_ancestor_dir}") && (-z "${solutionsv2_ancestor_dir}") ]]; then
+        # We are not in the solutions part of the tree
+        # Assume we are in the >=v2.0.0 cmdb config or operations trees
+        infrastructure_dir="${current_dir//settings/solutions}"
+        infrastructure_dir="${infrastructure_dir//operations/infrastructure}"
+        infrastructure_dir="${infrastructure_dir//config/infrastructure}"
+        debug "Not in solutions tree - checking ${infrastructure_dir} ..."
+        if [[ -d "${infrastructure_dir}" ]]; then
+            cd "${infrastructure_dir}"
+        fi
+    fi
+
+    if [[ -f "segment.json" ]]; then
+        export SEGMENT="$(fileName "$(pwd)")"
+        if [[ -f "../environment.json" ]]; then
+        cd ..
+        else
+            export ENVIRONMENT="${SEGMENT}"
+            export SEGMENT="default"
+            cd ../../../config
+        fi
+    fi
+    save_context_property "SEGMENT" "${SEGMENT}"
+
+    if [[ -f "environment.json" ]]; then
+        export ENVIRONMENT="$(fileName "$(pwd)")"
+        cd ../../../config
+    fi
+    save_context_property "ENVIRONMENT" "${ENVIRONMENT}"
+
+    # handle the different structure for account and product sections of the CMDB
+    if [[ "$(pwd)" == "${infrastructure_dir}" && -d "../config" ]]; then
+        cd ../config
+    fi
+
+    if [[ -f "account.json" ]]; then
+        [[ -z "${ACCOUNT}" ]] && export ACCOUNT="$(cd ..; fileName "$(pwd)")"
+    fi
+
+    save_context_property "ACCOUNT" "${ACCOUNT}"
+
+    if [[ -f "product.json" ]]; then
+        export PRODUCT="$(fileName "$(pwd)")"
+        [[ "${PRODUCT}" == "config" ]] &&
+        export PRODUCT="$(cd ..; fileName "$(pwd)")"
+    fi
+
+    save_context_property "PRODUCT" "${PRODUCT}"
+
+    # Back to where we started
+    popd >/dev/null
+
     if [[ -z "${ROOT_DIR}" || ! (-d "${ROOT_DIR}") ]]; then
         fatal "ROOT_DIR: ${ROOT_DIR} - could not be found for existing tree"
         exit
