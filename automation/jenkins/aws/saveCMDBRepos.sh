@@ -65,44 +65,25 @@ function main() {
   options "$@" || return $?
 
   # save account details
-  if [[ "${ACCOUNT_REPOS}" == "true" ]]; then
+  if [[ "${ACCOUNT_REPOS}" == "true" && -n "${ACCOUNT}" ]]; then
 
     info "Committing changes to account repositories"
 
-    if [[ -n "${ACCOUNT_CONFIG_DIR}" ]]; then
-      save_repo "${ACCOUNT_CONFIG_DIR}" "account config" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
-    else
-      warn "Could not find ACCOUNT_CONFIG_DIR"
-    fi
+    save_repo "${ACCOUNT_CONFIG_DIR}" "account config" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
+    save_repo "${ACCOUNT_INFRASTRUCTURE_DIR}" "account infrastructure" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}"  || return $?
 
-    if [[ -n "${ACCOUNT_INFRASTRUCTURE_DIR}" ]]; then
-      save_repo "${ACCOUNT_INFRASTRUCTURE_DIR}" "account infrastructure" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}"  || return $?
-    else
-      warn "Could not find ACCOUNT_INFRASTRUCTURE_DIR"
-    fi
   fi
 
   # save product details
-  if [[ "${PRODUCT_REPOS}" == "true" ]]; then
+  if [[ "${PRODUCT_REPOS}" == "true" && -n "${PRODUCT}" ]]; then
 
     info "Committing changes to product repositories"
 
-    if [[ -n "${PRODUCT_CONFIG_DIR}" ]]; then
-      save_product_config "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
-    else
-      warn "Could not find PRODUCT_CONFIG_DIR"
-    fi
-
-    if [[ -n "${PRODUCT_INFRASTRUCTURE_DIR}" ]]; then
-      save_product_infrastructure "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
-    else
-       warn "Could not find PRODUCT_INFRASTRUCTURE_DIR"
-    fi
+    save_product_config "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
+    save_product_infrastructure "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
 
     if [[ -n "${PRODUCT_STATE_DIR}" ]]; then
       save_product_state "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
-    else
-      warn "Could not find PRODUCT_STATE_DIR"
     fi
   fi
 
