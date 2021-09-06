@@ -13,6 +13,7 @@
 
 # Set hamlet local store
 export HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
+export COMMIT_CACHE_DIR="${HAMLET_HOME_DIR}/commits"
 
 # -- Repositories --
 
