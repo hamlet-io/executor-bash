@@ -277,7 +277,7 @@ function defineGitProviderAttributes() {
 
 function set_context() {
   # Parse options
-  while getopts ":b:cd:e:hil:m:n:pr:s:t:u:v:" opt; do
+  while getopts ":b:cd:e:hil:m:n:pqr:s:t:u:v:" opt; do
       case $opt in
           b) REPO_BRANCH="${OPTARG}" ;;
           c) REPO_OPERATION="${REPO_OPERATION_CLONE}" ;;
