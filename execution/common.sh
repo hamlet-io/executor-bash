@@ -28,6 +28,7 @@ done
 export HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
 export GENERATION_CACHE_DIR="${HAMLET_HOME_DIR}/cache"
 export PLUGIN_CACHE_DIR="${HAMLET_HOME_DIR}/plugins"
+export COMMIT_CACHE_DIR="${HAMLET_HOME_DIR}/commits"
 
 # Set the log level if not set
 export GENERATION_LOG_LEVEL="${GENERATION_LOG_LEVEL:-${LOG_LEVEL_INFORMATION}}"

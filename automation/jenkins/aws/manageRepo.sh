@@ -12,6 +12,7 @@ REPO_OPERATION_PUSH="push"
 REPO_OPERATION_DEFAULT="${REPO_OPERATION_PUSH}"
 REPO_REMOTE_DEFAULT="origin"
 REPO_BRANCH_DEFAULT="master"
+DEFER_REPO_PUSH_DEFAULT="false"
 
 function usage() {
     cat <<EOF
@@ -35,6 +36,7 @@ where
 (o) -m REPO_MESSAGE     is used as the commit/tag message
 (m) -n REPO_LOG_NAME    to use in log messages
 (o) -p (REPO_OPERATION=${REPO_OPERATION_PUSH}) commit local repo and push to origin
+(o) -q DEFER_REPO_PUSH  saves the push details for a future push
 (o) -r REPO_REMOTE      is the remote name for pushing
 (o) -s GIT_USER         is the repo user
 (o) -t REPO_TAG         is the tag to add after any commit
@@ -101,6 +103,69 @@ function clone() {
 }
 
 function push() {
+
+    if ! git -C "${REPO_DIR}" rev-parse --is-inside-work-tree &>/dev/null; then
+        warning "Directory ${REPO_DIR} is not part of a git repo - skipping push"
+        return 0
+    fi
+
+    commit_stage_file="${COMMIT_CACHE_DIR}/commit_details.json"
+
+    if [[ -f "${commit_stage_file}" ]]; then
+        commit_details="$(cat "${commit_stage_file}" )"
+    else
+        mkdir -p "${COMMIT_CACHE_DIR}"
+    fi
+
+    if [[ -z "${commit_details}" ]]; then
+        commit_details="{}"
+    fi
+
+    formatted_commit_message=''
+
+    if [[ "${DEFER_REPO_PUSH,,}" == "true" ]]; then
+        info "Deferred push saving details for the next requested push"
+
+        commit_time="$( date --iso-8601=seconds )"
+        echo "${commit_details}" | jq --arg dir "${REPO_DIR}" --arg commit_time "${commit_time}" --arg msg "${REPO_MESSAGE}" '.dirs += [{"dir": $dir, "commit_time": $commit_time, "message": $msg }]' > "${commit_stage_file}"
+
+        return 0
+    else
+        if [[ -f "${commit_stage_file}" ]]; then
+
+            commit_msg_file="$( getTempFile XXXXXXX )"
+            staged_commits="$( jq -r --arg dir "${REPO_DIR}" '.dirs[] | select(.dir == $dir) | .message' "${commit_stage_file}")"
+
+            if [[ -n "${staged_commits}" ]]; then
+
+                echo "${REPO_MESSAGE}" > "${commit_msg_file}"
+                echo "${staged_commits}" >> "${commit_msg_file}"
+
+                formatted_commit_message+="$(format_conventional_commit "hamlet" "" "multiple updates" "")"
+                formatted_commit_message+=$'\n\n'
+
+                while read msg; do
+                    # Break the message in name/value pairs
+                    conventional_commit_base_body="$(format_conventional_commit_body "${msg}")"
+
+                    # Separate the values based on the conventional commit format
+                    conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
+                    conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
+                    conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
+                    conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
+
+                    formatted_commit_message+="$(format_conventional_commit \
+                        "${conventional_commit_type:-hamlet}" \
+                        "${conventional_commit_scope}" \
+                        "${conventional_commit_description:-automation}" \
+                        "${conventional_commit_body}" )"
+                    formatted_commit_message+=$'\n--------\n'
+
+                done < "${commit_msg_file}"
+            fi
+        fi
+    fi
+
     check_for_invalid_environment_variables "GIT_USER" "GIT_EMAIL" "REPO_MESSAGE" "REPO_REMOTE" || return $?
 
     git remote show "${REPO_REMOTE}" >/dev/null 2>&1
@@ -117,20 +182,26 @@ function push() {
         # Commit changes
         debug "Committing to the ${REPO_LOG_NAME} repo..."
 
-        # Break the message in name/value pairs
-        conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
+        if [[ -n "${formatted_commit_message}" ]]; then
 
-        # Separate the values based on the conventional commit format
-        conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
-        conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
-        conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
-        conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
+            # Break the message in name/value pairs
+            conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
 
-        git commit -m "$(format_conventional_commit \
-            "${conventional_commit_type:-hamlet}" \
-            "${conventional_commit_scope}" \
-            "${conventional_commit_description:-automation}" \
-            "${conventional_commit_body}" )"
+            # Separate the values based on the conventional commit format
+            conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
+            conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
+            conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
+            conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
+
+            formatted_commit_message="$(format_conventional_commit \
+                "${conventional_commit_type:-hamlet}" \
+                "${conventional_commit_scope}" \
+                "${conventional_commit_description:-automation}" \
+                "${conventional_commit_body}" )"
+        fi
+
+        echo "${formatted_commit_message}"
+        git commit -m "${formatted_commit_message}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
 
         REPO_PUSH_REQUIRED="true"
@@ -184,6 +255,10 @@ function push() {
             fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
         fi
     fi
+
+    # Removing commits which have been pushed
+    remaining_commits="$(jq --arg dir "${REPO_DIR}" 'del(.dirs[] | select(.dir == $dir))' "${commit_stage_file}")"
+    echo "${remaining_commits}" > "${commit_stage_file}"
 }
 
 # Define git provider attributes
@@ -214,6 +289,7 @@ function set_context() {
           m) REPO_MESSAGE="${OPTARG}" ;;
           n) REPO_NAME="${OPTARG}" ;;
           p) REPO_OPERATION="${REPO_OPERATION_PUSH}" ;;
+          q) DEFER_REPO_PUSH="true" ;;
           r) REPO_REMOTE="${OPTARG}" ;;
           s) GIT_USER="${OPTARG}" ;;
           t) REPO_TAG="${OPTARG}" ;;
@@ -225,9 +301,10 @@ function set_context() {
   done
 
   # Apply defaults
-  REPO_OPERATION="${REPO_OPERATION:-$REPO_OPERATION_DEFAULT}"
-  REPO_REMOTE="${REPO_REMOTE:-$REPO_REMOTE_DEFAULT}"
-  REPO_BRANCH="${REPO_BRANCH:-$REPO_BRANCH_DEFAULT}"
+  DEFER_REPO_PUSH="${DEFER_REPO_PUSH:-${DEFER_REPO_PUSH_DEFAULT}}"
+  REPO_OPERATION="${REPO_OPERATION:-${REPO_OPERATION_DEFAULT}}"
+  REPO_REMOTE="${REPO_REMOTE:-${REPO_REMOTE_DEFAULT}}"
+  REPO_BRANCH="${REPO_BRANCH:-${REPO_BRANCH_DEFAULT}}"
   if [[ -z "${REPO_URL}" ]]; then
     if [[ (-n "${REPO_PROVIDER}") &&
             (-n "${REPO_NAME}") ]]; then
