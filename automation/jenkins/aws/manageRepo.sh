@@ -182,7 +182,7 @@ function push() {
         # Commit changes
         debug "Committing to the ${REPO_LOG_NAME} repo..."
 
-        if [[ -n "${formatted_commit_message}" ]]; then
+        if [[ -z "${formatted_commit_message}" ]]; then
 
             # Break the message in name/value pairs
             conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
@@ -200,7 +200,6 @@ function push() {
                 "${conventional_commit_body}" )"
         fi
 
-        echo "${formatted_commit_message}"
         git commit -m "${formatted_commit_message}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
 

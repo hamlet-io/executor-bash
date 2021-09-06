@@ -322,6 +322,10 @@ if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
     #    fi
 
     fi
+
+    # Examine the structure and define key directories
+    findGen3Dirs "${BASE_DIR}"
+    RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 fi
 
 if [[ "${USE_EXISTING_TREE}" == "true" ]]; then
@@ -392,12 +396,11 @@ if [[ "${USE_EXISTING_TREE}" == "true" ]]; then
         exit
     fi
     BASE_DIR="${ROOT_DIR}"
+
+    # Examine the structure and define key directories
+    findGen3Dirs "${ROOT_DIR}" "${TENANT}" "${ACCOUNT}" "${PRODUCT}" "${ENVIRONMENT}" "${SEGMENT}"
+    RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 fi
-
-# Examine the structure and define key directories
-
-findGen3Dirs "${BASE_DIR}"
-RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
 
 # A couple of the older upgrades need GENERATION_DATA_DIR set to
 # locate the AWS account number to account id mappings
