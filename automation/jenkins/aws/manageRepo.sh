@@ -131,7 +131,7 @@ function push() {
 
         return 0
     else
-        if [[ -f "${commit_stage_file}" ]]; then
+        if [[ -s "${commit_stage_file}" ]]; then
 
             commit_msg_file="$( getTempFile XXXXXXX )"
             staged_commits="$( jq -r --arg dir "${REPO_DIR}" '.dirs[] | select(.dir == $dir) | .message' "${commit_stage_file}")"
@@ -256,8 +256,10 @@ function push() {
     fi
 
     # Removing commits which have been pushed
-    remaining_commits="$(jq --arg dir "${REPO_DIR}" 'del(.dirs[] | select(.dir == $dir))' "${commit_stage_file}")"
-    echo "${remaining_commits}" > "${commit_stage_file}"
+    if [[ -s "${commit_stage_file}" ]]; then
+        remaining_commits="$(jq --arg dir "${REPO_DIR}" 'del(.dirs[] | select(.dir == $dir))' "${commit_stage_file}")"
+        echo "${remaining_commits}" > "${commit_stage_file}"
+    fi
 }
 
 # Define git provider attributes
