@@ -1942,9 +1942,11 @@ function update_ssh_credentials() {
   local name="$1"; shift
   local key_file="$1"; shift
 
+  local ssh_key_file="$( getTempFile ssh_pub_key_XXXXX )"
+
   chmod 400 "${key_file}"
-  crt_content="$(ssh-keygen -y -f "${key_file}")"
-  aws --region "${region}" ec2 import-key-pair --key-name "${name}" --public-key-material "${crt_content}"
+  ssh-keygen -y -f "${key_file}" > "${ssh_key_file}"
+  aws --region "${region}" ec2 import-key-pair --key-name "${name}" --public-key-material "fileb://${ssh_key_file}"
 }
 
 function delete_ssh_credentials() {
