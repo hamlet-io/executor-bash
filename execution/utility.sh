@@ -1866,15 +1866,34 @@ function create_pki_credentials() {
   local account="$1"; shift
   local publickeyname="$1"; shift
   local privatekeyname="$1"; shift
+  local include_legacy="$1"; shift
 
-  if [[ (! -f "${dir}/aws-ssh-crt.pem") &&
-        (! -f "${dir}/aws-ssh-prv.pem") &&
-        (! -f "${dir}/.aws-ssh-crt.pem") &&
-        (! -f "${dir}/.aws-ssh-prv.pem") &&
-        (! -f "${dir}/.aws-${account}-${region}-ssh-crt.pem") &&
-        (! -f "${dir}/.aws-${account}-${region}-ssh-prv.pem") ]]; then
-      openssl genrsa -out "${dir}/${privatekeyname}.plaintext" 2048 || return $?
-      openssl rsa -in "${dir}/${privatekeyname}.plaintext" -pubout > "${dir}/${publickeyname}" || return $?
+  include_legacy="${include_legacy:-"true"}"
+  create_key="false"
+
+  if [[ "${include_legacy}" == "true" ]]; then
+
+    if [[ (! -f "${dir}/aws-ssh-crt.pem") &&
+          (! -f "${dir}/aws-ssh-prv.pem") &&
+          (! -f "${dir}/.aws-ssh-crt.pem") &&
+          (! -f "${dir}/.aws-ssh-prv.pem") &&
+          (! -f "${dir}/.aws-${account}-${region}-ssh-crt.pem") &&
+          (! -f "${dir}/.aws-${account}-${region}-ssh-prv.pem") ]]; then
+
+        create_key="true"
+    fi
+
+  else
+    if [[ (! -f "${dir}/${publickeyname}") &&
+          (! -f "${dir}/${privatekeyname}") ]]; then
+
+        create_key="true"
+    fi
+  fi
+
+  if [[ "${create_key}" == "true" ]]; then
+        openssl genrsa -out "${dir}/${privatekeyname}.plaintext" 2048 || return $?
+        openssl rsa -in "${dir}/${privatekeyname}.plaintext" -pubout > "${dir}/${publickeyname}" || return $?
   fi
 
   if [[ ! -f "${dir}/.gitignore" ]]; then
@@ -1921,9 +1940,10 @@ function show_ssh_credentials() {
 function update_ssh_credentials() {
   local region="$1"; shift
   local name="$1"; shift
-  local crt_file="$1"; shift
+  local key_file="$1"; shift
 
-  local crt_content=$(dos2unix < "${crt_file}" | awk 'BEGIN {RS="\n"} /^[^-]/ {printf $1}')
+  chmod 400 "${key_file}"
+  crt_content="$(ssh-keygen -y -f "${key_file}")"
   aws --region "${region}" ec2 import-key-pair --key-name "${name}" --public-key-material "${crt_content}"
 }
 
