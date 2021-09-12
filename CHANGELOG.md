@@ -1,9 +1,75 @@
 # Changelog
 
-## Unreleased (2021-06-21)
+## Unreleased (2021-09-12)
 
 #### New Features
 
+* adds a helper script to save cmdb updates
+* stage repository commits
+* set district on location in automation
+* handle waf logging disable on delete ([#260](https://github.com/hamlet-io/executor-bash/issues/260))
+* local run support and badge config check
+* support for local runs
+* add badges to app icons
+* add simple api definition file name
+* add support for deploying into local account
+* handle none source and user defined config
+* aws non auth source to bypass validation
+* replace automation with standard script
+* error on unknown provider
+* azure login consolidation
+* manage aws auth through profiles
+#### Fixes
+
+* errors on saving repo state
+* (ssh): use a file when providing the key
+* (sshkey): convert to sshkey pair for upload
+* construct dirs and repo saving
+* add defer to opts
+* typo in app publish script
+* add delete completion check
+* handling of location context
+* registry type definitions location ([#264](https://github.com/hamlet-io/executor-bash/issues/264))
+* resetting of temporary file stack
+* (docker): ecr repository lookup credentials
+* credentials utility access
+* aws role generation ([#257](https://github.com/hamlet-io/executor-bash/issues/257))
+* variable scope for env config
+* support legacy AWS account lookup
+* testing updates
+#### Refactorings
+
+* remove egrep usage for stack status
+* sentry release handling ([#259](https://github.com/hamlet-io/executor-bash/issues/259))
+* (sentry): minor updates and react updates
+* remove access key config integrator
+* remove access key handling and reformat
+* remove access key handling from context
+* remove access key handling
+* support generation credentials handling
+
+Full set of changes: [`8.2.1...cc9f61a`](https://github.com/hamlet-io/executor-bash/compare/8.2.1...cc9f61a)
+
+## 8.2.1 (2021-07-09)
+
+#### New Features
+
+* (ci): handle tag based releases ([#255](https://github.com/hamlet-io/executor-bash/issues/255))
+
+Full set of changes: [`8.2.0...8.2.1`](https://github.com/hamlet-io/executor-bash/compare/8.2.0...8.2.1)
+
+## 8.2.0 (2021-07-08)
+
+#### New Features
+
+* extend logging for invalid image formats
+* (automation): support profiles for automation
+* (automation): use an existing CMDB
+* add the hamletcli automation provider
+* handle react native bundle files in sentry ([#242](https://github.com/hamlet-io/executor-bash/issues/242))
+* .cmdb directory
+* add docker context handling
+* user provided images
 * stack management processing
 * always check caller identity
 * add check for aws account usage
@@ -11,14 +77,44 @@
 * docker based packaging ([#217](https://github.com/hamlet-io/executor-bash/issues/217))
 #### Fixes
 
+* use pull for remote image s3 pulls
+* remove stripping from context path for image
+* typo in existing tree check
+* typos and options cleanup
+* handle older env vars for docker images
+* registry handling for similar storage types
+* tagging update for docker images
+* (ci): docker and changelog
+* correct SENTRY_SOURCE_MAP_S3_URL value ([#241](https://github.com/hamlet-io/executor-bash/issues/241))
+* always update stack if no changes are found
+* handle same tmp dir for multiple passes
+* catch all updates to opts
+* master branch references ([#232](https://github.com/hamlet-io/executor-bash/issues/232))
+* typo
+* exit handling
+* allow for dockerfile override
+* changelog generation
+* update wording and fix install approach
 * replace templates in manage stack
 #### Refactorings
 
+* use docker meta for tagging
+* (ci): remove git dir from docker images
+* align wrapper env with engine envs
+* wrapper upgrade to 1.15.1 ([#235](https://github.com/hamlet-io/executor-bash/issues/235))
+* engine install process updates
+* (ci): updates from testing and ops
+* use paths instead of files for dirs
+* consolidate s3 zip registry files
+* remove assemble settings from image pull
 * remove jenkinsfile
 * Remove build time openapi extension ([#220](https://github.com/hamlet-io/executor-bash/issues/220))
 * dynamic cmdb plugin detection ([#218](https://github.com/hamlet-io/executor-bash/issues/218))
+#### Others
 
-Full set of changes: [`8.1.2...8c3e4f5`](https://github.com/hamlet-io/executor-bash/compare/8.1.2...8c3e4f5)
+* use hamlet cli release instead of pre
+
+Full set of changes: [`8.1.2...8.2.0`](https://github.com/hamlet-io/executor-bash/compare/8.1.2...8.2.0)
 
 ## 8.1.2 (2021-05-13)
 
