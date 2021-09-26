@@ -91,9 +91,6 @@ EXCLUDE_ACCOUNT_DIRECTORIES="${EXCLUDE_ACCOUNT_DIRECTORIES:-false}"
 EXCLUDE_PRODUCT_DIRECTORIES="${EXCLUDE_PRODUCT_DIRECTORIES:-false}"
 USE_EXISTING_TREE="${USE_EXISTING_TREE:-false}"
 
-# Check for required context
-[[ -z "${ACCOUNT}" ]] && fatal "ACCOUNT not defined" && exit
-
 if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
 
     # Save for later steps
@@ -230,6 +227,9 @@ if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
     fi
 
     if [[ !("${EXCLUDE_ACCOUNT_DIRECTORIES}" == "true") ]]; then
+
+        # Check for required context
+        [[ -z "${ACCOUNT}" ]] && fatal "ACCOUNT not defined" && exit
 
         # Multiple accounts in the account config repo
         MULTI_ACCOUNT_REPO=false
