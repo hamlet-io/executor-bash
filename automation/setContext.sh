@@ -439,17 +439,19 @@ function main() {
   findAndDefineSetting "ACCOUNT_PROVIDER" "ACCOUNT_PROVIDER" "${ACCOUNT}" "" "value" "aws"
 
   # - access credentials
-  case "${ACCOUNT_PROVIDER}" in
-      aws)
-          AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/${ACCOUNT_PROVIDER}"
-          . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-          ;;
+  if [[ "${AUTOMATION_CONTEXT_CREDENTIALS:-"true"}" == "true" ]]; then
+    case "${ACCOUNT_PROVIDER}" in
+        aws)
+            AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/${ACCOUNT_PROVIDER}"
+            . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
+            ;;
 
-        azure)
-          AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/aws"
-          . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-          ;;
-  esac
+            azure)
+            AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/aws"
+            . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
+            ;;
+    esac
+  fi
 
   # - cmdb git provider
   defineGitProviderSettings "ACCOUNT" "" "${ACCOUNT}" "" "github"
