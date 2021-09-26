@@ -13,18 +13,6 @@
 # Set up the context
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
 
-case $LEVEL in
-    account|product)
-        [[ ! ("${LEVEL}" =~ ${LOCATION} ) ]] &&
-            fatalLocation "Current directory doesn't match requested level \"${LEVEL}\"."
-        ;;
-    solution|segment|application|multiple)
-        [[ ! ("segment" =~ ${LOCATION} ) ]] &&
-            fatalLocation "Current directory doesn't match requested level \"${LEVEL}\"."
-        ;;
-esac
-
-
 # Determine the details of the template to be created
 PRODUCT_PREFIX="${PRODUCT}"
 LEVEL_PREFIX="${LEVEL}-"
