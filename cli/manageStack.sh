@@ -5,8 +5,6 @@ trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh' EXIT SIGHUP SIGINT S
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 # Defaults
-STACK_INITIATE_DEFAULT="true"
-STACK_MONITOR_DEFAULT="true"
 STACK_OPERATION_DEFAULT="update"
 STACK_WAIT_DEFAULT=15
 QUIET_MODE_DEFAULT="false"
@@ -22,9 +20,7 @@ where
 
 (o) -d (STACK_OPERATION=delete) to delete the stack
     -h                          shows this text
-(o) -i (STACK_MONITOR=false)    initiates but does not monitor the stack operation
 (m) -l LEVEL                    is the stack level - "account", "product", "segment", "solution", "application" or "multiple"
-(o) -m (STACK_INITIATE=false)   monitors but does not initiate the stack operation
 (o) -n STACK_NAME               to override standard stack naming
 (o) -o OUTPUT_DIR               is an override for the deployment output directory
 (o) -q (QUIET_MODE=true)        minimise output generated
@@ -38,8 +34,6 @@ where
 
 DEFAULTS:
 
-STACK_INITIATE  = ${STACK_INITIATE_DEFAULT}
-STACK_MONITOR   = ${STACK_MONITOR_DEFAULT}
 STACK_OPERATION = ${STACK_OPERATION_DEFAULT}
 STACK_WAIT      = ${STACK_WAIT_DEFAULT} seconds
 QUIET_MODE      = ${QUIET_MODE_DEFAULT}
@@ -62,9 +56,7 @@ function options() {
     case "${option}" in
       d) STACK_OPERATION=delete ;;
       h) usage; return 1 ;;
-      i) STACK_MONITOR=false ;;
       l) LEVEL="${OPTARG}" ;;
-      m) STACK_INITIATE=false ;;
       n) STACK_NAME="${OPTARG}" ;;
       o) OUTPUT_DIR="${OPTARG}" ;;
       q) QUIET_MODE=true ;;
@@ -81,8 +73,6 @@ function options() {
   # Apply defaults
   STACK_OPERATION=${STACK_OPERATION:-${STACK_OPERATION_DEFAULT}}
   STACK_WAIT=${STACK_WAIT:-${STACK_WAIT_DEFAULT}}
-  STACK_INITIATE=${STACK_INITIATE:-${STACK_INITIATE_DEFAULT}}
-  STACK_MONITOR=${STACK_MONITOR:-${STACK_MONITOR_DEFAULT}}
   QUIET_MODE=${QUIET_MODE:-${QUIET_MODE_DEFAULT}}
 
   # Set up the context
@@ -134,8 +124,9 @@ function get_stack_status_details {
 }
 
 function wait_for_stack_execution() {
-  local client_token="$1"; shift
-  local change_set_state="$1"; shift
+  local client_token="${1}"; shift
+  local stack_op="${1}"; shift
+  local change_set_state="${1}"; shift
 
   local stack_status_file="${tmp_dir}/stack_status"
   local stack_state=""
@@ -147,82 +138,78 @@ function wait_for_stack_execution() {
     stack_state="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" --max-items 1 2> /dev/null)"
     exit_status=$?
 
-    if [[ ("${STACK_OPERATION}" == "delete") && ("${exit_status}" -eq 255) ]]; then
+    if [[ ("${stack_op}" == "delete") &&
+          ( -z "$(aws --region "${REGION}" cloudformation list-stacks --query "StackSummaries[?StackName == '${STACK_NAME}' && StackStatus != 'DELETE_COMPLETE'].StackStatus" --output text )" ) ]]; then
       echo ""
       info "Delete completed for ${STACK_NAME}"
       exit_status=0
       break
     fi
 
-    if [[ "${STACK_MONITOR}" = "true" ]]; then
+    if [[ "${monitor_header}" == "0" ]]; then
+      echo -n " Status: "
+      monitor_header="1"
+    fi
 
-      if [[ "${monitor_header}" == "0" ]]; then
-        echo -n " Status: "
-        monitor_header="1"
-      fi
+    # Check the latest status
+    stack_status="$( echo "${stack_state}" | jq -r '.Stacks[0].StackStatus')"
 
-      # Check the latest status
-      stack_status="$( echo "${stack_state}" | jq -r '.Stacks[0].StackStatus')"
+    case "${stack_status}" in
+      *ROLLBACK*)
+        echo -n "<ROLLBACK"
+        ;;
+      *DELETE*)
+        echo -n "-"
+        ;;
+      *)
+        echo -n ">"
+        ;;
+    esac
 
-      case "${stack_status}" in
-        *ROLLBACK*)
-          echo -n "<ROLLBACK"
-          ;;
-        *DELETE*)
-          echo -n "-"
-          ;;
-        *)
-          echo -n ">"
-          ;;
-      esac
-
-      # Watch for roll backs
-      if [[ "${stack_status}" == *ROLLBACK_COMPLETE ]]; then
-        echo ""
-        warning "Stack ${STACK_NAME} could not complete and a rollback was performed"
-        get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
-        [[ -n "${stack_state}" ]] && echo "${stack_state}" > "${STACK}"
-        exit_status=1
-        break
-      fi
-
-      # Watch for failures
-      if [[ "${stack_status}" == *FAILED ]]; then
-        echo ""
-        fatal "Stack ${STACK_NAME} failed, fix stack before retrying"
-        get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
-        exit_status=255
-        break
-      fi
-
-      if [[ "${stack_status}" == "DELETE_COMPLETE" ]]; then
-        echo ""
-        info "Stack ${STACK_NAME} delete completed with status ${stack_status}"
-        break
-      fi
-
-      # Update State and break if the stack operation was completed
-      if [[ "${stack_status}" =~ ^(CREATE|UPDATE)_COMPLETE$ ]]; then
-        echo ""
-        info "Stack ${STACK_NAME} completed with status ${stack_status}"
-        [[ -n "${change_set_state}" ]] && echo "${change_set_state}" > "${CHANGE}"
-        [[ -n "${stack_state}" ]] && echo "${stack_state}" > "${STACK}"
-        break
-      fi
-
-      # Abort if not still in progress
-      if [[ ! "${stack_status}" == *_IN_PROGRESS ]]; then
-        echo ""
-        info "Stack ${STACK_NAME} in an unexpected state with status ${stack_status}"
-        get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
-        break
-      fi
-
-      # All good, wait a while longer
-      sleep ${STACK_WAIT}
-    else
+    # Watch for roll backs
+    if [[ "${stack_status}" == *ROLLBACK_COMPLETE ]]; then
+      echo ""
+      warning "Stack ${STACK_NAME} could not complete and a rollback was performed"
+      get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
+      [[ -n "${stack_state}" ]] && echo "${stack_state}" > "${STACK}"
+      exit_status=1
       break
     fi
+
+    # Watch for failures
+    if [[ "${stack_status}" == *FAILED ]]; then
+      echo ""
+      fatal "Stack ${STACK_NAME} failed, fix stack before retrying"
+      get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
+      exit_status=255
+      break
+    fi
+
+    if [[ "${stack_status}" == "DELETE_COMPLETE" ]]; then
+      echo ""
+      info "Stack ${STACK_NAME} delete completed with status ${stack_status}"
+      break
+    fi
+
+    # Update State and break if the stack operation was completed
+    if [[ "${stack_status}" =~ ^(CREATE|UPDATE)_COMPLETE$ ]]; then
+      echo ""
+      info "Stack ${STACK_NAME} completed with status ${stack_status}"
+      [[ -n "${change_set_state}" ]] && echo "${change_set_state}" > "${CHANGE}"
+      [[ -n "${stack_state}" ]] && echo "${stack_state}" > "${STACK}"
+      break
+    fi
+
+    # Abort if not still in progress
+    if [[ ! "${stack_status}" == *_IN_PROGRESS ]]; then
+      echo ""
+      info "Stack ${STACK_NAME} in an unexpected state with status ${stack_status}"
+      get_stack_status_details "${STACK_NAME}" "${stack_state}" "${client_token}"
+      break
+    fi
+
+    # All good, wait a while longer
+    sleep ${STACK_WAIT}
 
     # Check to see if the work has already been completed
     case ${exit_status} in
@@ -242,148 +229,164 @@ function process_stack() {
 
   local exit_status=0
 
-  if [[ "${STACK_INITIATE}" = "true" ]]; then
+  echo ""
+  info "Running stack operation for ${STACK_NAME}"
 
-    echo ""
-    info "Running stack operation for ${STACK_NAME}"
+  case ${STACK_OPERATION} in
+    delete)
+      [[ -n "${DRYRUN}" ]] && \
+        fatal "Dryrun not applicable when deleting a stack" && return 1
 
-    case ${STACK_OPERATION} in
-      delete)
-        [[ -n "${DRYRUN}" ]] && \
-          fatal "Dryrun not applicable when deleting a stack" && return 1
+      info "Deleting the "${STACK_NAME}" stack"
+      DELETE_CLIENT_TOKEN="delete-${change_set_id}"
 
-        info "Deleting the "${STACK_NAME}" stack"
-        DELETE_CLIENT_TOKEN="delete-${change_set_id}"
+      aws --region "${REGION}" cloudformation delete-stack --stack-name "${STACK_NAME}" \
+          --client-request-token "${DELETE_CLIENT_TOKEN}" 2>/dev/null
 
-        aws --region "${REGION}" cloudformation delete-stack --stack-name "${STACK_NAME}" \
-            --client-request-token "${DELETE_CLIENT_TOKEN}" 2>/dev/null
+      # For delete, we don't check result as stack may not exist
+      wait_for_stack_execution "${DELETE_CLIENT_TOKEN}" "${STACK_OPERATION}"
+      ;;
 
-        # For delete, we don't check result as stack may not exist
-        wait_for_stack_execution "${DELETE_CLIENT_TOKEN}"
-        ;;
+    update|create)
+      # Compress the template to minimise the impact of aws cli size limitations
+      jq -c '.' < ${TEMPLATE} > "${stripped_primary_template_file}"
 
-      update|create)
-        # Compress the template to minimise the impact of aws cli size limitations
-        jq -c '.' < ${TEMPLATE} > "${stripped_primary_template_file}"
+      existing_stack_status="$(aws --region "${REGION}" cloudformation list-stacks --query "StackSummaries[?StackName == '${STACK_NAME}' && StackStatus != 'DELETE_COMPLETE'].StackStatus" --output text || return $? )"
 
-        existing_stack_status="$(aws --region "${REGION}" cloudformation list-stacks --query "StackSummaries[?StackName == '${STACK_NAME}' && StackStatus != 'DELETE_COMPLETE'].StackStatus" --output text || return $? )"
+      # Handle stack which has rolled back on creation and hasn't been removed
+      if [[ "${existing_stack_status}" =~ ^.*ROLLBACK_COMPLETE$ || "${existing_stack_status}" =~ ^.*ROLLBACK_FAILED$ ]]; then
+        if [[ -z "$(aws --region "${REGION}" cloudformation list-stack-resources --stack-name "${STACK_NAME}" --query "StackResourceSummaries[?ResourceStatus != 'DELETE_COMPLETE' && ResourceStatus != 'DELETE_SKIPPED'].LogicalResourceId" --output text || return $?)" ]]; then
 
-        # Handle stacks that are already running so we don't fail in subsequent operations
-        if [[ "${existing_stack_status}" == *"_IN_PROGRESS" ]]; then
-          warning "Stack ${STACK_NAME} is currently running an operation. Will watch the state and continue once completed"
-          wait_for_stack_execution
+          CLEANUP_CLIENT_TOKEN="cleanup-${change_set_id}"
+
+          info "Cleaning up failed create"
+          aws --region "${REGION}" cloudformation delete-stack --stack-name "${STACK_NAME}" \
+              --client-request-token "${CLEANUP_CLIENT_TOKEN}" 2>/dev/null
+
+          wait_for_stack_execution "${CLEANUP_CLIENT_TOKEN}" "delete" || { exit_status=$?; break; }
+          existing_stack_status="$(aws --region "${REGION}" cloudformation list-stacks --query "StackSummaries[?StackName == '${STACK_NAME}' && StackStatus != 'DELETE_COMPLETE'].StackStatus" --output text || return $? )"
         fi
+      fi
 
-        # Check if stack needs to be created
-        # List state returns stacks that have been deleted as well
-        if [[ -z "${existing_stack_status}"
-              || "${existing_stack_status}" == "REVIEW_IN_PROGRESS"
-              || "${existing_stack_status}" == "DELETE_COMPLETE" ]]; then
+      # Handle stacks that are already running so we don't fail in subsequent operations
+      if [[ "${existing_stack_status}" == *"_IN_PROGRESS" ]]; then
+        warning "Stack ${STACK_NAME} is currently running an operation. Will watch the state and continue once completed"
+        wait_for_stack_execution "" "${STACK_OPERATION}" || { exit_status=$?; break; }
+      fi
 
-          STACK_OPERATION="create"
+      # Check if stack needs to be created
+      # List state returns stacks that have been deleted as well
+      if [[ -z "${existing_stack_status}"
+            || "${existing_stack_status}" == "REVIEW_IN_PROGRESS"
+            || "${existing_stack_status}" == "DELETE_COMPLETE" ]]; then
+
+        STACK_OPERATION="create"
+      fi
+
+      PRIMARY_CHANGE_SET="$(fileBase "${TEMPLATE}")-${change_set_id}"
+      submit_change_set "${REGION}" "${PRIMARY_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_primary_template_file}" || return $?
+
+      change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
+            --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" || return $?)"
+
+      if [[ -n "${DRYRUN}" ]]; then
+
+        if [[ "${QUIET_MODE}" == "true" ]]; then
+          echo "${change_set_state}" > "${PLANNED_CHANGE}"
+        else
+          info "${DRYRUN}Results for ${STACK_NAME}"
+          echo "${change_set_state}" | jq '.'
         fi
+        return 0
 
-        PRIMARY_CHANGE_SET="$(fileBase "${TEMPLATE}")-${change_set_id}"
-        submit_change_set "${REGION}" "${PRIMARY_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_primary_template_file}"
+      else
 
-        change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
-              --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" || return $?)"
+        if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
+          if [[ "$( echo "${change_set_state}" | jq -r '.StatusReason')" == \
+                "The submitted information didn't contain changes. Submit different information to create a change set." ]]; then
 
-        if [[ -n "${DRYRUN}" ]]; then
+            # Refresh the state to make sure everything is up to date
+            wait_for_stack_execution "" "${STACK_OPERATON}"> /dev/null
 
-          if [[ "${QUIET_MODE}" == "true" ]]; then
-            echo "${change_set_state}" > "${PLANNED_CHANGE}"
+            info "No updates needed for existing stack ${STACK_NAME}"
+            return 0
           else
-            info "${DRYRUN}Results for ${STACK_NAME}"
-            echo "${change_set_state}" | jq '.'
+            echo "An unexpected failure occurred in change set"
+            echo "${change_set_state}" | jq .
+            return 128
           fi
-          return 0
 
         else
 
-          if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
-            if [[ "$( echo "${change_set_state}" | jq -r '.StatusReason')" == \
-                  "The submitted information didn't contain changes. Submit different information to create a change set." ]]; then
+          replacement="$( echo "${change_set_state}" | jq -r '[.Changes[].ResourceChange.Replacement] | contains(["True"])' )"
+          REPLACE_TEMPLATES=$( for i in ${ALTERNATIVE_TEMPLATES} ; do echo $i | awk '/-replace[0-9]-template\.json$/'; done  | sort  )
 
-              # Refresh the state to make sure everything is up to date
-              wait_for_stack_execution > /dev/null
+          if [[ "${replacement}" == "true" && -n "${REPLACE_TEMPLATES}" ]]; then
 
-              info "No updates needed for existing stack ${STACK_NAME}"
-              return 0
-            else
-              echo "An unexpected failure occurred in change set"
-              echo "${change_set_state}" | jq .
-              return 128
-            fi
+              info "Replacement operation required"
+
+              for REPLACE_TEMPLATE in ${REPLACE_TEMPLATES}; do
+                info " - replace template : $(fileBase "${REPLACE_TEMPLATE}")"
+
+                local stripped_replace_template_file="${tmp_dir}/stripped_replace_template"
+                jq -c '.' < ${REPLACE_TEMPLATE} > "${stripped_replace_template_file}"
+
+                REPLACE_CHANGE_SET="$( fileBase "${REPLACE_TEMPLATE}")-${change_set_id}"
+                submit_change_set "${REGION}" "${REPLACE_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_replace_template_file}"
+
+                # Check ChangeSet for results
+                change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
+                    --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" || exit_status=$?)"
+
+                if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
+
+                  echo "${change_set_state}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
+                  if [[ ${no_change} == 0 ]]; then
+                    info "No updates needed for replacement stack ${STACK_NAME}. Treating as successful"
+                    break
+                  else
+                    fatal "An unexpected failure occurrend creating the change set"
+                    echo "${change_set_state}" | jq '.'
+                    return ${exit_status}
+                  fi
+                else
+                  # Running
+                  aws --region "${REGION}" cloudformation execute-change-set \
+                      --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" \
+                      --client-request-token "${REPLACE_CHANGE_SET}" > /dev/null || return $?
+
+                  wait_for_stack_execution "${REPLACE_CHANGE_SET}" "${STACK_OPERATION}" "${change_set_state}" || { exit_status=$?; break; }
+                fi
+              done
+
+              # catch loop failures
+              [[ "${exit_status}" -ne 0 ]] && { fatal "An issue occurred during replace template processing"; return "${exit_status}"; }
 
           else
+            # Execute the primary template change
+            aws --region "${REGION}" cloudformation execute-change-set \
+                  --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" \
+                  --client-request-token "${PRIMARY_CHANGE_SET}" > /dev/null || return $?
 
-            replacement="$( echo "${change_set_state}" | jq -r '[.Changes[].ResourceChange.Replacement] | contains(["True"])' )"
-            REPLACE_TEMPLATES=$( for i in ${ALTERNATIVE_TEMPLATES} ; do echo $i | awk '/-replace[0-9]-template\.json$/'; done  | sort  )
+            wait_for_stack_execution "${PRIMARY_CHANGE_SET}" "${STACK_OPERATION}" "${change_set_state}" || return $?
 
-            if [[ "${replacement}" == "true" && -n "${REPLACE_TEMPLATES}" ]]; then
-
-                info "Replacement operation required"
-
-                for REPLACE_TEMPLATE in ${REPLACE_TEMPLATES}; do
-                  info " - replace template : $(fileBase "${REPLACE_TEMPLATE}")"
-
-                  local stripped_replace_template_file="${tmp_dir}/stripped_replace_template"
-                  jq -c '.' < ${REPLACE_TEMPLATE} > "${stripped_replace_template_file}"
-
-                  REPLACE_CHANGE_SET="$( fileBase "${REPLACE_TEMPLATE}")-${change_set_id}"
-                  submit_change_set "${REGION}" "${REPLACE_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_replace_template_file}"
-
-                  # Check ChangeSet for results
-                  change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
-                      --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" || exit_status=$?)"
-
-                  if [[ "$( echo "${change_set_state}" | jq -r '.Status')" == "FAILED" ]]; then
-
-                    echo "${change_set_state}" | jq -r '.StatusReason' | grep -q "The submitted information didn't contain changes."; no_change=$?
-                    if [[ ${no_change} == 0 ]]; then
-                      info "No updates needed for replacement stack ${STACK_NAME}. Treating as successful"
-                      break
-                    else
-                      fatal "An unexpected failure occurrend creating the change set"
-                      echo "${change_set_state}" | jq '.'
-                      return ${exit_status}
-                    fi
-                  else
-                    # Running
-                    aws --region "${REGION}" cloudformation execute-change-set \
-                        --stack-name "${STACK_NAME}" --change-set-name "${REPLACE_CHANGE_SET}" \
-                        --client-request-token "${REPLACE_CHANGE_SET}" > /dev/null || return $?
-
-                    wait_for_stack_execution "${REPLACE_CHANGE_SET}" "${change_set_state}" || { exit_status=$?; break; }
-                  fi
-                done
-
-                # catch loop failures
-                [[ "${exit_status}" -ne 0 ]] && { fatal "An issue occurred during replace template processing"; return "${exit_status}"; }
-
-            else
-              # Execute the primary template change
-              aws --region "${REGION}" cloudformation execute-change-set \
-                    --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" \
-                    --client-request-token "${PRIMARY_CHANGE_SET}" > /dev/null || return $?
-
-              wait_for_stack_execution "${PRIMARY_CHANGE_SET}" "${change_set_state}" || return $?
-
-            fi
           fi
         fi
-        ;;
+      fi
+      ;;
 
-      *)
-        fatal "\"${STACK_OPERATION}\" is not one of the known stack operations"
-        return 1
-        ;;
-    esac
-  fi
+    *)
+      fatal "\"${STACK_OPERATION}\" is not one of the known stack operations"
+      return 1
+      ;;
+  esac
 
   # Clean up the stack if required
   if [[ "${STACK_OPERATION}" == "delete" && "${exit_stats}" -eq 0 ]]; then
+    for i in ${PSEUDO_STACK_WILDCARD}; do
+      rm "${i}"
+    done
+
     if [[ -f "${STACK}" ]]; then
       rm "${STACK}"
     fi
