@@ -121,7 +121,20 @@ function push() {
         commit_details="{}"
     fi
 
-    formatted_commit_message=''
+    # Break the message in name/value pairs
+    conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
+
+    # Separate the values based on the conventional commit format
+    conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
+    conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
+    conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
+    conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
+
+    formatted_commit_message="$(format_conventional_commit \
+        "${conventional_commit_type:-hamlet}" \
+        "${conventional_commit_scope}" \
+        "${conventional_commit_description:-automation}" \
+        "${conventional_commit_body}" )"
 
     if [[ "${DEFER_REPO_PUSH,,}" == "true" ]]; then
         info "Deferred push saving details for the next requested push"
@@ -141,7 +154,6 @@ function push() {
                 echo "${REPO_MESSAGE}" > "${commit_msg_file}"
                 echo "${staged_commits}" >> "${commit_msg_file}"
 
-                formatted_commit_message+="$(format_conventional_commit "hamlet" "" "multiple updates" "")"
                 formatted_commit_message+=$'\n\n'
 
                 while read msg; do
@@ -182,28 +194,12 @@ function push() {
         # Commit changes
         debug "Committing to the ${REPO_LOG_NAME} repo..."
 
-        if [[ -z "${formatted_commit_message}" ]]; then
-
-            # Break the message in name/value pairs
-            conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
-
-            # Separate the values based on the conventional commit format
-            conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
-            conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
-            conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
-            conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
-
-            formatted_commit_message="$(format_conventional_commit \
-                "${conventional_commit_type:-hamlet}" \
-                "${conventional_commit_scope}" \
-                "${conventional_commit_description:-automation}" \
-                "${conventional_commit_body}" )"
-        fi
-
         git commit -m "${formatted_commit_message}"
         RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
 
         REPO_PUSH_REQUIRED="true"
+    else
+        info "no changes to ${REPO_DIR}"
     fi
 
     # Tag the commit if required
