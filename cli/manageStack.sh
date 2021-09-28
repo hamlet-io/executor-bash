@@ -284,7 +284,9 @@ function process_stack() {
       fi
 
       PRIMARY_CHANGE_SET="$(fileBase "${TEMPLATE}")-${change_set_id}"
-      submit_change_set "${REGION}" "${PRIMARY_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_primary_template_file}" || return $?
+
+      # This will return a non zero exit code if there is no change to the change set - so we want to ignore the exit status here
+      submit_change_set "${REGION}" "${PRIMARY_CHANGE_SET}" "${STACK_NAME}" "${STACK_OPERATION}" "${stripped_primary_template_file}"
 
       change_set_state="$(aws --region "${REGION}" cloudformation describe-change-set \
             --stack-name "${STACK_NAME}" --change-set-name "${PRIMARY_CHANGE_SET}" || return $?)"
