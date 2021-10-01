@@ -58,7 +58,11 @@ function getTempRootDir() {
 }
 
 # Check the root of the context tree can be located
-export GENERATION_DATA_DIR=$(findGen3RootDir "${ROOT_DIR:-$(pwd)}")
+if [[ -n "${ROOT_DIR}" ]]; then
+  export GENERATION_DATA_DIR="${ROOT_DIR}"
+else
+  export GENERATION_DATA_DIR="$(findGen3RootDir "$(pwd)")"
+fi
 debug "GENERATION_DATA_DIR=${GENERATION_DATA_DIR}"
 
 # Cache for assembled components
