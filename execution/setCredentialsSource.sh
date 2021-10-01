@@ -282,7 +282,7 @@ case "${ACCOUNT_PROVIDER}" in
                     fatal "  - Hamlet Account Id: ${CRED_ACCOUNT}"
                     fatal "  - AWS Account Id: ${local_aws_account_id}"
                     fatal "  - HAMLET_AWS_AUTH_SOURCE: ${local_aws_auth_source}"
-                    fatal "  - HAMLET_AWS_AUTH_ROLE: ${local_aws_aith_role}"
+                    fatal "  - HAMLET_AWS_AUTH_ROLE: ${local_aws_auth_role}"
                     fatal "Check your aws credentials configuration and try again"
                     fatal "Make sure to set HAMLET_AWS_AUTH_ROLE if you need to switch role to access the account"
                     exit 128
