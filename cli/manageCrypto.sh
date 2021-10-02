@@ -377,7 +377,7 @@ function main() {
 
         # Decode if required
         if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
-            CRYPTO_TEXT=$(base64 -d <<< "${CRYPTO_TEXT}" |
+            CRYPTO_TEXT="$(base64 -d <<< "${CRYPTO_TEXT}" )"
         fi
 
         # Update if required
