@@ -6,7 +6,7 @@ See https://docs.hamlet.io for more info on Hamlet Deploy
 
 ## Installation
 
-The bash executor is included as part of the official [hamlet base engine](https://github.com/hamlet-io/hamlet-engine-base/) so it will be included as part of your hamlet installation if you are using the [hamlet cli](https://pypi.org/project/hamlet-cli/)
+See the [hamlet install guide](https://docs.hamlet.io/docs/getting-started/install) for details on how to install hamlet
 
 ### Alternative Method
 
