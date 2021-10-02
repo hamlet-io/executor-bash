@@ -98,11 +98,14 @@ case "${ACCOUNT_PROVIDER}" in
 
                 hamlet_aws_profile="source:env"
 
-                aws configure set "profile.${hamlet_aws_profile}.aws_access_key_id" "${AWS_ACCESS_KEY_ID}"
-                aws configure set "profile.${hamlet_aws_profile}.aws_secret_access_key" "${AWS_SECRET_ACCESS_KEY}"
+                if [[ -n "${AWS_ACCESS_KEY_ID}" && -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
 
-                if [[ -n "${AWS_SESSION_TOKEN}" ]]; then
-                    aws configure set "profile.${hamlet_aws_profile}.aws_session_token" "${AWS_SESSION_TOKEN}"
+                    aws configure set "profile.${hamlet_aws_profile}.aws_access_key_id" "${AWS_ACCESS_KEY_ID}"
+                    aws configure set "profile.${hamlet_aws_profile}.aws_secret_access_key" "${AWS_SECRET_ACCESS_KEY}"
+
+                    if [[ -n "${AWS_SESSION_TOKEN}" ]]; then
+                        aws configure set "profile.${hamlet_aws_profile}.aws_session_token" "${AWS_SESSION_TOKEN}"
+                    fi
                 fi
 
                 set_aws_mfa_token_serial "${hamlet_aws_profile}" "${local_aws_auth_mfa_serial}"
