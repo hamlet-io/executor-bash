@@ -96,5 +96,3 @@ else
     runJQ ${JSON_FORMAT} -s "${JSON_FILTER}" "${JSON_ARRAY[@]}" > ${JSON_OUTPUT}
 fi
 RESULT=$?
-[[ "${RESULT}" -eq 0 ]] && dos2unix "${JSON_OUTPUT}" 2> /dev/null
-#

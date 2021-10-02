@@ -323,10 +323,10 @@ function main() {
     # base64 decode if necessary
     if [[ (-n "${CRYPTO_DECODE}") ]]; then
         # Sanity check on input
-        dos2unix < "${ciphertext_src}" | grep -q "${BASE64_REGEX}"
+        grep -q "${BASE64_REGEX}" "${ciphertext_src}"
         RESULT=$?
         if [[ "${RESULT}" -eq 0 ]]; then
-            dos2unix < "${ciphertext_src}" | base64 -d  > "${ciphertext_bin}"
+            base64 -d "${ciphertext_src}" > "${ciphertext_bin}"
         else
             fatal "Input doesn't appear to be base64 encoded"
             return 255
@@ -377,7 +377,7 @@ function main() {
 
         # Decode if required
         if [[ "${CRYPTO_VISIBLE}" == "true" ]]; then
-            CRYPTO_TEXT=$(dos2unix <<< "${CRYPTO_TEXT}" | base64 -d)
+            CRYPTO_TEXT=$(base64 -d <<< "${CRYPTO_TEXT}" |
         fi
 
         # Update if required
