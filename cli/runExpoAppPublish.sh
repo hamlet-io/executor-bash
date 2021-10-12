@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright 2021, GoSource
 
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 
@@ -133,7 +134,7 @@ function set_android_manifest_property() {
     local name="$1"; shift
     local value="$1"; shift
 
-    # Upserts properties into the android manfiest metadata
+    # Upsert properties into the android manifest metadata
     # Manifest Url
     android_manifest_properties="$( echo "{}" | jq -c --arg name "${name}" --arg propValue "${value}"  '{ "@android:name" : $name, "@android:value" : $propValue }' )"
 
@@ -143,7 +144,7 @@ function set_android_manifest_property() {
         --argjson manifest_props "${android_manifest_properties}" \
         'if ( .manifest.application["meta-data"] | map( select( .["@android:name"] == $propName )) | length ) == 0 then .manifest.application["meta-data"] |= . + [ $manifest_props ]  else . end' )"
 
-    #Update the Expo Update Url
+    # Update the Expo Update Url
     manifest_content="$( echo "${manifest_content}" | xq --xml-output \
         --arg propName "${name}" \
         --argjson manifest_props "${android_manifest_properties}" \
@@ -155,7 +156,7 @@ function set_android_manifest_property() {
 
 function env_setup() {
 
-    # hombrew install
+    # Homebrew install
     brew upgrade || return $?
     brew install \
         jq \
@@ -174,10 +175,10 @@ function env_setup() {
     curl -o /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip --url https://dl.google.com/android/repository/commandlinetools-mac-6609375_latest.zip
     unzip /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip -d /usr/local/share/android-commandlinetools/
 
-    # Accept Licenses
+    # - Accept Licenses
     yes |  /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} --licenses
 
-    # Install required packages
+    # - Install required packages
     /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root=${ANDROID_HOME} 'cmdline-tools;latest' 'platforms;android-30' 'platforms;android-10' 'build-tools;30.0.2'
 
     # Make sure we have required software installed
@@ -367,18 +368,18 @@ function main() {
   mkdir -p "${OPS_PATH}"
   mkdir -p "${REPORTS_PATH}"
 
-  # get config file
+  # Get config file
   CONFIG_BUCKET="$( jq -r '.Occurrence.State.Attributes.CONFIG_BUCKET' < "${BUILD_BLUEPRINT}" )"
   CONFIG_KEY="$( jq -r '.Occurrence.State.Attributes.CONFIG_FILE' < "${BUILD_BLUEPRINT}" )"
   CONFIG_FILE="${OPS_PATH}/config.json"
 
   ENVIRONMENT="$( jq -r '.Occurrence.Core.Environment.Name' < "${BUILD_BLUEPRINT}" )"
 
-  # handle local region config
+  # Handle local region config
   placement_region="$(jq -r '.Occurrence.State.ResourceGroups.default.Placement.Region | select (.!=null)' < "${BUILD_BLUEPRINT}" )"
   AWS_REGION="${AWS_REGION:-${placement_region}}"
 
-  info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
+  info "Getting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
   aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # Operations data - Credentials, config etc.
@@ -428,12 +429,12 @@ function main() {
         ;;
   esac
 
-  # decrypt secrets from credentials store
+  # Decrypt secrets from credentials store
   info "Getting credentials from s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}"
   aws --region "${AWS_REGION}" s3 sync --only-show-errors "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
   find "${OPS_PATH}" -name \*.kms -exec decrypt_kms_file "${AWS_REGION}" "{}" \;
 
-  # get the version of the expo SDK which is required
+  # Get the version of the expo SDK which is required
   EXPO_SDK_VERSION="$(jq -r '.expo.sdkVersion | select (.!=null)' < ./app.json)"
   EXPO_PROJECT_SLUG="$(jq -r '.expo.slug' < ./app.json)"
 
@@ -465,7 +466,7 @@ function main() {
     fi
 
 
-  # Defin an archive based on build references to allow for source map replays and troubleshooting
+  # Define an archive based on build references to allow for source map replays and troubleshooting
   EXPO_ARCHIVE_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/archive/${BUILD_REFERENCE}/"
 
   # Make details available for downstream jobs
@@ -507,7 +508,7 @@ function main() {
     '.expo.releaseChannel=$RELEASE_CHANNEL | .expo.extra.BUILD_REFERENCE=$BUILD_REFERENCE | .expo.ios.buildNumber=$BUILD_NUMBER | .expo.extra=.expo.extra + $envConfig[]["AppConfig"]' <  "./app.json" > "${tmpdir}/environment-app.json"
   mv "${tmpdir}/environment-app.json" "./app.json"
 
-  ## Optional app.json overrides
+  # Optional app.json overrides
   IOS_DIST_BUNDLE_ID="$( jq -r '.BuildConfig.IOS_DIST_BUNDLE_ID' < "${CONFIG_FILE}" )"
   if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
     jq --arg IOS_DIST_BUNDLE_ID "${IOS_DIST_BUNDLE_ID}" '.expo.ios.bundleIdentifier=$IOS_DIST_BUNDLE_ID' <  "./app.json" > "${tmpdir}/ios-bundle-app.json"
@@ -590,7 +591,7 @@ function main() {
             export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/ios_distribution.p12"
 
-            #Get properties from retrieved config file and decrypt if required
+            # Get properties from retrieved config file and decrypt if required
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APPLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_EXPORT_METHOD" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -599,7 +600,7 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_CODESIGN_IDENTITY" "${KMS_PREFIX}" "${AWS_REGION}"
 
-            #Setting Defaults
+            # Setting Defaults
             IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
 
             # Turtle Specific overrides
@@ -636,7 +637,7 @@ function main() {
             "fastlane")
                 echo "Using fastlane to build the binary image"
 
-                # Adds a shield to the App icons with the environment for the app
+                # Add a shield to the App icons with the environment for the app
                 if [[ "${ENVIRONMENT_BADGE}" == "true" ]]; then
 
                     which badge || (fatal "badge not installed - run gem install badge to install"; return 128)
@@ -646,7 +647,7 @@ function main() {
 
                     # iOS is the default pattern to match
                     badge "${docker_args[@]}" --shield_geometry "+0+5%"
-                    # Andoird search path
+                    # Android search path
                     badge "${docker_args[@]}" --shield_geometry "+0+20%" --glob "/**/src/main/res/mipmap-*/ic_launcher*.png"
 
                 fi
@@ -700,7 +701,7 @@ function main() {
 
                     else
                         # Legacy Expokit support
-                        # Update Expo Details and seed with latest expo expot bundles
+                        # Update Expo Details and seed with latest expo bundles
                         BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
                         cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
 
@@ -717,10 +718,10 @@ function main() {
                         fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:releaseChannel value:"${RELEASE_CHANNEL}" || return $?
                     fi
 
-                    # Keychain setup - Creates a temporary keychain
+                    # Keychain setup - Create a temporary keychain
                     fastlane run create_keychain path:"${FASTLANE_KEYCHAIN_PATH}" password:"${FASTLANE_KEYCHAIN_NAME}" add_to_search_list:"true" unlock:"true" timeout:3600 || return $?
 
-                    # codesigning setup
+                    # Codesigning setup
                     fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
                     CODESIGN_IDENTITY="$( security find-certificate -c "${IOS_DIST_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}"  |  openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p' )"
                     if [[ -z "${CODESIGN_IDENTITY}" ]]; then
@@ -728,12 +729,12 @@ function main() {
                         return 255
                     fi
 
-                    # load the app provisioning profile
+                    # Load the app provisioning profile
                     fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
                     fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
-                    # load extension profiles
-                    # extension target name is assumed to be the string appended to "ios_profile" in the profile name
+                    # Load extension profiles
+                    # Extension target name is assumed to be the string appended to "ios_profile" in the profile name
                     # ios_profile_xxx.mobileprovision -> target is xxx
                     for PROFILE in "${OPS_PATH}"/"${IOS_DIST_PROVISIONING_PROFILE_BASE}"*${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}; do
                         TARGET="${PROFILE%${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}}"
@@ -786,13 +787,13 @@ function main() {
                         # Update Url
                         manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${EXPO_MANIFEST_URL}" )"
 
-                        #Sdk Version
+                        # Sdk Version
                         manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_SDK_VERSION" "${EXPO_SDK_VERSION}" )"
 
-                        #Check for updates
+                        # Check for updates
                         manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" "ALWAYS" )"
 
-                        #Check for updates
+                        # Check for updates
                         manifest_content="$( set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" "10000" )"
 
                         if [[ -n "${manifest_content}" ]]; then
