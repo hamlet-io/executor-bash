@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Copyright 2021, GoSource
 
 [[ -n "${GENERATION_DEBUG}" ]] && set ${GENERATION_DEBUG}
 
