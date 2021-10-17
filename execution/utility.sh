@@ -2028,7 +2028,7 @@ function get_vpn_connection_tunnel_ips() {
   local vpnConnectionId="${1}"; shift
 
   vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
-  echo "$( aws --region "${region}" ec2 describe-vpn-connections --output text --vpn-connection-ids ${vpnConnection} --query 'VpnConnections[0].VgwTelemetry[*].OutsideIpAddress' || return $? ) )"
+  echo "$( aws --region "${region}" ec2 describe-vpn-connections --output text --vpn-connection-ids ${vpnConnection} --query 'VpnConnections[0].VgwTelemetry[].[OutsideIpAddress]' || return $? )"
 }
 
 function update_vpn_options() {
