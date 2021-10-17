@@ -296,13 +296,14 @@ case "${ACCOUNT_PROVIDER}" in
 
     azure)
 
-        az_login_args=()
         # -- Only show errors unless debugging --
         if willLog "${LOG_LEVEL_DEBUG}"; then
-            az_login_args+=("--output" "json" )
+            az_debug_args+=("--output" "json" )
         else
-            az_login_args+=("--output" "none" )
+            az_debug_args+=("--output" "none" )
         fi
+
+         az_login_args=( $( echo ${az_debug_args[*]}) )
 
         find_env_config "local_az_auth_method" "HAMLET" "AZ_AUTH_METHOD" "${CRED_ACCOUNT}"
         find_env_config "local_legacy_az_auth_method" "" "AZ_AUTOMATION_AUTH_METHOD" "${CRED_ACCOUNT}"
@@ -374,7 +375,7 @@ case "${ACCOUNT_PROVIDER}" in
 
         if [[ "${local_az_auth_method^^}" != "NONE" ]]; then
             # Set the current subscription to use
-            az account set --subscription "${local_az_account_id}" "${az_login_args[@]}" > /dev/null || { fatal "Could not login to subscription ${CRED_ACCOUNT} ${local_az_auth_method}"; exit 128; }
+            az account set --subscription "${local_az_account_id}" "${az_debug_args[@]}" > /dev/null || { fatal "Could not login to subscription ${CRED_ACCOUNT} ${local_az_auth_method}"; exit 128; }
         fi
 
         ;;
