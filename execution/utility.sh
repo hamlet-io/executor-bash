@@ -2035,6 +2035,7 @@ function update_vpn_options() {
   local region="${1}"; shift
   local cfnStackName="$1"; shift
   local vpnConnectionId="${1}"; shift
+  local vpnTunnelIndex="${1}"; shift
   local configfile="${1}"; shift
 
   vpnConnection="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${vpnConnectionId}" "ref" || return $?)"
@@ -2042,7 +2043,7 @@ function update_vpn_options() {
 
   aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
 
-  for vpn_ip in "${vpnIPList[@]}"; do
+  for vpn_ip in "${vpnIPList[vpnTunnelIndex]}"; do
     info "Updating VPN: ${vpnConnection} - IP: ${vpn_ip}"
     aws --region "${region}" ec2 modify-vpn-tunnel-options --vpn-connection-id "${vpnConnection}" --vpn-tunnel-outside-ip-address "${vpn_ip}" --cli-input-json "file://${configfile}" || return $?
     aws --region "${region}" ec2 wait vpn-connection-available --vpn-connection-ids "${vpnConnection}" || return $?
