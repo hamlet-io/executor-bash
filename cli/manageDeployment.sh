@@ -245,9 +245,9 @@ function process_deployment() {
         # Execute the deployment to the resource group
         info "${DRYRUN}Starting deployment of ${DEPLOYMENT_NAME} to the Resource Group ${RESOURCE_GROUP}."
         if [ -z ${DRYRUN} ]; then
-          az deployment group create ${group_deployment_args[@]/#/--} --mode Complete --no-wait > /dev/null || return $?
+          az deployment group create ${group_deployment_args[@]/#/--} --mode Incremental --no-wait > /dev/null || return $?
         else
-          az deployment group what-if ${group_deployment_args[@]/#/--} --mode Complete --no-pretty-print > ${potential_change_file} || return $?
+          az deployment group what-if ${group_deployment_args[@]/#/--} --mode Incremental --no-pretty-print > ${potential_change_file} || return $?
         fi
 
       elif [[ "${DEPLOYMENT_SCOPE}" == "subscription" ]]; then
