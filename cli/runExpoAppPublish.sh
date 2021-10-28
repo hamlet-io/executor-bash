@@ -645,9 +645,9 @@ function main() {
                     badge_args=("${BADGE_CONTENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South" "--shield_parameters" "style=flat")
 
                     # iOS is the default pattern to match
-                    badge "${docker_args[@]}" --shield_geometry "+0+5%"
+                    badge "${badge_args[@]}" --shield_geometry "+0+5%"
                     # Android search path
-                    badge "${docker_args[@]}" --shield_geometry "+0+20%" --glob "/**/src/main/res/mipmap-*/ic_launcher*.png"
+                    badge "${badge_args[@]}" --shield_geometry "+0+20%" --glob "/**/src/main/res/mipmap-*/ic_launcher*.png"
 
                 fi
 
