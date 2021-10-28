@@ -642,7 +642,7 @@ function main() {
                     which badge || (fatal "badge not installed - run gem install badge to install"; return 128)
 
                     BADGE_CONTENT="${ENVIRONMENT_BADGE_CONTENT:-${ENVIRONMENT}}"
-                    badge_args=("${BADGE_CONTENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South" "--shield_parameters" "style=flat")
+                    badge_args=("--shield" "${BADGE_CONTENT}-blue" "--shield_scale" "0.50" "--no_badge" "--shield_gravity" "South" "--shield_parameters" "style=flat")
 
                     # iOS is the default pattern to match
                     badge "${badge_args[@]}" --shield_geometry "+0+5%"
