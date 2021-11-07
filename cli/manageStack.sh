@@ -244,7 +244,7 @@ function process_stack() {
           --client-request-token "${DELETE_CLIENT_TOKEN}" 2>/dev/null
 
       # For delete, we don't check result as stack may not exist
-      wait_for_stack_execution "${DELETE_CLIENT_TOKEN}" "${STACK_OPERATION}"
+      wait_for_stack_execution "${DELETE_CLIENT_TOKEN}" "${STACK_OPERATION}" || return $?
       ;;
 
     update|create)
@@ -384,7 +384,7 @@ function process_stack() {
   esac
 
   # Clean up the stack if required
-  if [[ "${STACK_OPERATION}" == "delete" && "${exit_stats}" -eq 0 ]]; then
+  if [[ "${STACK_OPERATION}" == "delete" ]]; then
     for i in ${PSEUDO_STACK_WILDCARD}; do
       rm "${i}"
     done
