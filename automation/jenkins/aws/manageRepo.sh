@@ -139,7 +139,7 @@ function push() {
     if [[ "${DEFER_REPO_PUSH,,}" == "true" ]]; then
         info "Deferred push saving details for the next requested push"
 
-        commit_time="$( date --iso-8601=seconds )"
+        commit_time="$( date -u +"%Y-%m-%dT%H:%M:%SZ" )"
         echo "${commit_details}" | jq --arg dir "${REPO_DIR}" --arg commit_time "${commit_time}" --arg msg "${REPO_MESSAGE}" '.dirs += [{"dir": $dir, "commit_time": $commit_time, "message": $msg }]' > "${commit_stage_file}"
 
         return 0

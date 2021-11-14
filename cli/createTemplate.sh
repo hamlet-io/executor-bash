@@ -760,7 +760,7 @@ function process_template() {
   [[ ! -d ${cf_dir} ]] && mkdir -p ${cf_dir}
 
   # Create a random string to use as the run identifier
-  run_id="$(dd bs=128 count=1 if=/dev/urandom status=none | base64 | env LC_CTYPE=C tr -dc 'a-z0-9' | fold -w 10 | head -n 1)"
+  run_id="$( echo "${RANDOM}" | sha1sum | fold -w 10 | head -n 1 )"
 
   # Directory for temporary files
   pushTempDir "create_template_XXXXXX"
