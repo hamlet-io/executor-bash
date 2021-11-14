@@ -558,22 +558,24 @@ function main() {
   esac
 
   # Regenerate the deployment unit list in case the first code commit/tag or format was overriden
-  UPDATED_UNITS_ARRAY=()
-  for INDEX in $( seq 0 $((${#DEPLOYMENT_UNIT_ARRAY[@]}-1)) ); do
-      UPDATED_UNIT=("${DEPLOYMENT_UNIT_ARRAY[$INDEX]}")
-      if [[ "${CODE_TAG_ARRAY[$INDEX]}" != "?" ]]; then
-          UPDATED_UNIT+=("${CODE_TAG_ARRAY[$INDEX]}")
-      else
-          if [[ "${CODE_COMMIT_ARRAY[$INDEX]}" != "?" ]]; then
-              UPDATED_UNIT+=("${CODE_COMMIT_ARRAY[$INDEX]}")
-          fi
-      fi
-      if [[ "${IMAGE_FORMATS_ARRAY[$INDEX]}" != "?" ]]; then
-          UPDATED_UNIT+=("${IMAGE_FORMATS_ARRAY[$INDEX]}")
-      fi
-      UPDATED_UNITS_ARRAY+=("$(listFromArray "UPDATED_UNIT" "${BUILD_REFERENCE_PART_SEPARATORS}")")
-  done
-  UPDATED_UNITS=$(listFromArray "UPDATED_UNITS_ARRAY" "${DEPLOYMENT_UNIT_SEPARATORS}")
+  if [[ -n "${DEPLOYMENT_UNIT_ARRAY}" ]]; then
+    UPDATED_UNITS_ARRAY=()
+    for INDEX in $( seq 0 $((${#DEPLOYMENT_UNIT_ARRAY[@]}-1)) ); do
+        UPDATED_UNIT=("${DEPLOYMENT_UNIT_ARRAY[$INDEX]}")
+        if [[ "${CODE_TAG_ARRAY[$INDEX]}" != "?" ]]; then
+            UPDATED_UNIT+=("${CODE_TAG_ARRAY[$INDEX]}")
+        else
+            if [[ "${CODE_COMMIT_ARRAY[$INDEX]}" != "?" ]]; then
+                UPDATED_UNIT+=("${CODE_COMMIT_ARRAY[$INDEX]}")
+            fi
+        fi
+        if [[ "${IMAGE_FORMATS_ARRAY[$INDEX]}" != "?" ]]; then
+            UPDATED_UNIT+=("${IMAGE_FORMATS_ARRAY[$INDEX]}")
+        fi
+        UPDATED_UNITS_ARRAY+=("$(listFromArray "UPDATED_UNIT" "${BUILD_REFERENCE_PART_SEPARATORS}")")
+    done
+    UPDATED_UNITS=$(listFromArray "UPDATED_UNITS_ARRAY" "${DEPLOYMENT_UNIT_SEPARATORS}")
+  fi
 
   # Save for subsequent processing
   save_context_property DEPLOYMENT_UNIT_LIST "${DEPLOYMENT_UNIT_ARRAY[*]}"
