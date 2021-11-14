@@ -15,7 +15,7 @@ function main() {
   # save_repo "${ACCOUNT_DIR}" "account config" "${DETAIL_MESSAGE}" "${PRODUCT_CONFIG_REFERENCE}" || return $?
 
   # Commit the generated application templates/stacks
-  save_repo "${ACCOUNT_INFRASTRUCTURE_DIR}" "account infrastructure" "${DETAIL_MESSAGE}" "${ACCOUNT_INFRASTRUCTURE_REFERENCE}" || return $?
+  save_repo "${ACCOUNT_STATE_DIR}" "account infrastructure" "${DETAIL_MESSAGE}" "${ACCOUNT_INFRASTRUCTURE_REFERENCE}" || return $?
 }
 
 main "$@"

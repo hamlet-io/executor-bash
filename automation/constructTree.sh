@@ -283,8 +283,8 @@ if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
             save_context_property ACCOUNT_CONFIG_COMMIT "$(git -C "${ACCOUNT_CONFIG_DIR}" rev-parse HEAD)"
         fi
 
-        ACCOUNT_INFRASTRUCTURE_DIR=$(findGen3AccountInfrastructureDir "${BASE_DIR}" "${ACCOUNT}")
-        if [[ -z "${ACCOUNT_INFRASTRUCTURE_DIR}" ]]; then
+        ACCOUNT_STATE_DIR=$(findGen3AccountStateDir "${BASE_DIR}" "${ACCOUNT}")
+        if [[ -z "${ACCOUNT_STATE_DIR}" ]]; then
             # Pull in the account infrastructure repo
             ${AUTOMATION_DIR}/manageRepo.sh -c -l "account infrastructure" \
                 -n "${ACCOUNT_INFRASTRUCTURE_REPO}" -v "${ACCOUNT_GIT_PROVIDER}" \
@@ -298,13 +298,13 @@ if [[ "${USE_EXISTING_TREE}" == "false" ]]; then
             # Is account repo contains multiple accounts, assume the infrastructure repo does too
             if [[ "${MULTI_ACCOUNT_REPO}" == "true" ]]; then
                 # Multi-account repo
-                ACCOUNT_INFRASTRUCTURE_DIR="${BASE_DIR}/infrastructure/accounts"
+                ACCOUNT_STATE_DIR="${BASE_DIR}/infrastructure/accounts"
             else
                 # Single account repo
-                ACCOUNT_INFRASTRUCTURE_DIR="${BASE_DIR}/infrastructure/${ACCOUNT}"
+                ACCOUNT_STATE_DIR="${BASE_DIR}/infrastructure/${ACCOUNT}"
             fi
-            mkdir -p $(filePath "${ACCOUNT_INFRASTRUCTURE_DIR}")
-            mv "${BASE_DIR_TEMP}" "${ACCOUNT_INFRASTRUCTURE_DIR}"
+            mkdir -p $(filePath "${ACCOUNT_STATE_DIR}")
+            mv "${BASE_DIR_TEMP}" "${ACCOUNT_STATE_DIR}"
         fi
 
     # TODO(mfl): 03/02/2020 Remove the following code once its confirmed its redundant

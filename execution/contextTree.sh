@@ -598,17 +598,13 @@ function findGen3Dirs() {
     "$(findGen3AccountSettingsDir "${root_dir}" "${account}" )" || return 1
   debug "ACCOUNT_SETTINGS_DIR=${ACCOUNT_SETTINGS_DIR}"
 
-  setGen3DirEnv "ACCOUNT_INFRASTRUCTURE_DIR" "${prefix}" \
-    "$(findGen3AccountInfrastructureDir "${root_dir}" "${account}" )" || return 1
-  debug "ACCOUNT_INFRASTRUCTURE_DIR=${ACCOUNT_INFRASTRUCTURE_DIR}"
+  setGen3DirEnv "ACCOUNT_STATE_DIR" "${prefix}" \
+    "$(findGen3AccountStateDir "${root_dir}" "${account}" )" || return 1
+  debug "ACCOUNT_STATE_DIR=${ACCOUNT_STATE_DIR}"
 
   setGen3DirEnv "ACCOUNT_OPERATIONS_DIR" "${prefix}" \
     "$(findGen3AccountOperationsDir "${root_dir}" "${account}" )" || return 1
   debug "ACCOUNT_OPERATIONS_DIR=${ACCOUNT_OPERATIONS_DIR}"
-
-  setGen3DirEnv "ACCOUNT_STATE_DIR" "${prefix}" \
-    "$(findGen3AccountStateDir "${root_dir}" "${account}" )" || return 1
-  debug "ACCOUNT_STATE_DIR=${ACCOUNT_STATE_DIR}"
 
   if [[ -n "${product}" ]]; then
     setGen3DirEnv "PRODUCT_DIR" "${prefix}" \

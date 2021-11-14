@@ -69,7 +69,7 @@ function main() {
 
     info "Committing changes to account repositories"
     save_repo "${ACCOUNT_DIR}" "account config" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}" || return $?
-    save_repo "${ACCOUNT_INFRASTRUCTURE_DIR}" "account infrastructure" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}"  || return $?
+    save_repo "${ACCOUNT_STATE_DIR}" "account state" "${COMMIT_MESSAGE}" "${REFERENCE}" "${TAG}"  || return $?
 
   fi
 
