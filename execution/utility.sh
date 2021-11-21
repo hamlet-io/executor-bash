@@ -1134,6 +1134,14 @@ function create_cloudwatch_event () {
   return ${return_status}
 }
 
+function set_cloudwatch_log_group_retention () {
+  local region="$1"; shift
+  local logGroupName="$1"; shift
+  local retentionInDays="$1"; shift
+
+  aws --region "${region}" logs put-retention-policy --log-group-name "${logGroupName}" --retention-in-days "${retentionInDays}"
+}
+
 # -- CloudFormation --
 function get_cloudformation_stack_output() {
   local region="$1"; shift
