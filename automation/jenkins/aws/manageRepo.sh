@@ -180,8 +180,8 @@ function push() {
 
     check_for_invalid_environment_variables "GIT_USER" "GIT_EMAIL" "REPO_MESSAGE" "REPO_REMOTE" || return $?
 
-    git remote show "${REPO_REMOTE}" >/dev/null 2>&1
-    RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Remote ${REPO_REMOTE} is not initialised" && return 1
+    # Make sure we can access the remote and that the branch exists
+    git ls-remote -q "${REPO_REMOTE}" "${REPO_BRANCH}" 1> /dev/null || return $?
 
     # Ensure git knows who we are
     git config user.name  "${GIT_USER}"
