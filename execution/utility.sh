@@ -1139,7 +1139,12 @@ function set_cloudwatch_log_group_retention () {
   local logGroupName="$1"; shift
   local retentionInDays="$1"; shift
 
-  aws --region "${region}" logs put-retention-policy --log-group-name "${logGroupName}" --retention-in-days "${retentionInDays}"
+  info "Setting retention period ${retentionInDays} on ${logGroupName}"
+  if [[ -n "$(aws --region "${region}" logs describe-log-groups --output text --query "logGroups[?logGroupName == '${logGroupName}'].logGroupName" || return $?)"  ]]; then
+    aws --region "${region}" logs put-retention-policy --log-group-name "${logGroupName}" --retention-in-days "${retentionInDays}"
+  else
+    info "log group ${logGroupName} not found - will try on next update"
+  fi
 }
 
 # -- CloudFormation --
