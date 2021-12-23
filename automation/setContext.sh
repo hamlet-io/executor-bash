@@ -474,7 +474,7 @@ function main() {
   defineGitProviderSettings "PRODUCT" "CODE" "${PRODUCT}" "${ENVIRONMENT}" "${PRODUCT_GIT_PROVIDER}"
 
   # - local registry providers
-  REGISTRY_TYPES=("dataset" "docker" "lambda" "pipeline" "scripts" "swagger" "openapi" "spa" "contentnode" "rdssnapshot" )
+  REGISTRY_TYPES=("dataset" "docker" "lambda" "lambda_jar" "pipeline" "scripts" "swagger" "openapi" "spa" "contentnode" "rdssnapshot" )
   for REGISTRY_TYPE in "${REGISTRY_TYPES[@]}"; do
       defineRegistryProviderSettings "${REGISTRY_TYPE}" "PRODUCT" "" "${PRODUCT}" "${ENVIRONMENT}" "${ACCOUNT}"
   done
