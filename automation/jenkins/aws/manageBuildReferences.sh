@@ -373,6 +373,19 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                             RESULT=$?
                             [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
                             ;;
+
+                        lambda_jar)
+                            ${AUTOMATION_DIR}/manageS3Registry.sh -k \
+                                -a "${IMAGE_PROVIDER}" \
+                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -y "${IMAGE_FORMAT_LOWER}" \
+                                -f "${IMAGE_FORMAT_LOWER}.jar" \
+                                -g "${CODE_COMMIT}" \
+                                -r "${ACCEPTANCE_TAG}" \
+                                -c "${REGISTRY_SCOPE}"
+                            RESULT=$?
+                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
+                            ;;
                         *)
                             fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
                             ;;
@@ -546,6 +559,17 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                             -c "${REGISTRY_SCOPE}"
                         RESULT=$?
                         ;;
+
+                    lambda_jar)
+                        ${AUTOMATION_DIR}/manageS3Registry.sh -v \
+                            -y "${IMAGE_FORMAT,,}" \
+                            -f "${IMAGE_FORMAT,,}.jar" \
+                            -a "${IMAGE_PROVIDER}" \
+                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                            -g "${CODE_COMMIT}" \
+                            -c "${REGISTRY_SCOPE}"
+                        RESULT=$?
+                        ;;
                     *)
                         fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
                         ;;
@@ -589,6 +613,18 @@ for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
                                 ${AUTOMATION_DIR}/manageS3Registry.sh -p \
                                     -y "${IMAGE_FORMAT,,}" \
                                     -f "${IMAGE_FORMAT,,}.zip" \
+                                    -a "${IMAGE_PROVIDER}" \
+                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                    -g "${CODE_COMMIT}" \
+                                    -r "${VERIFICATION_TAG}" \
+                                    -z "${FROM_IMAGE_PROVIDER}" \
+                                    -c "${REGISTRY_SCOPE}"
+                                RESULT=$?
+                                ;;
+                            lambda_jar)
+                                ${AUTOMATION_DIR}/manageS3Registry.sh -p \
+                                    -y "${IMAGE_FORMAT,,}" \
+                                    -f "${IMAGE_FORMAT,,}.jar" \
                                     -a "${IMAGE_PROVIDER}" \
                                     -u "${REGISTRY_DEPLOYMENT_UNIT}" \
                                     -g "${CODE_COMMIT}" \

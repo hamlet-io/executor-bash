@@ -254,6 +254,39 @@ function main() {
                 fi
                 ;;
 
+            lambda_jar)
+                IMAGE_FILENAME="${FORMAT,,}.jar"
+                if [[ -n "${PATHS[index]}" ]]; then
+                    pushd "$(pwd)" > /dev/null
+                    USER_IMAGE="${PATHS[index]}"
+                    IMAGE_FILE="${image_dir}/${IMAGE_FILENAME}"
+
+                    if [[ -f "${USER_IMAGE}" ]]; then
+                        if [[ "$(fileExtension "${USER_IMAGE}")" != "jar" ]]; then
+                            fatal "${FORMAT..} image must be a jar file - ${USER_IMAGE} does not have jar extension"
+                            return 1
+                        fi
+                        cp "${USER_IMAGE}" "${IMAGE_FILE}"
+                    fi
+                else
+                    pushd "${AUTOMATION_BUILD_DIR}" > /dev/null
+                    IMAGE_FILE="${AUTOMATION_BUILD_SRC_DIR}/dist/${IMAGE_FILENAME}"
+                fi
+
+                if [[ -f "${IMAGE_FILE}" ]]; then
+                    ${AUTOMATION_DIR}/manageS3Registry.sh -s \
+                            -y "${FORMAT,,}" -f "${IMAGE_FILENAME}" \
+                            -u "${DEPLOYMENT_UNIT}" \
+                            -g "${CODE_COMMIT}" \
+                            -f "${IMAGE_FILE}" \
+                            -c "${REGISTRY_SCOPE}" || return $?
+                    popd > /dev/null
+                else
+                    fatal "${FORMAT,,} image ${USER_IMAGE:-${IMAGE_FILE}} missing"
+                    return 1
+                fi
+                ;;
+
             *)
                 fatal "Unsupported image format \"${FORMAT}\""
                 return 1
