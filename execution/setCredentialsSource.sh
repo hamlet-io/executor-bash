@@ -329,22 +329,22 @@ case "${ACCOUNT_PROVIDER}" in
         case "${local_az_auth_method^^}" in
             SERVICE)
 
-                find_env_config "local_az_username" "HAMLET" "AZ_USERNAME" "${CRED_ACCOUNT}"
+                find_env_config "local_az_auth_username" "HAMLET" "AZ_AUTH_USERNAME" "${CRED_ACCOUNT}"
                 find_env_config "local_legacy_az_username" "" "AZ_USERNAME" "${CRED_ACCOUNT}"
 
-                local_az_username="${local_az_username:-${local_legacy_az_username}}"
+                local_az_auth_username="${local_az_auth_username:-${local_legacy_az_username}}"
 
-                find_env_config "local_az_pass" "HAMLET" "AZ_PASS" "${CRED_ACCOUNT}"
+                find_env_config "local_az_auth_password" "HAMLET" "AZ_AUTH_PASSWORD" "${CRED_ACCOUNT}"
                 find_env_config "local_legacy_az_pass" "" "AZ_PASS" "${CRED_ACCOUNT}"
 
-                local_az_pass="${local_az_pass:-${local_legacy_az_pass}}"
+                local_az_auth_password="${local_az_auth_password:-${local_legacy_az_pass}}"
 
-                if [[ (-z "${local_az_username}") || ( -z "${local_az_pass}") || ( -z "${local_az_tenant_id}") ]]; then
-                    fatal "Azure Service prinicpal login missing information - requires environment - HAMLET_AZ_USERNAME | HAMLET_AZ_PASS | HAMLET_AZ_TENANT_ID"
+                if [[ (-z "${local_az_auth_username}") || ( -z "${local_az_auth_password}") || ( -z "${local_az_tenant_id}") ]]; then
+                    fatal "Azure Service prinicpal login missing information - requires environment - HAMLET_AZ_AUTH_USERNAME | HAMLET_AZ_AUTH_PASSWORD | HAMLET_AZ_TENANT_ID"
                     exit 255
                 fi
 
-                az login --service-principal --username "${local_az_username}" --password "${local_az_pass}" ${az_login_args[@]}
+                az login --service-principal --username "${local_az_auth_username}" --password "${local_az_auth_password}" ${az_login_args[@]}
                 ;;
 
             MANAGED)
