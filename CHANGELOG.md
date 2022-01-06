@@ -1,6 +1,53 @@
 # Changelog
 
-## Unreleased (2021-09-12)
+## Unreleased (2022-01-06)
+
+#### New Features
+
+* output handling for runbook entrances
+* (lambda): add support for lambda jar registry
+* log group retention control ([#300](https://github.com/hamlet-io/executor-bash/issues/300))
+* split vpn tunnel configuration
+* disable credential setup in automation
+* remove location checks
+#### Fixes
+
+* sleep command formatting for compatability
+* align azure auth envs with aws envs
+* (cloudwatch): check for log group before retention update
+* account state lookup
+* osx differences for commands
+* handle failed stack deletes
+* (expo): fix sheild args for badge
+* (expo): use correct args in badge config
+* set ses active ruleset parameter substitution
+* set default ses ruleset ([#293](https://github.com/hamlet-io/executor-bash/issues/293))
+* revert deployment mode change
+* (aws): make tunnel ip support bash arrays
+* missing var ending
+* env credential switching
+* automation executor updates
+* remove return from change set creation
+* account directory for cmdb save
+* handle existing tree search for account
+* remove tag requirement
+* (ci): generate changelog on tag
+#### Refactorings
+
+* show output on failed remote check
+* azure deployment updates
+* remove dos2unix
+* always format commit message
+* stack delete handling
+#### Others
+
+* remove copyright notice
+* add a copyright and fix some typos
+* changelog bump ([#233](https://github.com/hamlet-io/executor-bash/issues/233))
+
+Full set of changes: [`8.3.0...8a04ec0`](https://github.com/hamlet-io/executor-bash/compare/8.3.0...8a04ec0)
+
+## 8.3.0 (2021-09-10)
 
 #### New Features
 
@@ -48,7 +95,7 @@
 * remove access key handling
 * support generation credentials handling
 
-Full set of changes: [`8.2.1...cc9f61a`](https://github.com/hamlet-io/executor-bash/compare/8.2.1...cc9f61a)
+Full set of changes: [`8.2.1...8.3.0`](https://github.com/hamlet-io/executor-bash/compare/8.2.1...8.3.0)
 
 ## 8.2.1 (2021-07-09)
 
