@@ -139,7 +139,7 @@ if [[ ("${RETAIN}" != "") || ("${AGE}" != "") ]]; then
 fi
 
 if [[ "${WAIT}" == "true" ]]; then
-    sleep 5s
+    sleep 5
     while [ "${exit_status}" != "0" ]; do
         SNAPSHOT_STATE="$(aws --region "${REGION}" rds describe-db-snapshots --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --query 'DBSnapshots[0].Status' || return $? )"
         SNAPSHOT_PROGRESS="$(aws --region "${REGION}" rds describe-db-snapshots --db-snapshot-identifier "${DB_SNAPSHOT_IDENTIFIER}" --query 'DBSnapshots[0].PercentProgress' || return $? )"

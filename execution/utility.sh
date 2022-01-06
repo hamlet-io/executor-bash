@@ -2169,7 +2169,7 @@ function create_snapshot() {
       return 0
     fi
 
-    sleep 5s
+    sleep 5
     while [ "${exit_status}" != "0" ]
     do
         SNAPSHOT_STATE="$(aws --region "${region}" rds describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" --query 'DBClusterSnapshots[0].Status' || return $? )"
@@ -2193,7 +2193,7 @@ function create_snapshot() {
       return 0
     fi
 
-    sleep 5s
+    sleep 5
     while [ "${exit_status}" != "0" ]
     do
         SNAPSHOT_STATE="$(aws --region "${region}" rds describe-db-snapshots --db-snapshot-identifier "${db_snapshot_identifier}" --query 'DBSnapshots[0].Status' || return $? )"
