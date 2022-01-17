@@ -33,14 +33,6 @@ These options must be set in order for Hamlet Deploy Executor to function correc
 | GENERATION_BASE_DIR     | `<clone dir>`                          |
 | GENERATION_DIR          | `<clone dir>/cli`                      |
 
-##### Optional Variables
-
-The following optional variables will further configure the Hamlet Deploy Executor.
-
-| Variable            | Value                                                               |
-|---------------------|---------------------------------------------------------------------|
-| AZURE_EXTENSION_DIR | A filepath to the directory containing extensions to the Azure CLI. |
-
 ## Usage
 
 Though typical use of the Executor is performed through the Hamlet Deploy CLI, scripts within the Executor may be manually invoked.
