@@ -458,9 +458,10 @@ function process_template_pass() {
   if [[ -f "${generation_contract_stage}" ]]; then
     local output_filename="$( jq -r '.Id' < "${generation_contract_stage}")"
     arrayFromList pass_result_files "$( jq -r '[ .Steps[] | select( .Type == "process_template_pass" ) | .Parameters.outputFileName ] | join(",")' < "${generation_contract_stage}" )"
-
+    arrayFromList stage_step_statuses "$( getStepStatusesFromContractStage "$( cat ${generation_contract_stage} )" "," )"
   else
     arrayFromList pass_result_files "${output_filename}"
+    arrayFromList stage_step_statuses "available"
   fi
 
   # Make the temp directory a cmdb so that we can write into it
@@ -481,62 +482,65 @@ function process_template_pass() {
   # The debug file is the default output and should only be used for serious debugging
   local debug_file="${tmp_dir}/${output_filename}.debug"
 
-  ${GENERATION_BASE_DIR}/execution/freemarker.sh \
-    -d "${template_dir}" \
-    ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
-    -d "${GENERATION_ENGINE_DIR}/engine" \
-    -d "${GENERATION_ENGINE_DIR}/providers" \
-    ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
-    -t "${template}" \
-    -o "${debug_file}" \
-    "${args[@]}"; return_code=$?
+  if inArray "stage_step_statuses" "available"; then
 
-  if [[ ${return_code} -ne 0 ]]; then
-    # The engine does most of the work here - this is mostly to put errors in context
-    case "${return_code}" in
-      100)
-        fatal "[!] hamlet managed exception"
-        ;;
+    ${GENERATION_BASE_DIR}/execution/freemarker.sh \
+      -d "${template_dir}" \
+      ${GENERATION_PRE_PLUGIN_DIRS:+ -d "${GENERATION_PRE_PLUGIN_DIRS}"} \
+      -d "${GENERATION_ENGINE_DIR}/engine" \
+      -d "${GENERATION_ENGINE_DIR}/providers" \
+      ${GENERATION_PLUGIN_DIRS:+ -d "${GENERATION_PLUGIN_DIRS}"} \
+      -t "${template}" \
+      -o "${debug_file}" \
+      "${args[@]}"; return_code=$?
 
-      101)
-        fatal "[!] hamlet unmanaged exception"
-        ;;
+    if [[ ${return_code} -ne 0 ]]; then
+      # The engine does most of the work here - this is mostly to put errors in context
+      case "${return_code}" in
+        100)
+          fatal "[!] hamlet managed exception"
+          ;;
 
-      102)
-        fatal "[!] hamlet internal isssue"
-        ;;
+        101)
+          fatal "[!] hamlet unmanaged exception"
+          ;;
 
-      110)
-        fatal "[!] hamlet log errors"
-        ;;
+        102)
+          fatal "[!] hamlet internal isssue"
+          ;;
 
-      200)
-        fatal "[!] engine I/O issue"
-        ;;
+        110)
+          fatal "[!] hamlet log errors"
+          ;;
 
-      202|203)
-        fatal "[!] engine invalid parameters found"
-        ;;
+        200)
+          fatal "[!] engine I/O issue"
+          ;;
 
-      209)
-        fatal "[!] engine issue in freemarker wrapper"
-        ;;
+        202|203)
+          fatal "[!] engine invalid parameters found"
+          ;;
 
-      1**)
-        fatal "[!] hamlet unknown issue, code = ${return_code}"
-        ;;
+        209)
+          fatal "[!] engine issue in freemarker wrapper"
+          ;;
 
-      2**)
-        fatal "[!] engine unknown issue, code = ${return_code}"
-        ;;
+        1**)
+          fatal "[!] hamlet unknown issue, code = ${return_code}"
+          ;;
 
-      *)
-        fatal "[!] unknown issue, code = ${return_code}"
-        ;;
+        2**)
+          fatal "[!] engine unknown issue, code = ${return_code}"
+          ;;
 
-    esac
+        *)
+          fatal "[!] unknown issue, code = ${return_code}"
+          ;;
 
-    return ${return_code}
+      esac
+
+      return ${return_code}
+    fi
   fi
 
   # Now a few tests on the result file
@@ -830,31 +834,32 @@ function process_template() {
       stage_content_file="${tmp_dir}/generation_contract_stage_${stageIndex}.json"
       echo "${stage_content}" > "${stage_content_file}"
 
+
       arrayFromList stage_step_types "$( getStepTypesFromContractStage "${stage_content}" "," )"
 
       if inArray "stage_step_types" "process_template_pass"; then
 
-        process_template_pass \
-          "${entrance}" \
-          "${flows}" \
-          "${GENERATION_PROVIDERS}" \
-          "${GENERATION_FRAMEWORK}" \
-          "${deployment_unit}" \
-          "${deployment_group}" \
-          "${account}" \
-          "${account_region}" \
-          "${region}" \
-          "${request_reference}" \
-          "${configuration_reference}" \
-          "${deployment_mode}" \
-          "${cf_dir}" \
-          "${run_id}" \
-          "${deployment_unit_state_subdirectories}" \
-          "${entranceParameters}" \
-          "${stage_content_file}" \
-          ""
+          process_template_pass \
+            "${entrance}" \
+            "${flows}" \
+            "${GENERATION_PROVIDERS}" \
+            "${GENERATION_FRAMEWORK}" \
+            "${deployment_unit}" \
+            "${deployment_group}" \
+            "${account}" \
+            "${account_region}" \
+            "${region}" \
+            "${request_reference}" \
+            "${configuration_reference}" \
+            "${deployment_mode}" \
+            "${cf_dir}" \
+            "${run_id}" \
+            "${deployment_unit_state_subdirectories}" \
+            "${entranceParameters}" \
+            "${stage_content_file}" \
+            ""
 
-        local result=$?
+          local result=$?
 
         arrayFromList process_template_files "$( echo "${stage_content}" | jq -r '[ .Steps[] | select( .Type == "process_template_pass" ) | .Parameters.outputFileName ] | join(",")' )"
         for file in "${process_template_files[@]}"; do

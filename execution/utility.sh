@@ -847,6 +847,13 @@ function getStepTypesFromContractStage() {
   echo "$( echo "${contractStage}" | jq -r --arg seperator "${seperator}" '[ .Steps[].Type ] | join($seperator)' || return $?)"
 }
 
+function getStepStatusesFromContractStage() {
+  local contractStage="$1"; shift
+  local seperator="$1"; shift
+
+  echo "$( echo "${contractStage}" | jq -r --arg seperator "${seperator}" '[ .Steps[].Status ] | join($seperator)' || return $?)"
+}
+
 # -- Environment Config handling
 # handles environment variable configuration with qualification support
 function find_env_config() {
