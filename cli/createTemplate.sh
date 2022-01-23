@@ -123,7 +123,7 @@ function options() {
   fi
   FLOWS="$(listFromArray "FLOWS_ARRAY" ",")"
 
-  ENTRANCE_PARAMETERS="$(listFromArray "ENTRANCE_PARAMETERS_ARRAY" ",")"
+  ENTRANCE_PARAMETERS="$(listFromArray "ENTRANCE_PARAMETERS_ARRAY" "||")"
 
   # Ensure other mandatory arguments have been provided
   if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
@@ -438,7 +438,7 @@ function process_template_pass() {
   args+=("-r" "accountRegion=${account_region}")
 
   # Entrance parameters
-  arrayFromList entranceParametersArray "${entrance_parameters}" ","
+  arrayFromList entranceParametersArray "${entrance_parameters}" "||"
   for entranceParameter in "${entranceParametersArray[@]}"; do
     args+=("-r" "${entranceParameter}")
   done
