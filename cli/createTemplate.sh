@@ -763,8 +763,8 @@ function process_template() {
   # Ensure the aws tree for the templates exists
   [[ ! -d ${cf_dir} ]] && mkdir -p ${cf_dir}
 
-  # Create a random string to use as the run identifier
-  run_id="$( echo "${RANDOM}" | sha1sum | fold -w 10 | head -n 1 )"
+  # Create a random id to use as the run identifier
+  run_id="$(( ${RANDOM} ** 3 ))" && run_id="${run_id:0:10}"
 
   # Directory for temporary files
   pushTempDir "create_template_XXXXXX"
