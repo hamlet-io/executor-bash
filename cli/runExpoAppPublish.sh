@@ -208,6 +208,7 @@ where
 (o) -l BUILD_LOGS                   show the build logs for binary builds
 (o) -e ENVIRONMENT_BADGE            add a badge to the app icons with the environment
 (o) -d ENVIRONMENT_BADGE_CONTENT    override the environment content with your own
+(o) -o OUTPUT_DIR                   The output directory for binaries
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -241,7 +242,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":b:d:efg:hk:lmn:sq:t:u:v:" opt; do
+    while getopts ":b:d:efg:hk:lmn:o:sq:t:u:v:" opt; do
         case $opt in
             b)
                 BINARY_BUILD_PROCESS="${OPTARG}"
@@ -272,6 +273,9 @@ function options() {
                 ;;
             n)
                 NODE_PACKAGE_MANAGER="${OPTARG}"
+                ;;
+            o)
+                OUTPUT_DIR="${OPTARG}"
                 ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
@@ -353,7 +357,7 @@ function main() {
   fi
 
   # Make sure we are in the build source directory
-  BINARY_PATH="${WORKSPACE_DIR}/binary"
+  BINARY_PATH="${OUTPUT_DIR:-${WORKSPACE_DIR}}/binary"
   SRC_PATH="${WORKSPACE_DIR}/src"
   OPS_PATH="${WORKSPACE_DIR}/ops"
   REPORTS_PATH="${WORKSPACE_DIR}/reports"
