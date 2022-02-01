@@ -208,7 +208,7 @@ where
 (o) -l BUILD_LOGS                   show the build logs for binary builds
 (o) -e ENVIRONMENT_BADGE            add a badge to the app icons with the environment
 (o) -d ENVIRONMENT_BADGE_CONTENT    override the environment content with your own
-(o) -o OUTPUT_DIR                   The output directory for binaries
+(o) -o BINARY_OUTPUT_DIR            The output directory for binaries
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -275,7 +275,7 @@ function options() {
                 NODE_PACKAGE_MANAGER="${OPTARG}"
                 ;;
             o)
-                OUTPUT_DIR="${OPTARG}"
+                BINARY_OUTPUT_DIR="${OPTARG}"
                 ;;
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
@@ -357,7 +357,7 @@ function main() {
   fi
 
   # Make sure we are in the build source directory
-  BINARY_PATH="${OUTPUT_DIR:-${WORKSPACE_DIR}}/binary"
+  BINARY_PATH="${BINARY_OUTPUT_DIR:-"${WORKSPACE_DIR}/binary"}"
   SRC_PATH="${WORKSPACE_DIR}/src"
   OPS_PATH="${WORKSPACE_DIR}/ops"
   REPORTS_PATH="${WORKSPACE_DIR}/reports"
