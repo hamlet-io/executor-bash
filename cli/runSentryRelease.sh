@@ -27,6 +27,7 @@ where
 (o) -m SENTRY_SOURCE_MAP_S3_URL     s3 link to sourcemap files
 (o) -p SENTRY_URL_PREFIX            prefix for sourcemap files
 (o) -r SENTRY_RELEASE               sentry release name
+(o) -w WORK_DIR                     working directory (will use temp dir by default)
 
 (m) mandatory, (o) optional, (d) deprecated
 
@@ -45,7 +46,7 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":a:hg:m:p:r:u:" opt; do
+    while getopts ":a:hg:m:p:r:u:w:" opt; do
         case $opt in
             a)
                 APP_TYPE="${OPTARG}"
@@ -71,6 +72,9 @@ function options() {
             u)
                 DEPLOYMENT_UNIT="${OPTARG}"
                 ;;
+            w)
+                WORK_DIR="${OPTARG}"
+                ;;
             \?)
                 fatalOption
                 ;;
@@ -84,6 +88,7 @@ function options() {
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
     SENTRY_CLI_VERSION="${SENTRY_CLI_VERSION:-${DEFAULT_SENTRY_CLI_VERSION}}"
     SENTRY_URL_PREFIX="${SENTRY_URL_PREFIX:-${DEFAULT_SENTRY_URL_PREFIX}}"
+    WORK_DIR="${WORK_DIR:-$(getTempDir "cote_sentry_XXXXX")}"
 
 }
 
@@ -113,8 +118,8 @@ function main() {
       return 255
   fi
 
-  SOURCE_MAP_PATH="${AUTOMATION_DATA_DIR}/source_map"
-  OPS_PATH="${AUTOMATION_DATA_DIR}/ops"
+  SOURCE_MAP_PATH="${WORK_DIR}/source_map"
+  OPS_PATH="${WORK_DIR}/ops"
 
   mkdir -p "${SOURCE_MAP_PATH}"
   mkdir -p "${OPS_PATH}"
@@ -124,8 +129,12 @@ function main() {
   CONFIG_KEY="$( jq -r '.Occurrence.State.Attributes.CONFIG_FILE' < "${BUILD_BLUEPRINT}" )"
   CONFIG_FILE="${OPS_PATH}/config.json"
 
+  # Handle local region config
+  placement_region="$(jq -r '.Occurrence.State.ResourceGroups.default.Placement.Region | select (.!=null)' < "${BUILD_BLUEPRINT}" )"
+  export AWS_REGION="${AWS_REGION:-${placement_region}}"
+
   info "Gettting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
-  aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+  aws s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
 
   # attempting to read sentry configuration parameter from the configuration file if it is not passed as an argument
   # configuration file for expo builds contains .AppConfig element
@@ -153,7 +162,7 @@ function main() {
   export SENTRY_ORG=$SENTRY_ORG
 
   info "Getting source code from from ${SENTRY_SOURCE_MAP_S3_URL}"
-  aws --region "${AWS_REGION}" s3 cp --recursive --only-show-errors "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
+  aws s3 cp --recursive --only-show-errors "${SENTRY_SOURCE_MAP_S3_URL}" "${SOURCE_MAP_PATH}" || return $?
 
   info "Creating a new release ${SENTRY_RELEASE}"
   npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases new "${SENTRY_RELEASE}" || return $?
@@ -214,7 +223,9 @@ function main() {
   npx ${npx_base_args} --package @sentry/cli@"${SENTRY_CLI_VERSION}" sentry-cli releases finalize "${SENTRY_RELEASE}" || return $?
 
   DETAIL_MESSAGE="${DETAIL_MESSAGE} Source map files uploaded for the release ${SENTRY_RELEASE}."
-  echo "DETAIL_MESSAGE=${DETAIL_MESSAGE}" >> ${AUTOMATION_DATA_DIR}/context.properties
+  if [[ -n "${AUTOMATION_DATA_DIR}" ]]; then
+      echo "DETAIL_MESSAGE=${DETAIL_MESSAGE}" >> ${AUTOMATION_DATA_DIR}/context.properties
+  fi
 
   # All good
   return 0
