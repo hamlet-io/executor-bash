@@ -2513,7 +2513,7 @@ function get_dds_url() {
   local fqdn="$1"; shift
   local port="$1"; shift
 
-  echo "${scheme}://${username}:${password}@${fqdn}:${port}"
+  echo "${scheme}://${username}:${password}@${fqdn}:${port}/"
 }
 
 function update_dds_ca_identifier() {
@@ -2525,6 +2525,101 @@ function update_dds_ca_identifier() {
   aws --region "${region}" docdb wait db-instance-available --db-instance-identifier "${db_identifier}" || return $?
   aws --region "${region}" docdb modify-db-instance --apply-immediately --db-instance-identifier ${db_identifier} --ca-certificate-identifier "${ca_identifier}" 1> /dev/null || return $?
 }
+
+function create_dds_snapshot() {
+  local region="$1"; shift
+  local db_identifier="$1"; shift
+  local db_snapshot_identifier="$1"; shift
+
+  # Check that the database exists
+  db_info=$(aws --region "${region}" docdb describe-db-clusters --db-cluster-identifier ${db_identifier} )
+
+  if [[ -n "${db_info}" ]]; then
+    aws --region "${region}" docdb create-db-cluster-snapshot --db-cluster-snapshot-identifier "${db_snapshot_identifier}"  --db-cluster-identifier "${db_identifier}" 1> /dev/null || return $?
+  else
+    info "Could not find db ${db_identifier} - Skipping pre-deploy snapshot"
+    return 0
+  fi
+
+  sleep 180
+  while [ "${SNAPSHOT_PROGRESS}" != "100" ]
+  do
+      SNAPSHOT_STATE="$(aws --region "${region}" docdb describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" --query 'DBClusterSnapshots[0].Status' || return $? )"
+      SNAPSHOT_PROGRESS="$(aws --region "${region}" docdb describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" --query 'DBClusterSnapshots[0].PercentProgress' || return $? )"
+      info "Snapshot id ${db_snapshot_identifier} creation: state is ${SNAPSHOT_STATE}, ${SNAPSHOT_PROGRESS}%..."
+
+      # not support for docdb: aws --region "${region}" docdb wait db-cluster-snapshot-available --db-cluster-snapshot-identifier "${db_snapshot_identifier}"
+      # exit_status="$?"
+      sleep 20
+  done
+
+  db_snapshot=$(aws --region "${region}" docdb describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" || return $?)
+  info "Snapshot Created - $(echo "${db_snapshot}" | jq -r '.DBClusterSnapshots[0] | .DBSnapshotIdentifier + " " + .SnapshotCreateTime' )"
+}
+
+function encrypt_dds_snapshot() {
+  local region="$1"; shift
+  local db_snapshot_identifier="$1"; shift
+  local kms_key_id="$1"; shift
+
+  # Check the snapshot status
+  snapshot_info=$(aws --region "${region}" docdb describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" || return $? )
+
+  if [[ -n "${snapshot_info}" ]]; then
+    if [[ $(echo "${snapshot_info}" | jq -r '.DBClusterSnapshots[0].Status == "available"') ]]; then
+
+      if [[ $(echo "${snapshot_info}" | jq -r '.DBClusterSnapshots[0].StorageEncrypted') == false ]]; then
+
+        info "Converting snapshot ${db_snapshot_identifier} to an encrypted snapshot"
+
+        # create encrypted snapshot
+        aws --region "${region}" docdb copy-db-cluster-snapshot \
+          --source-db-cluster-snapshot-identifier "${db_snapshot_identifier}" \
+          --target-db-cluster-snapshot-identifier "encrypted-${db_snapshot_identifier}" \
+          --kms-key-id "${kms_key_id}" 1> /dev/null || return $?
+
+        info "Waiting for temp encrypted snapshot to become available..."
+        sleep 2
+        aws --region "${region}" docdb wait db-cluster-snapshot-available --db-cluster-snapshot-identifier "encrypted-${db_snapshot_identifier}" || return $?
+
+        info "Removing plaintext snapshot..."
+        # delete the original snapshot
+        aws --region "${region}" docdb delete-db-cluster-snapshot --db-cluster-snapshot-identifier "${db_snapshot_identifier}"  1> /dev/null || return $?
+        aws --region "${region}" docdb wait db-cluster-snapshot-deleted --db-cluster-snapshot-identifier "${db_snapshot_identifier}"  || return $?
+
+        # Copy snapshot back to original identifier
+        info "Renaming encrypted snapshot..."
+        aws --region "${region}" docdb copy-db-cluster-snapshot \
+          --source-db-cluster-snapshot-identifier "encrypted-${db_snapshot_identifier}" \
+          --target-db-cluster-snapshot-identifier "${db_snapshot_identifier}" 1> /dev/null || return $?
+
+        sleep 2
+        aws --region "${region}" docdb wait db-cluster-snapshot-available --db-cluster-snapshot-identifier "${db_snapshot_identifier}"  || return $?
+
+        # Remove the encrypted temp snapshot
+        aws --region "${region}" docdb delete-db-cluster-snapshot --db-cluster-snapshot-identifier "encrypted-${db_snapshot_identifier}"  1> /dev/null || return $?
+        aws --region "${region}" docdb wait db-cluster-snapshot-deleted --db-cluster-snapshot-identifier "encrypted-${db_snapshot_identifier}"  || return $?
+
+        db_snapshot=$(aws --region "${region}" docdb describe-db-cluster-snapshots --db-cluster-snapshot-identifier "${db_snapshot_identifier}" || return $?)
+        info "Snapshot Converted - $(echo "${db_snapshot}" | jq -r '.DBClusterSnapshots[0] | .DBClusterSnapshotIdentifier + " " + .SnapshotCreateTime + " Encrypted: " + (.StorageEncrypted|tostring)' )"
+
+        return 0
+
+      else
+
+        echo "Snapshot ${db_snapshot_identifier} already encrypted"
+        return 0
+
+      fi
+
+    else
+      echo "Snapshot not in a usuable state $(echo "${snapshot_info}")"
+      return 255
+    fi
+  fi
+}
+
+
 
 # -- WAF --
 function manage_waf_logging() {
