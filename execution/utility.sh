@@ -2433,6 +2433,99 @@ function update_rds_ca_identifier() {
   aws --region "${region}" rds modify-db-instance --apply-immediately --db-instance-identifier ${db_identifier} --ca-certificate-identifier "${ca_identifier}" 1> /dev/null || return $?
 }
 
+function add_tag_dds_resource() {
+  local region="$1"; shift
+  local db_identifier="$1"; shift
+  local key="${1}"; shift
+  local value="${1}"; shift
+
+  aws --region "${region}" docdb add-tags-to-resource --resource-name "${db_identifier}" --tags "Key=${key},Value=${value}" || return $?
+
+}
+
+function set_dds_master_password() {
+  local region="$1"; shift
+  local db_identifier="$1"; shift
+  local password="$1"; shift
+
+  info "Resetting master password for DocDB instance ${db_identifier}"
+  aws --region "${region}" docdb modify-db-cluster --db-cluster-identifier "${db_identifier}" --master-user-password "${password}" --apply-immediately 1> /dev/null
+}
+
+function get_dds_hostname() {
+  local region="$1"; shift
+  local db_identifier="$1"; shift
+  local db_endpoint_type="$1"; shift
+
+  if [[ "${db_endpoint_type}" == "read" ]]; then
+      hostname="$(aws --region "${region}" docdb describe-db-clusters --db-cluster-identifier ${db_identifier} --query 'DBClusters[0].ReaderEndpoint' --output text)"
+  else
+      hostname="$(aws --region "${region}" docdb describe-db-clusters --db-cluster-identifier ${db_identifier} --query 'DBClusters[0].Endpoint' --output text)"
+  fi
+
+  if [[ "${hostname}" != "None" ]]; then
+    echo "${hostname}"
+    return 0
+  else
+    fatal "hostname not found for docdb instance ${db_identifier}"
+    return 255
+  fi
+}
+
+function check_dds_snapshot_username() {
+  local region="$1"; shift
+  local db_snapshot_identifier="$1"; shift
+  local expected_username="$1"; shift
+
+  info "Checking snapshot username matches expected username"
+
+  snapshot_info="$(aws --region ${region} docdb describe-db-cluster-snapshots --include-shared --include-public --db-snapshot-identifier ${db_snapshot_identifier} || return $? )"
+
+  if [[ -n "${snapshot_info}" ]]; then
+    snapshot_username="$( echo "${snapshot_info}" | jq -r '.DBSnapshots[0].MasterUsername' )"
+
+    if [[ "${snapshot_username}" != "${expected_username}" ]]; then
+
+      error "Snapshot Username does not match the expected username"
+      error "Update the RDS username configuration to match the snapshot username"
+      error "    Snapshot username: ${snapshot_username}"
+      error "    Configured username: ${expected_username}"
+      return 128
+
+    else
+
+      info "Snapshot Username is the same as the expected username"
+      return 0
+
+    fi
+  else
+
+    error "Snapshot ${db_snapshot_identifier} - Not Found"
+    return 255
+
+  fi
+}
+
+function get_dds_url() {
+  local scheme="$1"; shift
+  local username="$1"; shift
+  local password="$1"; shift
+  local fqdn="$1"; shift
+  local port="$1"; shift
+
+  echo "${scheme}://${username}:${password}@${fqdn}:${port}"
+}
+
+function update_dds_ca_identifier() {
+  local region="$1"; shift
+  local db_identifier="$1"; shift
+  local ca_identifier="$1"; shift
+
+  info "Updating CA for RDS instance ${db_identifier} to ${ca_identifier}"
+  aws --region "${region}" docdb wait db-instance-available --db-instance-identifier "${db_identifier}" || return $?
+  aws --region "${region}" docdb modify-db-instance --apply-immediately --db-instance-identifier ${db_identifier} --ca-certificate-identifier "${ca_identifier}" 1> /dev/null || return $?
+}
+
 # -- WAF --
 function manage_waf_logging() {
   local region="$1"; shift
