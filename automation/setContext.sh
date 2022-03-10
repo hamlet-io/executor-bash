@@ -292,7 +292,7 @@ function main() {
 
       # Build directory
       AUTOMATION_BUILD_DIR="${AUTOMATION_DATA_DIR}"
-      [[ -d build ]] && AUTOMATION_BUILD_DIR="${AUTOMATION_BUILD_DIR}/build"
+      [[ -d "${AUTOMATION_BUILD_DIR}/build" ]] && AUTOMATION_BUILD_DIR="${AUTOMATION_BUILD_DIR}/build"
       if [[ -n "${BUILD_PATH}" ]]; then
         [[ -d "${AUTOMATION_BUILD_DIR}/${BUILD_PATH}" ]] &&
           AUTOMATION_BUILD_DIR="${AUTOMATION_BUILD_DIR}/${BUILD_PATH}" ||
