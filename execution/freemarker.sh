@@ -119,13 +119,23 @@ if [[ "${#CMDB_MAPPINGS[@]}" -gt 0 ]]; then
   CMDB_MAPPINGS=("-g" "${CMDB_MAPPINGS[@]}")
 fi
 
-GENERATION_WRAPPER_JAR_FILE="${GENERATION_WRAPPER_JAR_FILE}"
-if [[ -z "${GENERATION_WRAPPER_JAR_FILE}" && -f "${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.15.1.jar" ]]; then
-    GENERATION_WRAPPER_JAR_FILE="${GENERATION_ENGINE_DIR}/bin/freemarker-wrapper-1.15.1.jar"
-fi
+# Migration to a bundled version of the freemarker-wrapper
+# The bundled version removes the need to have a local java installation and ensures compatability
+# Defaulting to the current state but will eventually move away from it
+GENERATION_WRAPPER_LOCAL_JAVA="${GENERATION_WRAPPER_LOCAL_JAVA:-"true"}"
 
-if [[ -z "${GENERATION_WRAPPER_COMMAND}" ]]; then
+if [[ "${GENERATION_WRAPPER_LOCAL_JAVA,,}" == "true" ]]; then
+    if [[ ! -f "${GENERATION_WRAPPER_JAR_FILE}" ]]; then
+        fatal "Could not find engine core jar file - GENERATION_WRAPPER_JAR_FILE: ${GENERATION_WRAPPER_JAR_FILE}"
+        exit 128
+    fi
     GENERATION_WRAPPER_COMMAND="java -jar ${GENERATION_WRAPPER_JAR_FILE}"
+else
+    if [[ ! -f "${GENERATION_WRAPPER_SCRIPT_FILE}" ]]; then
+        fatal "Could not find engine core script file - GENERATION_WRAPPER_SCRIPT_FILE: ${GENERATION_WRAPPER_SCRIPT_FILE}"
+        exit 128
+    fi
+    GENERATION_WRAPPER_COMMAND="${GENERATION_WRAPPER_SCRIPT_FILE}"
 fi
 
 ${GENERATION_WRAPPER_COMMAND} \
