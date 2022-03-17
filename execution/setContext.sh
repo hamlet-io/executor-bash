@@ -101,6 +101,22 @@ if [[ (-f "root.json") || ((-d config) && (-d infrastructure)) ]]; then
     export LOCATION="${LOCATION:-root}"
 fi
 
+# The district determines the layers that are used within the deployment
+# The current user location is a good way to determine the district overall
+if [[ -z "${DISTRICT}" ]]; then
+    case "${LOCATION}" in
+        "account")
+            export DISTRICT="account"
+            ;;
+        "environment")
+            export DISTRCIT="environment"
+            ;;
+        default)
+            export DISTRICT="segment"
+            ;;
+    esac
+fi
+
 cd "${GENERATION_DATA_DIR}"
 [[ -z "${ACCOUNT}" ]] && export ACCOUNT="$(fileName "${GENERATION_DATA_DIR}")"
 
