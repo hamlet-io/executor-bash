@@ -427,6 +427,7 @@ function process_template_pass() {
   args+=("-r" "runId=${run_id}")
 
   # Starting layers
+  args+=("-r" "district=${DISTRICT}")
   args+=("-r" "tenant=${TENANT}")
   args+=("-r" "account=${ACCOUNT}")
   args+=("-r" "region=${region}")
