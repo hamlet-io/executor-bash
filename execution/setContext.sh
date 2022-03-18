@@ -109,13 +109,15 @@ if [[ -z "${DISTRICT}" ]]; then
             export DISTRICT="account"
             ;;
         "environment")
-            export DISTRCIT="environment"
+            export DISTRICT="environment"
             ;;
-        default)
+        "segment")
             export DISTRICT="segment"
             ;;
     esac
 fi
+
+export DISTRICT="${DISTRICT:-"segment"}"
 
 cd "${GENERATION_DATA_DIR}"
 [[ -z "${ACCOUNT}" ]] && export ACCOUNT="$(fileName "${GENERATION_DATA_DIR}")"
