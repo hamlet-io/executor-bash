@@ -1,6 +1,27 @@
 # Changelog
 
-## Unreleased (2022-01-06)
+## Unreleased (2022-03-22)
+
+#### New Features
+
+* add support for providing the district cli option to templates
+* add docdb support ([#312](https://github.com/hamlet-io/executor-bash/issues/312))
+* add support for bundled freemarker wrapper
+#### Fixes
+
+* district default handling
+* sentry release cli support
+* make output dir for binary only
+* macos run_id and expo ouputs
+#### Refactorings
+
+* district rename to district type
+* handling of bundled vs jar wrapper
+* use weird seperate for user provided paramters
+
+Full set of changes: [`8.4.0...183f478`](https://github.com/hamlet-io/executor-bash/compare/8.4.0...183f478)
+
+## 8.4.0 (2022-01-06)
 
 #### New Features
 
@@ -41,11 +62,12 @@
 * stack delete handling
 #### Others
 
+* changelog bump ([#279](https://github.com/hamlet-io/executor-bash/issues/279))
 * remove copyright notice
 * add a copyright and fix some typos
 * changelog bump ([#233](https://github.com/hamlet-io/executor-bash/issues/233))
 
-Full set of changes: [`8.3.0...8a04ec0`](https://github.com/hamlet-io/executor-bash/compare/8.3.0...8a04ec0)
+Full set of changes: [`8.3.0...8.4.0`](https://github.com/hamlet-io/executor-bash/compare/8.3.0...8.4.0)
 
 ## 8.3.0 (2021-09-10)
 
