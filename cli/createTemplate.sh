@@ -386,19 +386,28 @@ function process_template_pass() {
 
   # Args common across all passes
   local args=()
+
+  # Run time references
+  args+=("-r" "requestReference=${request_reference}")
+  args+=("-r" "configurationReference=${configuration_reference}")
+  args+=("-r" "runId=${run_id}")
+
+  # Base data and plugin access
+  args+=("-g" "${GENERATION_DATA_DIR}" )
+  args+=("-v" "pluginState=${PLUGIN_STATE}")
+
+  # Input and output handling
   [[ -n "${entrance}" ]]                  && args+=("-r" "entrance=${entrance}")
   [[ -n "${flows}" ]]                     && args+=("-r" "flows=${flows}")
-  [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
-  [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
-  [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
-  [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
   [[ -n "${output_filename}" ]]           && args+=("-r" "outputFileName=${output_filename}")
   [[ -n "${GENERATION_INPUT_SOURCE}" ]]   && args+=("-r" "inputSource=${GENERATION_INPUT_SOURCE}")
 
+  # Logging
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-r" "logLevel=${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_LEVEL}" ]]      && args+=("-l" "${GENERATION_LOG_LEVEL}")
   [[ -n "${GENERATION_LOG_FORMAT}" ]]     && args+=("-r" "logFormat=${GENERATION_LOG_FORMAT}")
 
+  # Contract Stage
   [[ -n "${generation_contract_stage}" ]] && args+=("-v" "generationContractStage=${generation_contract_stage}")
 
   # Include the template composites
@@ -411,32 +420,32 @@ function process_template_pass() {
     [[ -f "${composite_var}" ]] && args+=("-v" "${composite,,}Template=${composite_var}")
   done
 
-  args+=( "-g" "${GENERATION_DATA_DIR}" )
-
   # Composites
-  args+=("-v" "pluginState=${PLUGIN_STATE}")
   [[ -f "${COMPOSITE_BLUEPRINT}" ]] && args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
   [[ -f "${COMPOSITE_SETTINGS}" ]] && args+=("-v" "settings=${COMPOSITE_SETTINGS}")
   [[ -f "${COMPOSITE_DEFINITIONS}" ]] && args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
   [[ -f "${COMPOSITE_STACK_OUTPUTS}" ]] && args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
 
-  # Run time references
-  args+=("-r" "requestReference=${request_reference}")
-  args+=("-r" "configurationReference=${configuration_reference}")
-  args+=("-r" "deploymentMode=${DEPLOYMENT_MODE}")
-  args+=("-r" "runId=${run_id}")
+  # Deployment Handling
+  [[ -n "${DEPLOYMENT_MODE}" ]] && args+=("-r" "deploymentMode=${DEPLOYMENT_MODE}")
+  [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
+  [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
+
+  # Providers and frameworks
+  [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
+  [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
 
   # Starting layers
-  args+=("-r" "district=${DISTRICT}")
-  args+=("-r" "tenant=${TENANT}")
-  args+=("-r" "account=${ACCOUNT}")
-  args+=("-r" "region=${region}")
-  args+=("-r" "product=${PRODUCT}")
-  args+=("-r" "environment=${ENVIRONMENT}")
-  args+=("-r" "segment=${SEGMENT}")
+  [[ -n "${DISTRICT_TYPE}" ]] && args+=("-r" "districtType=${DISTRICT_TYPE}")
+  [[ -n "${TENANT}" ]] && args+=("-r" "tenant=${TENANT}")
+  [[ -n "${ACCOUNT}" ]] && args+=("-r" "account=${ACCOUNT}")
+  [[ -n "${region}" ]] && args+=("-r" "region=${region}")
+  [[ -n "${PRODUCT}" ]] && args+=("-r" "product=${PRODUCT}")
+  [[ -n "${ENVIRONMENT}" ]] && args+=("-r" "environment=${ENVIRONMENT}")
+  [[ -n "${SEGMENT}" ]] && args+=("-r" "segment=${SEGMENT}")
 
   # Account Override
-  args+=("-r" "accountRegion=${account_region}")
+  [[ -n "${account_region}" ]] && args+=("-r" "accountRegion=${account_region}")
 
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" "||"
