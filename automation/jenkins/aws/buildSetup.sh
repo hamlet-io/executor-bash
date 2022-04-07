@@ -48,7 +48,7 @@ if [[ -z "${DEPLOYMENT_UNIT_LIST}" ]]; then
                         fi
                         declare "${ATTRIBUTE^^}"="${ATTRIBUTE_VALUE}"
                     done
-                    export DEPLOYMENT_UNIT_LIST="${UNITS:-${SLICES}}"
+                    export DEPLOYMENT_UNIT_LIST="${UNITS}"
                     break
                     ;;
 
