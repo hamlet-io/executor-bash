@@ -5,7 +5,6 @@ trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 #Defaults
-GENERATION_DOCS_BLUEPRINT_DEFAULT="false"
 
 function usage() {
     cat <<EOF
@@ -24,7 +23,6 @@ Usage: $(basename $0) -l LEVELS_LIST -r REFERENCE -m DEPLOYMENT_MODE -y
 where
 
 (o) -a APPLICATION_UNITS_LIST is the list of application level units to process
-(o) -b GENERATION_DOCS_BLUEPRINT  create a build print for documentation
 (o) -c ACCOUNT_UNITS_LIST     is the list of account level units to process
 (o) -g SEGMENT_UNITS_LIST     is the list of segment level units to process
     -h                        shows this text
@@ -42,7 +40,6 @@ where
 DEFAULTS:
 
 ACCOUNT_LIST=\${ACCOUNT}
-GENERATION_DOCS_BLUEPRINT=${DEFAULT_GENERATION_DOCS_BLUEPRINT}
 
 NOTES:
 
@@ -57,7 +54,6 @@ function options() {
     while getopts ":a:bc:g:hl:m:n:p:r:s:u:y" option; do
         case $option in
             a) APPLICATION_UNITS_LIST="${OPTARG}" ;;
-            b) GENERATION_DOCS_BLUEPRINT="true" ;;
             c) ACCOUNT_UNITS_LIST="${OPTARG}" ;;
             g) SEGMENT_UNITS_LIST="${OPTARG}" ;;
             h) usage; return 1 ;;
@@ -74,14 +70,14 @@ function options() {
          esac
     done
 
+    DEPLOYMENT_MODE="${DEPLOYMENT_MODE:-${DEPLOYMENT_MODE_DEFAULT}}"
+
     return 0
 }
 
 function main() {
 
   options "$@" || return $?
-
-  GENERATION_DOCS_BLUEPRINT="${GENERATION_DOCS_BLUEPRINT:-${GENERATION_DOCS_BLUEPRINT_DEFAULT}}"
 
   # Process each account
   arrayFromList accounts_required "${ACCOUNTS_LIST:-${ACCOUNT}}"
@@ -185,14 +181,6 @@ function main() {
           fi
         fi
       done
-
-      # Update blueprint if a stack is being managed
-      # - Currently the blueprint only generates a segment level blueprin
-      if [[ "${level}" != "account" && "${level}" != "product" && "${GENERATION_DOCS_BLUEPRINT}" == "true" ]]; then
-          info "${DRYRUN}Generating deployment blueprint... \n"
-          ${GENERATION_DIR}/createTemplate.sh -e blueprint 2>/dev/null ||
-              { warning "An issue occurred generating the blueprint - This will not break things but could be an issue with your components"; }
-      fi
     done
   done
 
