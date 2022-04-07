@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-
-# AUTOMATION_BASE_DIR assumed to be pointing to base of gen3-automation tree
-
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
-trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
+
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 function usage() {
@@ -11,7 +8,7 @@ function usage() {
 
 Determine key settings for an tenant/account/product/segment
 
-Usage: $(basename $0) -i INTEGRATOR -t TENANT -a ACCOUNT -p PRODUCT -e ENVIRONMENT -s SEGMENT -r RELEASE_MODE -d DEPLOYMENT_MODE
+Usage: $(basename $0) -t TENANT -a ACCOUNT -p PRODUCT -e ENVIRONMENT -s SEGMENT -r RELEASE_MODE -d DEPLOYMENT_MODE
 
 where
 
@@ -19,7 +16,6 @@ where
 (o) -d DEPLOYMENT_MODE  is the mode to be used for deployment activity
 (o) -e ENVIRONMENT      is the environment name e.g. "production"
     -h                  shows this text
-(o) -i INTEGRATOR       is the integrator name
 (o) -p PRODUCT          is the product name e.g. "eticket"
 (o) -r RELEASE_MODE     is the mode to be used for release activity
 (o) -s SEGMENT          is the SEGMENT name e.g. "default"
@@ -30,14 +26,11 @@ where
 DEFAULTS:
 
 RELEASE_MODE = ${RELEASE_MODE_DEFAULT}
-DEPLOYMENT_MODE = ${DEPLOYMENT_MODE_DEFAULT}
-ACCOUNT=\${ACCOUNT_LIST[0]}
 
 NOTES:
 
 1. The setting values are saved in context.properties in the current directory
-2. DEPLOYMENT_MODE is one of "${DEPLOYMENT_MODE_UPDATE}", "${DEPLOYMENT_MODE_STOPSTART}" and "${DEPLOYMENT_MODE_STOP} or custom update deployment modes"
-3. RELEASE_MODE is one of "${RELEASE_MODE_CONTINUOUS}", "${RELEASE_MODE_SELECTIVE}", "${RELEASE_MODE_ACCEPTANCE}", "${RELEASE_MODE_PROMOTION}" and "${RELEASE_MODE_HOTFIX}"
+2. RELEASE_MODE is one of "${RELEASE_MODE_CONTINUOUS}", "${RELEASE_MODE_SELECTIVE}", "${RELEASE_MODE_ACCEPTANCE}", "${RELEASE_MODE_PROMOTION}" and "${RELEASE_MODE_HOTFIX}"
 
 EOF
   exit
@@ -251,18 +244,15 @@ function main() {
   ### Automation framework details ###
 
   # First things first - what automation provider are we?
-  if [[ -n "${JOB_NAME}" ]]; then
-    AUTOMATION_PROVIDER="${AUTOMATION_PROVIDER:-jenkins}"
+  if [[ -z "${AUTOMATION_PROVIDER}" && -n "${JENKINS_HOME}" ]]; then
+    AUTOMATION_PROVIDER="jenkins"
   fi
-  AUTOMATION_PROVIDER="${AUTOMATION_PROVIDER,,}"
-  # TODO(rossmurr4y): Update to use AUTOMATION_PROVIDER once there is more than the jenkins provider dir.
-  # AUTOMATION_PROVIDER_DIR="${AUTOMATION_BASE_DIR}/${AUTOMATION_PROVIDER}"
-  AUTOMATION_PROVIDER_DIR="${AUTOMATION_BASE_DIR}/jenkins"
 
+  AUTOMATION_PROVIDER="${AUTOMATION_PROVIDER,,}"
 
   ### Context from automation provider ###
-  # TODO(rossmurr4y): seperate out azure pipelines
   case "${AUTOMATION_PROVIDER}" in
+
     jenkins)
       # Determine the aggregator/integrator/tenant/product/environment/segment from
       # the job name if not already defined or provided on the command line
@@ -272,10 +262,7 @@ function main() {
       for PART in "${JOB_PATH[@]}"; do
         if contains "${PART}" "^(cot.?)-(.+)"; then
           case "${BASH_REMATCH[1]}" in
-            cota) AGGREGATOR="${AGGREGATOR:-${BASH_REMATCH[2]}}" ;;
-            coti) INTEGRATOR="${INTEGRATOR:-${BASH_REMATCH[2]}}" ;;
             cott) TENANT="${TENANT:-${BASH_REMATCH[2}}" ;;
-            cotw) WORKAREA="${WORKAREA:-${BASH_REMATCH[2]}}" ;;
             cotp) PRODUCT="${PRODUCT:-${BASH_REMATCH[2]}}" ;;
             cote) ENVIRONMENT="${ENVIRONMENT:-${BASH_REMATCH[2]}}" ;;
             cots) SEGMENT="${SEGMENT:-${BASH_REMATCH[2]}}" ;;
@@ -342,22 +329,34 @@ function main() {
       ;;
 
     hamletcli)
-        GIT_USER="${GIT_USER:-"$(git config --get user.name)"}"
-        GIT_EMAIL="${GIT_EMAIL:-"$(git config --get user.email)"}"
+      GIT_USER="${GIT_USER:-"$(git config --get user.name)"}"
+      GIT_EMAIL="${GIT_EMAIL:-"$(git config --get user.email)"}"
 
-        save_context_property GIT_USER  "${GIT_USER}"
-        save_context_property GIT_EMAIL "${GIT_EMAIL}"
-        ;;
+      save_context_property GIT_USER  "${GIT_USER}"
+      save_context_property GIT_EMAIL "${GIT_EMAIL}"
+      ;;
   esac
 
+  define_context_property DEPLOYMENT_MODE_UPDATE    "update"
+  define_context_property DEPLOYMENT_MODE_STOPSTART "stopstart"
+  define_context_property DEPLOYMENT_MODE_STOP      "stop"
+  define_context_property DEPLOYMENT_MODE_DEFAULT   "${DEPLOYMENT_MODE_UPDATE}"
+
+  # Release and Deployment modes
+  define_context_property RELEASE_MODE_CONTINUOUS   "continuous"
+  define_context_property RELEASE_MODE_SELECTIVE    "selective"
+  define_context_property RELEASE_MODE_ACCEPTANCE   "acceptance"
+  define_context_property RELEASE_MODE_PROMOTION    "promotion"
+  define_context_property RELEASE_MODE_HOTFIX       "hotfix"
+  define_context_property RELEASE_MODE_DEFAULT      "${RELEASE_MODE_CONTINUOUS}"
+
   # Parse options
-  while getopts ":a:d:e:hi:p:r:s:t:" option; do
+  while getopts ":a:d:e:hp:r:s:t:" option; do
     case "${option}" in
       a) ACCOUNT="${OPTARG}" ;;
       d) DEPLOYMENT_MODE="${OPTARG}" ;;
       e) ENVIRONMENT="${OPTARG}" ;;
       h) usage ;;
-      i) INTEGRATOR="${OPTARG}" ;;
       p) PRODUCT="${OPTARG}" ;;
       r) RELEASE_MODE="${OPTARG}" ;;
       s) SEGMENT="${OPTARG}" ;;
@@ -368,21 +367,6 @@ function main() {
   done
 
   ### Core settings ###
-
-  # Release and Deployment modes
-
-  define_context_property DEPLOYMENT_MODE_UPDATE    "update"
-  define_context_property DEPLOYMENT_MODE_STOPSTART "stopstart"
-  define_context_property DEPLOYMENT_MODE_STOP      "stop"
-  define_context_property DEPLOYMENT_MODE_DEFAULT   "${DEPLOYMENT_MODE_UPDATE}"
-
-  define_context_property RELEASE_MODE_CONTINUOUS   "continuous"
-  define_context_property RELEASE_MODE_SELECTIVE    "selective"
-  define_context_property RELEASE_MODE_ACCEPTANCE   "acceptance"
-  define_context_property RELEASE_MODE_PROMOTION    "promotion"
-  define_context_property RELEASE_MODE_HOTFIX       "hotfix"
-  define_context_property RELEASE_MODE_DEFAULT      "${RELEASE_MODE_CONTINUOUS}"
-
   findAndDefineSetting "TENANT" "" "" "" "value"
   findAndDefineSetting "PRODUCT" "" "" "" "value"
 
@@ -414,10 +398,6 @@ function main() {
   # ORG is product specific so not defaulted here
   findAndDefineSetting "GITHUB_GIT_DNS" "" "" "" "value" "github.com"
 
-  # Default generation framework git provider - "codeontap"
-  findAndDefineSetting "CODEONTAP_GIT_DNS" "" "" "" "value" "github.com"
-  findAndDefineSetting "CODEONTAP_GIT_ORG" "" "" "" "value" "codeontap"
-
   # Default who to include as the author if git updates required
   findAndDefineSetting "GIT_USER"  "" "" "" "value" "${GIT_USER_DEFAULT:-automation}"
   findAndDefineSetting "GIT_EMAIL" "" "" "" "value" "${GIT_EMAIL_DEFAULT}"
@@ -430,28 +410,13 @@ function main() {
   findAndDefineSetting "IMAGE_FORMAT_SEPARATORS" "" "${PRODUCT}" "${ENVIRONMENT}" "value" ":|"
 
   # Modes
-  findAndDefineSetting "DEPLOYMENT_MODE" "" "" "" "value" "${MODE}"
-  findAndDefineSetting "RELEASE_MODE" "" "" "" "value" "${RELEASE_MODE_CONTINUOUS}"
+  findAndDefineSetting "DEPLOYMENT_MODE" "" "" "" "value" "${MODE:-DEPLOYMENT_MODE_DEFAULT}"
+  findAndDefineSetting "RELEASE_MODE" "" "" "" "value" "${RELEASE_MODE_DEFAULT}"
 
   ### Account details ###
 
   # - provider
   findAndDefineSetting "ACCOUNT_PROVIDER" "ACCOUNT_PROVIDER" "${ACCOUNT}" "" "value" "aws"
-
-  # - access credentials
-  if [[ "${AUTOMATION_CONTEXT_CREDENTIALS:-"true"}" == "true" ]]; then
-    case "${ACCOUNT_PROVIDER}" in
-        aws)
-            AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/${ACCOUNT_PROVIDER}"
-            . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-            ;;
-
-            azure)
-            AUTOMATION_DIR="${AUTOMATION_PROVIDER_DIR}/aws"
-            . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
-            ;;
-    esac
-  fi
 
   # - cmdb git provider
   defineGitProviderSettings "ACCOUNT" "" "${ACCOUNT}" "" "github"
@@ -459,7 +424,6 @@ function main() {
   # - cmdb repos
   defineRepoSettings "ACCOUNT" "CONFIG"         "${ACCOUNT}" "" "accounts-cmdb"
   defineRepoSettings "ACCOUNT" "INFRASTRUCTURE" "${ACCOUNT}" "" "accounts-cmdb"
-
 
   ### Product details ###
 
@@ -489,25 +453,24 @@ function main() {
   CODE_PROVIDER_ARRAY=()
   IMAGE_FORMATS_ARRAY=()
   REGISTRY_SCOPE_ARRAY=()
-  arrayFromList "UNITS" "${DEPLOYMENT_UNITS:-${DEPLOYMENT_UNIT:-${SLICES:-${SLICE}}}}" "${DEPLOYMENT_UNIT_SEPARATORS}"
+
+  arrayFromList "UNITS" "${DEPLOYMENT_UNITS:-${DEPLOYMENT_UNIT}}" "${DEPLOYMENT_UNIT_SEPARATORS}"
   for CURRENT_DEPLOYMENT_UNIT in "${UNITS[@]}"; do
+
       [[ -z "${CURRENT_DEPLOYMENT_UNIT}" ]] && continue
+
       arrayFromList "BUILD_REFERENCE_PARTS" "${CURRENT_DEPLOYMENT_UNIT}" "${BUILD_REFERENCE_PART_SEPARATORS}"
       DEPLOYMENT_UNIT_PART="${BUILD_REFERENCE_PARTS[0]}"
       TAG_PART="${BUILD_REFERENCE_PARTS[1]:-?}"
       FORMATS_PART="${BUILD_REFERENCE_PARTS[2]:-?}"
       SCOPE_PART="${BUILD_REFERENCE_PARTS[3]:-?}"
       COMMIT_PART="?"
-      if [[ ("${#DEPLOYMENT_UNIT_ARRAY[@]}" -eq 0) ||
-              ("${APPLY_TO_ALL_DEPLOYMENT_UNITS}" == "true") ]]; then
+
+      if [[ ("${#DEPLOYMENT_UNIT_ARRAY[@]}" -eq 0) || ("${APPLY_TO_ALL_DEPLOYMENT_UNITS}" == "true") ]]; then
           # Processing the first deployment unit or all units if forced
 
           # Capture any provided git commit
-          case ${AUTOMATION_PROVIDER} in
-              jenkins|azurepipelines|hamletcli)
-                    [[ -n "${GIT_COMMIT}" ]] && COMMIT_PART="${GIT_COMMIT}"
-                    ;;
-          esac
+          [[ -n "${GIT_COMMIT}" ]] && COMMIT_PART="${GIT_COMMIT}"
 
           if [[ -n "${CODE_TAG}" ]]; then
               # Permit separate variable for tag/commit value - easier if only one repo involved
@@ -550,12 +513,7 @@ function main() {
       CODE_PROVIDER_ARRAY+=("${PRODUCT_CODE_GIT_PROVIDER}")
   done
 
-  # For builds, need to capture any provided git commit even if no deployment units defined at this point
-  case ${AUTOMATION_PROVIDER} in
-      jenkins|azurepipelines|hamletcli)
-          [[ ( -n "${GIT_COMMIT}" ) && ( -z "${CODE_COMMIT_ARRAY[0]}" ) ]] && CODE_COMMIT_ARRAY[0]="${GIT_COMMIT}"
-          ;;
-  esac
+  [[ ( -n "${GIT_COMMIT}" ) && ( -z "${CODE_COMMIT_ARRAY[0]}" ) ]] && CODE_COMMIT_ARRAY[0]="${GIT_COMMIT}"
 
   # Regenerate the deployment unit list in case the first code commit/tag or format was overriden
   if [[ -n "${DEPLOYMENT_UNIT_ARRAY}" ]]; then
@@ -585,6 +543,7 @@ function main() {
   save_context_property CODE_PROVIDER_LIST   "${CODE_PROVIDER_ARRAY[*]}"
   save_context_property IMAGE_FORMATS_LIST   "${IMAGE_FORMATS_ARRAY[*]}"
   save_context_property REGISTRY_SCOPE_LIST   "${REGISTRY_SCOPE_ARRAY[*]}"
+
   [[ -n "${UPDATED_UNITS}" ]] && save_context_property CLEANED_DEPLOYMENT_UNITS "${UPDATED_UNITS}"
 
   ### Release management ###
@@ -592,26 +551,14 @@ function main() {
   case "${RELEASE_MODE}" in
       # Promotion details
       ${RELEASE_MODE_SELECTIVE}|${RELEASE_MODE_PROMOTION})
+
           findAndDefineSetting "FROM_ENVIRONMENT" "PROMOTION_FROM_ENVIRONMENT" "${PRODUCT}" "${ENVIRONMENT}" "value"
           [[ -z "${FROM_ENVIRONMENT}" ]] && findAndDefineSetting "FROM_ENVIRONMENT" "PROMOTION_FROM_SEGMENT" "${PRODUCT}" "${ENVIRONMENT}" "value"
-          # Hard code some defaults for now
-          if [[ -z "${FROM_ENVIRONMENT}" ]]; then
-              case "${ENVIRONMENT}" in
-                  staging|preproduction)
-                      FROM_ENVIRONMENT="integration"
-                      ;;
-                  production)
-                      FROM_ENVIRONMENT="preproduction"
-                      ;;
-              esac
-              define_context_property "FROM_ENVIRONMENT" "${FROM_ENVIRONMENT}" "lower"
-          fi
 
           findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${FROM_ENVIRONMENT}" "value"
           [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${FROM_ENVIRONMENT}_${SEGMENT}" "value"
 
-          if [[ (-n "${FROM_ENVIRONMENT}") &&
-                  (-n "${FROM_ACCOUNT}")]]; then
+          if [[ (-n "${FROM_ENVIRONMENT}") && (-n "${FROM_ACCOUNT}")]]; then
               defineGitProviderSettings    "FROM_ACCOUNT" "" "${FROM_ACCOUNT}" "" "github"
               defineGitProviderSettings    "FROM_PRODUCT" "" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${FROM_ACCOUNT_GIT_PROVIDER}"
               defineRepoSettings           "FROM_PRODUCT" "CONFIG" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${PRODUCT}-cmdb"
@@ -619,23 +566,15 @@ function main() {
                   defineRegistryProviderSettings "${REGISTRY_TYPE}" "FROM_PRODUCT" "" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${FROM_ACCOUNT}"
               done
           else
-              fatal "PROMOTION environment/account not defined" && RESULT=1 && exit
+              fatal "PROMOTION environment/account not defined" return 1
           fi
           ;;
 
       #  Hotfix details
       ${RELEASE_MODE_HOTFIX})
+
           findAndDefineSetting "FROM_ENVIRONMENT" "HOTFIX_FROM_ENVIRONMENT" "${PRODUCT}" "${ENVIRONMENT}" "value"
           [[ -z "${FROM_ENVIRONMENT}" ]] && findAndDefineSetting "FROM_ENVIRONMENT" "HOTFIX_FROM_SEGMENT" "${PRODUCT}" "${ENVIRONMENT}" "value"
-          # Hard code some defaults for now
-          if [[ -z "${FROM_ENVIRONMENT}" ]]; then
-              case "${ENVIRONMENT}" in
-                  *)
-                      FROM_ENVIRONMENT="integration"
-                      ;;
-              esac
-              define_context_property "FROM_ENVIRONMENT" "${FROM_ENVIRONMENT}" "lower"
-          fi
 
           findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${HOTFIX_FROM_ENVIRONMENT}" "value"
           [[ -z "${FROM_ACCOUNT}" ]] && findAndDefineSetting "FROM_ACCOUNT" "ACCOUNT" "${PRODUCT}" "${HOTFIX_FROM_ENVIRONMENT}_${SEGMENT}" "value"
@@ -646,29 +585,27 @@ function main() {
                   defineRegistryProviderSettings "${REGISTRY_TYPE}" "FROM_PRODUCT" "" "${PRODUCT}" "${FROM_ENVIRONMENT}" "${FROM_ACCOUNT}"
               done
           else
-              fatal "HOTFIX environment/account not defined" && RESULT=1 && exit
+              fatal "HOTFIX environment/account not defined" return 1
           fi
           ;;
   esac
 
-
   ### Tags ###
+  AUTOMATION_RELEASE_IDENTIFIER="${RELEASE_IDENTIFIER:-${AUTOMATION_JOB_IDENTIFIER}}"
+  AUTOMATION_DEPLOYMENT_IDENTIFIER="${DEPLOYMENT_IDENTIFIER:-${AUTOMATION_JOB_IDENTIFIER}}"
+  if [[ "${AUTOMATION_RELEASE_IDENTIFIER}" =~ ^[0-9]+$ ]]; then
+      # If its just a number then add an "r" in front otherwise assume
+      # the user is deciding the naming scheme
+      AUTOMATION_RELEASE_IDENTIFIER="r${AUTOMATION_RELEASE_IDENTIFIER}"
+  fi
+  if [[ "${AUTOMATION_DEPLOYMENT_IDENTIFIER}" =~ ^[0-9]+$ ]]; then
+      # If its just a number then add an "d" in front otherwise assume
+      # the user is deciding the naming scheme
+      AUTOMATION_DEPLOYMENT_IDENTIFIER="d${AUTOMATION_DEPLOYMENT_IDENTIFIER}"
+  fi
 
-      AUTOMATION_RELEASE_IDENTIFIER="${RELEASE_IDENTIFIER:-${AUTOMATION_JOB_IDENTIFIER}}"
-      AUTOMATION_DEPLOYMENT_IDENTIFIER="${DEPLOYMENT_IDENTIFIER:-${AUTOMATION_JOB_IDENTIFIER}}"
-      if [[ "${AUTOMATION_RELEASE_IDENTIFIER}" =~ ^[0-9]+$ ]]; then
-          # If its just a number then add an "r" in front otherwise assume
-          # the user is deciding the naming scheme
-          AUTOMATION_RELEASE_IDENTIFIER="r${AUTOMATION_RELEASE_IDENTIFIER}"
-      fi
-      if [[ "${AUTOMATION_DEPLOYMENT_IDENTIFIER}" =~ ^[0-9]+$ ]]; then
-          # If its just a number then add an "d" in front otherwise assume
-          # the user is deciding the naming scheme
-          AUTOMATION_DEPLOYMENT_IDENTIFIER="d${AUTOMATION_DEPLOYMENT_IDENTIFIER}"
-      fi
-
-     define_context_property "RELEASE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER}-${DEPLOYMENT_LOCATION}"
-     define_context_property "DEPLOYMENT_TAG" "${AUTOMATION_DEPLOYMENT_IDENTIFIER}-${DEPLOYMENT_LOCATION}"
+  define_context_property "RELEASE_TAG" "${AUTOMATION_RELEASE_IDENTIFIER}-${DEPLOYMENT_LOCATION}"
+  define_context_property "DEPLOYMENT_TAG" "${AUTOMATION_DEPLOYMENT_IDENTIFIER}-${DEPLOYMENT_LOCATION}"
 
   case "${RELEASE_MODE}" in
       ${RELEASE_MODE_CONTINUOUS})
@@ -708,40 +645,34 @@ function main() {
   ### Capture details for logging etc ###
 
   # Basic details for git commits/slack notification (enhanced by other scripts)
-  [[ -n "${PRODUCT}" ]] &&
-    DETAIL_MESSAGE="product=${PRODUCT}" ||
-    DETAIL_MESSAGE="account=${ACCOUNT}"
+  [[ -n "${TENANT}" ]]                   && DETAIL_MESSAGE="tenant=${TENANT}"
+  [[ -n "${ACCOUNT}" ]]                  && DETAIL_MESSAGE="account=${ACCOUNT}"
+  [[ -n "${PRODUCT}" ]]                  && DETAIL_MESSAGE="product=${PRODUCT}"
   [[ -n "${ENVIRONMENT}" ]]              && DETAIL_MESSAGE="${DETAIL_MESSAGE}, environment=${ENVIRONMENT}"
-  [[ ("${SEGMENT}" != "${ENVIRONMENT}") &&
-      ("${SEGMENT}" != "default") ]]     && DETAIL_MESSAGE="${DETAIL_MESSAGE}, segment=${SEGMENT}"
-  [[ -n "${TIER}" ]]                     && DETAIL_MESSAGE="${DETAIL_MESSAGE}, tier=${TIER}"
-  [[ -n "${COMPONENT}" ]]                && DETAIL_MESSAGE="${DETAIL_MESSAGE}, component=${COMPONENT}"
+  [[ ("${SEGMENT}" != "${ENVIRONMENT}")
+      && ("${SEGMENT}" != "default") ]]  && DETAIL_MESSAGE="${DETAIL_MESSAGE}, segment=${SEGMENT}"
+
   [[ "${#DEPLOYMENT_UNIT_ARRAY[@]}" -ne 0 ]] && DETAIL_MESSAGE="${DETAIL_MESSAGE}, units=${UPDATED_UNITS}"
-  [[ -n "${TASK}" ]]                     && DETAIL_MESSAGE="${DETAIL_MESSAGE}, task=${TASK}"
-  [[ -n "${TASKS}" ]]                    && DETAIL_MESSAGE="${DETAIL_MESSAGE}, tasks=${TASKS}"
-  [[ -n "${GIT_USER}" ]]                 && DETAIL_MESSAGE="${DETAIL_MESSAGE}, user=${GIT_USER}"
   [[ -n "${DEPLOYMENT_MODE}" ]]          && DETAIL_MESSAGE="${DETAIL_MESSAGE}, mode=${DEPLOYMENT_MODE}"
+
+  [[ -n "${GIT_USER}" ]]                 && DETAIL_MESSAGE="${DETAIL_MESSAGE}, user=${GIT_USER}"
   [[ -n "${COMMENT}" ]]                  && DETAIL_MESSAGE="${DETAIL_MESSAGE}, comment=${COMMENT}"
 
   save_context_property DETAIL_MESSAGE
 
   ### Remember automation details ###
-
-  save_context_property AUTOMATION_BASE_DIR
   save_context_property AUTOMATION_PROVIDER
-  save_context_property AUTOMATION_PROVIDER_DIR
-  save_context_property AUTOMATION_DIR
+
   save_context_property AUTOMATION_DATA_DIR
+
   save_context_property AUTOMATION_BUILD_DIR
   save_context_property AUTOMATION_BUILD_SRC_DIR
   save_context_property AUTOMATION_BUILD_DEVOPS_DIR
+
   save_context_property AUTOMATION_JOB_IDENTIFIER
   save_context_property AUTOMATION_RELEASE_IDENTIFIER
   save_context_property AUTOMATION_DEPLOYMENT_IDENTIFIER
   save_context_property "REGISTRY_TYPES_LIST"  "$(listFromArray "REGISTRY_TYPES" ",")"
-
-  # All good
-  RESULT=0
 }
 
 main "$@"

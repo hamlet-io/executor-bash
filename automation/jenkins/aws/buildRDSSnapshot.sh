@@ -3,13 +3,14 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") ; exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
-# Get the generation context so we can run template generation
-. "${GENERATION_BASE_DIR}/execution/setContext.sh"
-
-tmpdir="$(getTempDir "cota_inf_XXX")"
-
-
 function main() {
+
+    tmpdir="$(getTempDir "cota_inf_XXX")"
+
+    # Get the generation context so we can run template generation
+    . "${GENERATION_BASE_DIR}/execution/setContext.sh"
+    . ${AUTOMATION_DIR}/setCredentials.sh "${ACCOUNT}"
+
     info "Building Deployment ${DEPLOYMENT_UNIT_LIST}"
     for DEPLOYMENT_UNIT in ${DEPLOYMENT_UNIT_LIST[0]}; do
 
