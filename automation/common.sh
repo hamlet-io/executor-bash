@@ -13,7 +13,8 @@
 
 # Set hamlet local store
 export HAMLET_HOME_DIR="${HAMLET_HOME_DIR:-"${HOME}/.hamlet"}"
-export COMMIT_CACHE_DIR="${HAMLET_HOME_DIR}/commits"
+export HAMLET_EVENT_DIR="${HAMLET_HOME_DIR}/events"
+export HAMLET_EVENT_LOG="${HAMLET_EVENT_DIR}/event_log.json"
 
 # -- Repositories --
 
