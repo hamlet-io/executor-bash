@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
-trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
+
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 # Defaults
@@ -60,7 +60,7 @@ NOTES:
    are padded with "?" to match the length of DEPLOYMENT_UNIT_LIST
 
 EOF
-    exit
+    return 0
 }
 
 # Update DETAIL_MESSAGE with build information
@@ -182,496 +182,501 @@ function defineGitProviderAttributes() {
     done
 }
 
-# Parse options
-while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
-    case $opt in
-        a)
-            REFERENCE_OPERATION="${REFERENCE_OPERATION_ACCEPT}"
-            ACCEPTANCE_TAG="${OPTARG}"
-            ;;
-        c)
-            CODE_COMMIT_LIST="${OPTARG}"
-            ;;
-        f)
-            REFERENCE_OPERATION="${REFERENCE_OPERATION_LISTFULL}"
-            ;;
-        g)
-            SEGMENT_BUILDS_DIR="${OPTARG}"
-            ;;
-        h)
-            usage
-            ;;
-        i)
-            IMAGE_FORMATS_LIST="${OPTARG}"
-            ;;
-        l)
-            REFERENCE_OPERATION="${REFERENCE_OPERATION_LIST}"
-            ;;
-        o)
-            REGISTRY_SCOPE_LIST="${OPTARG}"
-            ;;
-        p)
-            CODE_PROVIDER_LIST="${OPTARG}"
-            ;;
-        r)
-            CODE_REPO_LIST="${OPTARG}"
-            ;;
-        s)
-            DEPLOYMENT_UNIT_LIST="${OPTARG}"
-            ;;
-        t)
-            CODE_TAG_LIST="${OPTARG}"
-            ;;
-        u)
-            REFERENCE_OPERATION="${REFERENCE_OPERATION_UPDATE}"
-            ;;
-        v)
-            REFERENCE_OPERATION="${REFERENCE_OPERATION_VERIFY}"
-            VERIFICATION_TAG="${OPTARG}"
-            ;;
-        \?)
-            fatalOption; RESULT=1 && exit
-            ;;
-        :)
-            fatalOptionArgument; RESULT=1 && exit
-            ;;
-     esac
-done
+function options() {
 
-# Apply defaults
-REFERENCE_OPERATION="${REFERENCE_OPERATION:-${REFERENCE_OPERATION_DEFAULT}}"
+    # Access existing build info
+    DEPLOYMENT_UNIT_ARRAY=(${DEPLOYMENT_UNIT_LIST})
+    CODE_COMMIT_ARRAY=(${CODE_COMMIT_LIST})
+    CODE_TAG_ARRAY=(${CODE_TAG_LIST})
+    CODE_REPO_ARRAY=(${CODE_REPO_LIST})
+    CODE_PROVIDER_ARRAY=(${CODE_PROVIDER_LIST})
+    IMAGE_FORMATS_ARRAY=(${IMAGE_FORMATS_LIST})
+    REGISTRY_SCOPE_ARRAY=(${REGISTRY_SCOPE_LIST})
 
-# Ensure mandatory arguments have been provided
-case ${REFERENCE_OPERATION} in
-    ${REFERENCE_OPERATION_ACCEPT})
-        # Add the acceptance tag on provided deployment unit list
-        # Normally this would be called after list full
-        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "ACCEPTANCE_TAG"
-        ;;
-
-    ${REFERENCE_OPERATION_LIST})
-        # Format the build details based on provided deployment unit list
-        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST"
-        ;;
-
-    ${REFERENCE_OPERATION_LISTFULL})
-        # Populate DEPLOYMENT_UNIT_LIST based on current appsettings
-        exit_on_invalid_environment_variables "SEGMENT_BUILDS_DIR"
-        ;;
-
-    ${REFERENCE_OPERATION_UPDATE})
-        # Update builds based on provided deployment unit list
-        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "SEGMENT_BUILDS_DIR"
-        ;;
-
-    ${REFERENCE_OPERATION_VERIFY})
-        # Verify builds based on provided deployment unit list
-        exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_LIST" "VERIFICATION_TAG"
-        ;;
-
-    *)
-        fatal "Invalid REFERENCE_OPERATION \"${REFERENCE_OPERATION}\"" && RESULT=1 && exit
-        ;;
-esac
-
-
-# Access existing build info
-DEPLOYMENT_UNIT_ARRAY=(${DEPLOYMENT_UNIT_LIST})
-CODE_COMMIT_ARRAY=(${CODE_COMMIT_LIST})
-CODE_TAG_ARRAY=(${CODE_TAG_LIST})
-CODE_REPO_ARRAY=(${CODE_REPO_LIST})
-CODE_PROVIDER_ARRAY=(${CODE_PROVIDER_LIST})
-IMAGE_FORMATS_ARRAY=(${IMAGE_FORMATS_LIST})
-REGISTRY_SCOPE_ARRAY=(${REGISTRY_SCOPE_LIST})
-
-if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
-    # Most operations require access to the segment build settings
-    mkdir -p ${SEGMENT_BUILDS_DIR}
-    cd ${SEGMENT_BUILDS_DIR}
-fi
-
-if [[ ("${REFERENCE_OPERATION}" == "${REFERENCE_OPERATION_LISTFULL}") ]]; then
-    # Update the deployment unit list with all deployment units
-    DEPLOYMENT_UNIT_ARRAY=()
-    for BUILD_FILE in $(find . -name "build.*"); do
-        DEPLOYMENT_UNIT_ARRAY+=("$(basename $(dirname ${BUILD_FILE}))")
+    # Parse options
+    while getopts ":a:c:fg:hi:lo:p:r:s:t:uv:z:" opt; do
+        case $opt in
+            a)
+                REFERENCE_OPERATION="${REFERENCE_OPERATION_ACCEPT}"
+                ACCEPTANCE_TAG="${OPTARG}"
+                ;;
+            c)
+                CODE_COMMIT_ARRAY+=("${OPTARG}")
+                ;;
+            f)
+                REFERENCE_OPERATION="${REFERENCE_OPERATION_LISTFULL}"
+                ;;
+            g)
+                SEGMENT_BUILDS_DIR="${OPTARG}"
+                ;;
+            h)
+                usage
+                ;;
+            i)
+                IMAGE_FORMATS_ARRAY+=("${OPTARG}")
+                ;;
+            l)
+                REFERENCE_OPERATION="${REFERENCE_OPERATION_LIST}"
+                ;;
+            o)
+                REGISTRY_SCOPE_ARRAY+=("${OPTARG}")
+                ;;
+            p)
+                CODE_PROVIDER_ARRAY+=("${OPTARG}")
+                ;;
+            r)
+                CODE_REPO_ARRAY+=("${OPTARG}")
+                ;;
+            s)
+                DEPLOYMENT_UNIT_ARRAY+=("${OPTARG}")
+                ;;
+            t)
+                CODE_TAG_ARRAY+=("${OPTARG}")
+                ;;
+            u)
+                REFERENCE_OPERATION="${REFERENCE_OPERATION_UPDATE}"
+                ;;
+            v)
+                REFERENCE_OPERATION="${REFERENCE_OPERATION_VERIFY}"
+                VERIFICATION_TAG="${OPTARG}"
+                ;;
+            \?)
+                fatalOption
+                return 1
+                ;;
+            :)
+                fatalOptionArgument
+                return 1
+                ;;
+        esac
     done
-fi
 
-# Process each deployment unit
-for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
+    # Apply defaults
+    REFERENCE_OPERATION="${REFERENCE_OPERATION:-${REFERENCE_OPERATION_DEFAULT}}"
 
-    # Next deployment unit to process
-    CURRENT_DEPLOYMENT_UNIT="${DEPLOYMENT_UNIT_ARRAY[${INDEX}]}"
-    CODE_COMMIT="${CODE_COMMIT_ARRAY[${INDEX}]:-?}"
-    CODE_TAG="${CODE_TAG_ARRAY[${INDEX}]:-?}"
-    CODE_REPO="${CODE_REPO_ARRAY[${INDEX}]:-?}"
-    CODE_PROVIDER="${CODE_PROVIDER_ARRAY[${INDEX}]:-?}"
-    IMAGE_FORMATS="${IMAGE_FORMATS_ARRAY[${INDEX}]:-?}"
-    REGISTRY_SCOPE="${REGISTRY_SCOPE_ARRAY[${INDEX}]:-?}"
-    IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
-
-    # Look for the deployment unit and build reference files
-    BUILD_FILE="${CURRENT_DEPLOYMENT_UNIT}/build.json"
-
-    # Allow for building a new build.json with a reference to a shared build
-    SHARED_BUILD_FILE="${CURRENT_DEPLOYMENT_UNIT}/shared_build.json"
-    if [[ -f "${SHARED_BUILD_FILE}" ]]; then
-        REGISTRY_DEPLOYMENT_UNIT="$(jq -r '.Reference' < ${SHARED_BUILD_FILE})"
-    else
-        REGISTRY_DEPLOYMENT_UNIT="${CURRENT_DEPLOYMENT_UNIT}"
-    fi
-
-    # Determine any shared formats/scope
-    SHARED_IMAGE_FORMATS="?"
-    SHARED_REGISTRY_SCOPE="?"
-    if [[ -n "${SEGMENT_SHARED_BUILDS_DIR}" ]]; then
-        # Support build.json and shared_build.json - build.json is preferred
-        for f in shared_build.json build.json; do
-            SHARED_BUILDS_DIR_FILE="${SEGMENT_SHARED_BUILDS_DIR}/${REGISTRY_DEPLOYMENT_UNIT}/$f"
-            if [[ -f "${SHARED_BUILDS_DIR_FILE}" ]]; then
-                getBuildReferenceParts "$(cat ${SHARED_BUILDS_DIR_FILE})"
-                [[ "${BUILD_REFERENCE_FORMATS}" != "?" ]] && SHARED_IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
-                [[ "${BUILD_REFERENCE_SCOPE}" != "?" ]] && SHARED_REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
-            fi
-        done
-    fi
-
-    # Ensure appsettings directories exist
-    if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
-        mkdir -p "${CURRENT_DEPLOYMENT_UNIT}"
-    fi
-
+    # Ensure mandatory arguments have been provided
     case ${REFERENCE_OPERATION} in
         ${REFERENCE_OPERATION_ACCEPT})
-            # Tag builds with an acceptance tag
-            if [[ "${IMAGE_FORMATS}" != "?" ]]; then
-                for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
-                    IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
-                    IMAGE_PROVIDER="${!IMAGE_PROVIDER_VAR}"
-                    IMAGE_FORMAT_LOWER=${IMAGE_FORMAT,,}
-                    case ${IMAGE_FORMAT_LOWER} in
-                        docker)
-                            ${AUTOMATION_DIR}/manageDocker.sh -k \
-                                -a "${IMAGE_PROVIDER}" \
-                                -s "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -g "${CODE_COMMIT}" \
-                                -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
-                            RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
-                            ;;
-                        lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot|openapi|swagger)
-                            ${AUTOMATION_DIR}/manageS3Registry.sh -k \
-                                -a "${IMAGE_PROVIDER}" \
-                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -y "${IMAGE_FORMAT_LOWER}" \
-                                -f "${IMAGE_FORMAT_LOWER}.zip" \
-                                -g "${CODE_COMMIT}" \
-                                -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
-                            RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
-                            ;;
-
-                        lambda_jar)
-                            ${AUTOMATION_DIR}/manageS3Registry.sh -k \
-                                -a "${IMAGE_PROVIDER}" \
-                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                -y "${IMAGE_FORMAT_LOWER}" \
-                                -f "${IMAGE_FORMAT_LOWER}.jar" \
-                                -g "${CODE_COMMIT}" \
-                                -r "${ACCEPTANCE_TAG}" \
-                                -c "${REGISTRY_SCOPE}"
-                            RESULT=$?
-                            [[ "${RESULT}" -ne 0 ]] && RESULT=1 && exit
-                            ;;
-                        *)
-                            fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
-                            ;;
-                    esac
-                done
-            fi
+            # Add the acceptance tag on provided deployment unit list
+            # Normally this would be called after list full
+            exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_ARRAY" "ACCEPTANCE_TAG"
             ;;
 
         ${REFERENCE_OPERATION_LIST})
-            # Add build info to DETAIL_MESSAGE
-            updateDetail \
-                "${CURRENT_DEPLOYMENT_UNIT}" \
-                "${CODE_COMMIT}" \
-                "${CODE_TAG}" \
-                "${IMAGE_FORMATS:-${SHARED_IMAGE_FORMATS}}" \
-                "${REGISTRY_SCOPE:-${SHARED_REGISTRY_SCOPE}}"
+            # Format the build details based on provided deployment unit list
+            exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_ARRAY"
             ;;
 
         ${REFERENCE_OPERATION_LISTFULL})
-            if [[ -f ${BUILD_FILE} && ! -f ${SHARED_BUILD_FILE} ]]; then
-                getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                if [[ "${BUILD_REFERENCE_COMMIT}" != "?" ]]; then
-                    # Update arrays
-                    CODE_COMMIT_ARRAY["${INDEX}"]="${BUILD_REFERENCE_COMMIT}"
-                    CODE_TAG_ARRAY["${INDEX}"]="${BUILD_REFERENCE_TAG}"
-                    IMAGE_FORMATS_ARRAY["${INDEX}"]="${BUILD_REFERENCE_FORMATS}"
-                    REGISTRY_SCOPE_ARRAY["${INDEX}"]="${BUILD_REFERENCE_SCOPE}"
-                fi
-            fi
-           ;;
+            # Populate DEPLOYMENT_UNIT_LIST based on current appsettings
+            exit_on_invalid_environment_variables "SEGMENT_BUILDS_DIR"
+            ;;
 
         ${REFERENCE_OPERATION_UPDATE})
-            # Ensure something to do for the current deployment unit
-            if [[ "${CODE_COMMIT}" == "?" ]]; then continue; fi
-
-            # Preserve the format if none provided
-            if [[ ("${IMAGE_FORMATS}" == "?") &&
-                    (-f ${BUILD_FILE}) ]]; then
-                getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
-            fi
-
-            # Formats must be known
-            if [[ ("${IMAGE_FORMATS}" == "?") && ("${SHARED_IMAGE_FORMATS}" == "?") ]]; then
-                fatal "Unable to determine image formats for unit ${CURRENT_DEPLOYMENT_UNIT}"
-                RESULT=1
-                exit
-            fi
-
-            # Preserve the scope if none provided
-            if [[ ("${REGISTRY_SCOPE}" == "?") &&
-                    (-f ${BUILD_FILE}) ]]; then
-                getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
-            fi
-
-            # Construct the build reference
-            formatBuildReference "${CODE_COMMIT}" "${CODE_TAG}" "${IMAGE_FORMATS}" "${REGISTRY_SCOPE}"
-
-            # Update the build reference
-            # Use newer naming and clean up legacy named build reference files
-            echo -n "${BUILD_REFERENCE}" > "${BUILD_FILE}"
+            # Update builds based on provided deployment unit list
+            exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_ARRAY" "SEGMENT_BUILDS_DIR"
             ;;
 
         ${REFERENCE_OPERATION_VERIFY})
-            # Ensure code repo defined if tag provided only if commit not provided
-            if [[ "${CODE_COMMIT}" == "?" ]]; then
-                if [[ "${CODE_TAG}" != "?" ]]; then
-                    if [[ ("${CODE_REPO}" == "?") ||
-                            ("${CODE_PROVIDER}" == "?") ]]; then
-                        fatal "Ignoring tag for the \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit - no code repo and/or provider defined" && RESULT=1 && exit
-                    fi
-                    # Determine the details of the provider hosting the code repo
-                    defineGitProviderAttributes "${CODE_PROVIDER}" "CODE"
-                    # Get the commit corresponding to the tag
-                    TAG_COMMIT=$(git ls-remote -t https://${!CODE_CREDENTIALS_VAR}@${CODE_DNS}/${CODE_ORG}/${CODE_REPO} \
-                                    "${CODE_TAG}" | cut -f 1)
-                    CODE_COMMIT=$(git ls-remote -t https://${!CODE_CREDENTIALS_VAR}@${CODE_DNS}/${CODE_ORG}/${CODE_REPO} \
-                                    "${CODE_TAG}^{}" | cut -f 1)
-                    [[ -z "${CODE_COMMIT}" ]] &&
-                        fatal "Tag ${CODE_TAG} not found in the ${CODE_REPO} repo. Was an annotated tag used?" && RESULT=1 && exit
+            # Verify builds based on provided deployment unit list
+            exit_on_invalid_environment_variables "DEPLOYMENT_UNIT_ARRAY" "VERIFICATION_TAG"
+            ;;
 
-                    # Fetch other info about the tag
-                    # We are using a github api here to avoid having to pull in the whole repo -
-                    # git currently doesn't have a command to query the message of a remote tag
-                    CODE_TAG_MESSAGE=$(curl -s https://${!CODE_CREDENTIALS_VAR}@${CODE_API_DNS}/repos/${CODE_ORG}/${CODE_REPO}/git/tags/${TAG_COMMIT} | jq .message | tr -d '"')
-                    [[ (-z "${CODE_TAG_MESSAGE}") ||
-                        ("${CODE_TAG_MESSAGE}" == "Not Found") ]] &&
-                        fatal "Message for tag ${CODE_TAG} not found in the ${CODE_REPO} repo" && RESULT=1 && exit
-                    # else
-                    # TODO: Confirm commit is in remote repo - for now we'll assume its there if an image exists
-                else
-                    # Nothing to do for this deployment unit
-                    # Note that it is permissible to not have a tag for a deployment unit
-                    # that is associated with a code repo. This situation arises
-                    # if application settings are changed and a new release is
-                    # thus required.
-                    continue
+        *)
+            fatal "Invalid REFERENCE_OPERATION \"${REFERENCE_OPERATION}\""
+            return 1
+            ;;
+    esac
+}
+
+function main() {
+
+    options "$@" || return $?
+
+    if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
+        # Most operations require access to the segment build settings
+        mkdir -p ${SEGMENT_BUILDS_DIR}
+        cd ${SEGMENT_BUILDS_DIR}
+    fi
+
+    if [[ ("${REFERENCE_OPERATION}" == "${REFERENCE_OPERATION_LISTFULL}") ]]; then
+        # Update the deployment unit list with all deployment units
+        DEPLOYMENT_UNIT_ARRAY=()
+        for BUILD_FILE in $(find . -name "build.*"); do
+            DEPLOYMENT_UNIT_ARRAY+=("$(basename $(dirname ${BUILD_FILE}))")
+        done
+    fi
+
+    # Process each deployment unit
+    for ((INDEX=0; INDEX<${#DEPLOYMENT_UNIT_ARRAY[@]}; INDEX++)); do
+
+        # Next deployment unit to process
+        CURRENT_DEPLOYMENT_UNIT="${DEPLOYMENT_UNIT_ARRAY[${INDEX}]}"
+        CODE_COMMIT="${CODE_COMMIT_ARRAY[${INDEX}]:-?}"
+        CODE_TAG="${CODE_TAG_ARRAY[${INDEX}]:-?}"
+        CODE_REPO="${CODE_REPO_ARRAY[${INDEX}]:-?}"
+        CODE_PROVIDER="${CODE_PROVIDER_ARRAY[${INDEX}]:-?}"
+        IMAGE_FORMATS="${IMAGE_FORMATS_ARRAY[${INDEX}]:-?}"
+        REGISTRY_SCOPE="${REGISTRY_SCOPE_ARRAY[${INDEX}]:-?}"
+        IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
+
+        # Look for the deployment unit and build reference files
+        BUILD_FILE="${CURRENT_DEPLOYMENT_UNIT}/build.json"
+
+        # Allow for building a new build.json with a reference to a shared build
+        SHARED_BUILD_FILE="${CURRENT_DEPLOYMENT_UNIT}/shared_build.json"
+        if [[ -f "${SHARED_BUILD_FILE}" ]]; then
+            REGISTRY_DEPLOYMENT_UNIT="$(jq -r '.Reference' < ${SHARED_BUILD_FILE})"
+        else
+            REGISTRY_DEPLOYMENT_UNIT="${CURRENT_DEPLOYMENT_UNIT}"
+        fi
+
+        # Determine any shared formats/scope
+        SHARED_IMAGE_FORMATS="?"
+        SHARED_REGISTRY_SCOPE="?"
+        if [[ -n "${SEGMENT_SHARED_BUILDS_DIR}" ]]; then
+            # Support build.json and shared_build.json - build.json is preferred
+            for f in shared_build.json build.json; do
+                SHARED_BUILDS_DIR_FILE="${SEGMENT_SHARED_BUILDS_DIR}/${REGISTRY_DEPLOYMENT_UNIT}/$f"
+                if [[ -f "${SHARED_BUILDS_DIR_FILE}" ]]; then
+                    getBuildReferenceParts "$(cat ${SHARED_BUILDS_DIR_FILE})"
+                    [[ "${BUILD_REFERENCE_FORMATS}" != "?" ]] && SHARED_IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+                    [[ "${BUILD_REFERENCE_SCOPE}" != "?" ]] && SHARED_REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
                 fi
-            fi
+            done
+        fi
 
-            # If no formats explicitly defined, use those in the build reference if defined
-            if [[ ("${IMAGE_FORMATS}" == "?") &&
-                    (-f ${BUILD_FILE}) ]]; then
-                getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
-            fi
-            # Format may be shared
-            [[ "${IMAGE_FORMATS}" == "?" ]] && IMAGE_FORMATS="${SHARED_IMAGE_FORMATS}"
-            IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
+        # Ensure appsettings directories exist
+        if [[ -n "${SEGMENT_BUILDS_DIR}" ]]; then
+            mkdir -p "${CURRENT_DEPLOYMENT_UNIT}"
+        fi
 
-            # If no scope explicitly defined, use the scope in the build reference if defined
-            if [[ ("${REGISTRY_SCOPE}" == "?") &&
-                    (-f ${BUILD_FILE}) ]]; then
-                getBuildReferenceParts "$(cat ${BUILD_FILE})"
-                REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
-            fi
-            # Scope may be shared
-            [[ "${REGISTRY_SCOPE}" == "?" ]] && REGISTRY_SCOPE="${SHARED_REGISTRY_SCOPE}"
-
-            # If we don't know the image type, then there is a problem
-            # Most likely it is the first time this unit has been mentioned and no format was
-            # included as part of the prepare operation.
-            [[ "${IMAGE_FORMATS}" == "?" ]] &&
-                {
-                    fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit"
-                    fatal "Valid image formats are ${REGISTRY_TYPES_LIST}"
-                    fatal "Automation scripts: Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time."
-                    fatal "hamlet cli: provide the --image-format option"
-                    RESULT=1
-                    exit
-                }
-
-            for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
-                IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
-                IMAGE_PROVIDER="${!IMAGE_PROVIDER_VAR}"
-                FROM_IMAGE_PROVIDER_VAR="FROM_PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
-                FROM_IMAGE_PROVIDER="${!FROM_IMAGE_PROVIDER_VAR}"
-                case ${IMAGE_FORMAT,,} in
-                    dataset)
-                        ${AUTOMATION_DIR}/manageDataSetS3.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    rdssnapshot)
-                        ${AUTOMATION_DIR}/manageDataSetRDSSnapshot.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    docker)
-                        ${AUTOMATION_DIR}/manageDocker.sh -v \
-                            -a "${IMAGE_PROVIDER}" \
-                            -s "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
-                        ${AUTOMATION_DIR}/manageS3Registry.sh -v \
-                            -y "${IMAGE_FORMAT,,}" \
-                            -f "${IMAGE_FORMAT,,}.zip" \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-
-                    lambda_jar)
-                        ${AUTOMATION_DIR}/manageS3Registry.sh -v \
-                            -y "${IMAGE_FORMAT,,}" \
-                            -f "${IMAGE_FORMAT,,}.jar" \
-                            -a "${IMAGE_PROVIDER}" \
-                            -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                            -g "${CODE_COMMIT}" \
-                            -c "${REGISTRY_SCOPE}"
-                        RESULT=$?
-                        ;;
-                    *)
-                        fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
-                        ;;
-                esac
-                if [[ "${RESULT}" -ne 0 ]]; then
-                    if [[ -n "${FROM_IMAGE_PROVIDER}" ]]; then
-                        # Attempt to pull image in from remote provider
-                        case ${IMAGE_FORMAT,,} in
-                            dataset)
-                                ${AUTOMATION_DIR}/manageDataSetS3.sh -p \
-                                    -a "${IMAGE_PROVIDER}" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -b "REGISTRY_CONTENT" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
-                            rdssnapshot)
-                                ${AUTOMATION_DIR}/manageDataSetRDSSnapshot.sh -p \
-                                    -a "${IMAGE_PROVIDER}" \
-                                    -u "${REGISTRY_DEPLOYMENT_UNIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -g "${CODE_COMMIT}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
-                                ;;
+        case ${REFERENCE_OPERATION} in
+            ${REFERENCE_OPERATION_ACCEPT})
+                # Tag builds with an acceptance tag
+                if [[ "${IMAGE_FORMATS}" != "?" ]]; then
+                    for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
+                        IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
+                        IMAGE_PROVIDER="${!IMAGE_PROVIDER_VAR}"
+                        IMAGE_FORMAT_LOWER=${IMAGE_FORMAT,,}
+                        case ${IMAGE_FORMAT_LOWER} in
                             docker)
-                                ${AUTOMATION_DIR}/manageDocker.sh -p \
+                                ${AUTOMATION_DIR}/manageDocker.sh -k \
                                     -a "${IMAGE_PROVIDER}" \
                                     -s "${REGISTRY_DEPLOYMENT_UNIT}" \
                                     -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
+                                    -r "${ACCEPTANCE_TAG}" \
+                                    -c "${REGISTRY_SCOPE}" || return $?
                                 ;;
-                            lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
-                                ${AUTOMATION_DIR}/manageS3Registry.sh -p \
-                                    -y "${IMAGE_FORMAT,,}" \
-                                    -f "${IMAGE_FORMAT,,}.zip" \
+                            lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot|openapi|swagger)
+                                ${AUTOMATION_DIR}/manageS3Registry.sh -k \
                                     -a "${IMAGE_PROVIDER}" \
                                     -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                    -y "${IMAGE_FORMAT_LOWER}" \
+                                    -f "${IMAGE_FORMAT_LOWER}.zip" \
                                     -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
+                                    -r "${ACCEPTANCE_TAG}" \
+                                    -c "${REGISTRY_SCOPE}" || return $?
                                 ;;
+
                             lambda_jar)
-                                ${AUTOMATION_DIR}/manageS3Registry.sh -p \
-                                    -y "${IMAGE_FORMAT,,}" \
-                                    -f "${IMAGE_FORMAT,,}.jar" \
+                                ${AUTOMATION_DIR}/manageS3Registry.sh -k \
                                     -a "${IMAGE_PROVIDER}" \
                                     -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                    -y "${IMAGE_FORMAT_LOWER}" \
+                                    -f "${IMAGE_FORMAT_LOWER}.jar" \
                                     -g "${CODE_COMMIT}" \
-                                    -r "${VERIFICATION_TAG}" \
-                                    -z "${FROM_IMAGE_PROVIDER}" \
-                                    -c "${REGISTRY_SCOPE}"
-                                RESULT=$?
+                                    -r "${ACCEPTANCE_TAG}" \
+                                    -c "${REGISTRY_SCOPE}" || return $?
                                 ;;
                             *)
-                                fatal "Unknown image format \"${IMAGE_FORMAT}\"" && RESULT=1 && exit
+                                fatal "Unknown image format \"${IMAGE_FORMAT}\""
+                                return 1
                                 ;;
                         esac
-                        [[ "${RESULT}" -ne 0 ]] &&
-                            fatal "Unable to pull ${IMAGE_FORMAT,,} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} from provider ${FROM_IMAGE_PROVIDER}. Was the build successful?" && RESULT=1 && exit
-                    else
-                        fatal "${IMAGE_FORMAT^} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} not found. Was the build successful?" && RESULT=1 && exit
+                    done
+                fi
+                ;;
+
+            ${REFERENCE_OPERATION_LIST})
+                # Add build info to DETAIL_MESSAGE
+                updateDetail \
+                    "${CURRENT_DEPLOYMENT_UNIT}" \
+                    "${CODE_COMMIT}" \
+                    "${CODE_TAG}" \
+                    "${IMAGE_FORMATS:-${SHARED_IMAGE_FORMATS}}" \
+                    "${REGISTRY_SCOPE:-${SHARED_REGISTRY_SCOPE}}"
+                ;;
+
+            ${REFERENCE_OPERATION_LISTFULL})
+                if [[ -f ${BUILD_FILE} && ! -f ${SHARED_BUILD_FILE} ]]; then
+                    getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                    if [[ "${BUILD_REFERENCE_COMMIT}" != "?" ]]; then
+                        # Update arrays
+                        CODE_COMMIT_ARRAY["${INDEX}"]="${BUILD_REFERENCE_COMMIT}"
+                        CODE_TAG_ARRAY["${INDEX}"]="${BUILD_REFERENCE_TAG}"
+                        IMAGE_FORMATS_ARRAY["${INDEX}"]="${BUILD_REFERENCE_FORMATS}"
+                        REGISTRY_SCOPE_ARRAY["${INDEX}"]="${BUILD_REFERENCE_SCOPE}"
                     fi
                 fi
-            done
+            ;;
 
-            # Save details of this deployment unit
-            CODE_COMMIT_ARRAY[${INDEX}]="${CODE_COMMIT}"
+            ${REFERENCE_OPERATION_UPDATE})
+                # Ensure something to do for the current deployment unit
+                if [[ "${CODE_COMMIT}" == "?" ]]; then continue; fi
+
+                # Preserve the format if none provided
+                if [[ ("${IMAGE_FORMATS}" == "?") &&
+                        (-f ${BUILD_FILE}) ]]; then
+                    getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                    IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+                fi
+
+                # Formats must be known
+                if [[ ("${IMAGE_FORMATS}" == "?") && ("${SHARED_IMAGE_FORMATS}" == "?") ]]; then
+                    fatal "Unable to determine image formats for unit ${CURRENT_DEPLOYMENT_UNIT}"
+                    return 1
+                fi
+
+                # Preserve the scope if none provided
+                if [[ ("${REGISTRY_SCOPE}" == "?") &&
+                        (-f ${BUILD_FILE}) ]]; then
+                    getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                    REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+                fi
+
+                # Construct the build reference
+                formatBuildReference "${CODE_COMMIT}" "${CODE_TAG}" "${IMAGE_FORMATS}" "${REGISTRY_SCOPE}"
+
+                # Update the build reference
+                # Use newer naming and clean up legacy named build reference files
+                echo -n "${BUILD_REFERENCE}" > "${BUILD_FILE}"
+
+                log_write_event "update_build_ref_${CURRENT_DEPLOYMENT_UNIT}_${CODE_COMMIT}" "update_build_reference" "$(dirname "${SEGMENT_BUILDS_DIR}/${BUILD_FILE}")" \
+                                    "deployment_unit=${CURRENT_DEPLOYMENT_UNIT}" "code_commit=${CODE_COMMIT}" "code_tag=${CODE_TAG}" "image_format=${IMAGE_FORMATS}" "registry_scope=${REGISTRY_SCOPE}"
+                ;;
+
+            ${REFERENCE_OPERATION_VERIFY})
+                # Ensure code repo defined if tag provided only if commit not provided
+                if [[ "${CODE_COMMIT}" == "?" ]]; then
+                    if [[ "${CODE_TAG}" != "?" ]]; then
+                        if [[ ("${CODE_REPO}" == "?") ||
+                                ("${CODE_PROVIDER}" == "?") ]]; then
+                            fatal "Ignoring tag for the \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit - no code repo and/or provider defined"
+                            return 1
+                        fi
+                        # Determine the details of the provider hosting the code repo
+                        defineGitProviderAttributes "${CODE_PROVIDER}" "CODE"
+                        # Get the commit corresponding to the tag
+                        TAG_COMMIT=$(git ls-remote -t https://${!CODE_CREDENTIALS_VAR}@${CODE_DNS}/${CODE_ORG}/${CODE_REPO} \
+                                        "${CODE_TAG}" | cut -f 1)
+                        CODE_COMMIT=$(git ls-remote -t https://${!CODE_CREDENTIALS_VAR}@${CODE_DNS}/${CODE_ORG}/${CODE_REPO} \
+                                        "${CODE_TAG}^{}" | cut -f 1)
+
+                        [[ -z "${CODE_COMMIT}" ]] &&
+                            fatal "Tag ${CODE_TAG} not found in the ${CODE_REPO} repo. Was an annotated tag used?" && return 1
+
+                        # Fetch other info about the tag
+                        # We are using a github api here to avoid having to pull in the whole repo -
+                        # git currently doesn't have a command to query the message of a remote tag
+                        CODE_TAG_MESSAGE=$(curl -s https://${!CODE_CREDENTIALS_VAR}@${CODE_API_DNS}/repos/${CODE_ORG}/${CODE_REPO}/git/tags/${TAG_COMMIT} | jq .message | tr -d '"')
+                        [[ (-z "${CODE_TAG_MESSAGE}") ||
+                            ("${CODE_TAG_MESSAGE}" == "Not Found") ]] &&
+                            fatal "Message for tag ${CODE_TAG} not found in the ${CODE_REPO} repo" && return 1
+                        # else
+                        # TODO: Confirm commit is in remote repo - for now we'll assume its there if an image exists
+                    else
+                        # Nothing to do for this deployment unit
+                        # Note that it is permissible to not have a tag for a deployment unit
+                        # that is associated with a code repo. This situation arises
+                        # if application settings are changed and a new release is
+                        # thus required.
+                        continue
+                    fi
+                fi
+
+                # If no formats explicitly defined, use those in the build reference if defined
+                if [[ ("${IMAGE_FORMATS}" == "?") &&
+                        (-f ${BUILD_FILE}) ]]; then
+                    getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                    IMAGE_FORMATS="${BUILD_REFERENCE_FORMATS}"
+                fi
+                # Format may be shared
+                [[ "${IMAGE_FORMATS}" == "?" ]] && IMAGE_FORMATS="${SHARED_IMAGE_FORMATS}"
+                IFS="${IMAGE_FORMAT_SEPARATORS}" read -ra CODE_IMAGE_FORMATS_ARRAY <<< "${IMAGE_FORMATS}"
+
+                # If no scope explicitly defined, use the scope in the build reference if defined
+                if [[ ("${REGISTRY_SCOPE}" == "?") &&
+                        (-f ${BUILD_FILE}) ]]; then
+                    getBuildReferenceParts "$(cat ${BUILD_FILE})"
+                    REGISTRY_SCOPE="${BUILD_REFERENCE_SCOPE}"
+                fi
+                # Scope may be shared
+                [[ "${REGISTRY_SCOPE}" == "?" ]] && REGISTRY_SCOPE="${SHARED_REGISTRY_SCOPE}"
+
+                # If we don't know the image type, then there is a problem
+                # Most likely it is the first time this unit has been mentioned and no format was
+                # included as part of the prepare operation.
+                [[ "${IMAGE_FORMATS}" == "?" ]] &&
+                    {
+                        fatal "Image format(s) not known for \"${CURRENT_DEPLOYMENT_UNIT}\" deployment unit"
+                        fatal "Valid image formats are ${REGISTRY_TYPES_LIST}"
+                        fatal "Automation scripts: Provide the format after the code reference separated by \"!\" if unit is being mentioned for the first time."
+                        fatal "hamlet cli: provide the --image-format option"
+                        return 1
+                    }
+
+                for IMAGE_FORMAT in "${CODE_IMAGE_FORMATS_ARRAY[@]}"; do
+                    IMAGE_PROVIDER_VAR="PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
+                    IMAGE_PROVIDER="${!IMAGE_PROVIDER_VAR}"
+                    FROM_IMAGE_PROVIDER_VAR="FROM_PRODUCT_${IMAGE_FORMAT^^}_PROVIDER"
+                    FROM_IMAGE_PROVIDER="${!FROM_IMAGE_PROVIDER_VAR}"
+
+                    local_image_available="true"
+
+                    case ${IMAGE_FORMAT,,} in
+                        dataset)
+                            ${AUTOMATION_DIR}/manageDataSetS3.sh -v \
+                                -a "${IMAGE_PROVIDER}" \
+                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -g "${CODE_COMMIT}" \
+                                -c "${REGISTRY_SCOPE}" || local_image_available="false"
+                            ;;
+                        rdssnapshot)
+                            ${AUTOMATION_DIR}/manageDataSetRDSSnapshot.sh -v \
+                                -a "${IMAGE_PROVIDER}" \
+                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -g "${CODE_COMMIT}" \
+                                -c "${REGISTRY_SCOPE}" || local_image_available="false"
+                            ;;
+                        docker)
+                            ${AUTOMATION_DIR}/manageDocker.sh -v \
+                                -a "${IMAGE_PROVIDER}" \
+                                -s "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -g "${CODE_COMMIT}" \
+                                -c "${REGISTRY_SCOPE}" || local_image_available="false"
+                            ;;
+                        lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                            ${AUTOMATION_DIR}/manageS3Registry.sh -v \
+                                -y "${IMAGE_FORMAT,,}" \
+                                -f "${IMAGE_FORMAT,,}.zip" \
+                                -a "${IMAGE_PROVIDER}" \
+                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -g "${CODE_COMMIT}" \
+                                -c "${REGISTRY_SCOPE}" || local_image_available="false"
+                            ;;
+
+                        lambda_jar)
+                            ${AUTOMATION_DIR}/manageS3Registry.sh -v \
+                                -y "${IMAGE_FORMAT,,}" \
+                                -f "${IMAGE_FORMAT,,}.jar" \
+                                -a "${IMAGE_PROVIDER}" \
+                                -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                -g "${CODE_COMMIT}" \
+                                -c "${REGISTRY_SCOPE}" || local_image_available="false"
+                            ;;
+                        *)
+                            fatal "Unknown image format \"${IMAGE_FORMAT}\""
+                            return 1
+                            ;;
+                    esac
+                    if [[ "${local_image_available}" == "false" ]]; then
+                        if [[ -n "${FROM_IMAGE_PROVIDER}" ]]; then
+                            # Attempt to pull image in from remote provider
+
+                            remote_image_avaialble="true"
+                            case ${IMAGE_FORMAT,,} in
+                                dataset)
+                                    ${AUTOMATION_DIR}/manageDataSetS3.sh -p \
+                                        -a "${IMAGE_PROVIDER}" \
+                                        -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                        -g "${CODE_COMMIT}" \
+                                        -r "${VERIFICATION_TAG}" \
+                                        -z "${FROM_IMAGE_PROVIDER}" \
+                                        -b "REGISTRY_CONTENT" \
+                                        -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
+                                    ;;
+                                rdssnapshot)
+                                    ${AUTOMATION_DIR}/manageDataSetRDSSnapshot.sh -p \
+                                        -a "${IMAGE_PROVIDER}" \
+                                        -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                        -r "${VERIFICATION_TAG}" \
+                                        -z "${FROM_IMAGE_PROVIDER}" \
+                                        -g "${CODE_COMMIT}" \
+                                        -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
+                                    ;;
+                                docker)
+                                    ${AUTOMATION_DIR}/manageDocker.sh -p \
+                                        -a "${IMAGE_PROVIDER}" \
+                                        -s "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                        -g "${CODE_COMMIT}" \
+                                        -r "${VERIFICATION_TAG}" \
+                                        -z "${FROM_IMAGE_PROVIDER}" \
+                                        -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
+                                    ;;
+                                lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                                    ${AUTOMATION_DIR}/manageS3Registry.sh -p \
+                                        -y "${IMAGE_FORMAT,,}" \
+                                        -f "${IMAGE_FORMAT,,}.zip" \
+                                        -a "${IMAGE_PROVIDER}" \
+                                        -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                        -g "${CODE_COMMIT}" \
+                                        -r "${VERIFICATION_TAG}" \
+                                        -z "${FROM_IMAGE_PROVIDER}" \
+                                        -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
+                                    ;;
+                                lambda_jar)
+                                    ${AUTOMATION_DIR}/manageS3Registry.sh -p \
+                                        -y "${IMAGE_FORMAT,,}" \
+                                        -f "${IMAGE_FORMAT,,}.jar" \
+                                        -a "${IMAGE_PROVIDER}" \
+                                        -u "${REGISTRY_DEPLOYMENT_UNIT}" \
+                                        -g "${CODE_COMMIT}" \
+                                        -r "${VERIFICATION_TAG}" \
+                                        -z "${FROM_IMAGE_PROVIDER}" \
+                                        -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
+                                    ;;
+                                *)
+                                    fatal "Unknown image format \"${IMAGE_FORMAT}\""
+                                    return 1
+                                    ;;
+                            esac
+                            [[ "${remote_image_avaialble}" == "false" ]] &&
+                                fatal "Unable to pull ${IMAGE_FORMAT,,} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} from provider ${FROM_IMAGE_PROVIDER}. Was the build successful?" && return 1
+                        else
+                            fatal "${IMAGE_FORMAT^} image for deployment unit ${CURRENT_DEPLOYMENT_UNIT} and commit ${CODE_COMMIT} not found. Was the build successful?" && return 1
+                        fi
+                    fi
+
+                done
+
+                # Save details of this deployment unit
+                CODE_COMMIT_ARRAY[${INDEX}]="${CODE_COMMIT}"
+                ;;
+
+        esac
+    done
+
+    # Capture any changes to context
+    case ${REFERENCE_OPERATION} in
+        ${REFERENCE_OPERATION_LIST})
+            save_context_property DETAIL_MESSAGE
+            ;;
+
+        ${REFERENCE_OPERATION_LISTFULL})
+            save_context_property DEPLOYMENT_UNIT_LIST "${DEPLOYMENT_UNIT_ARRAY[*]}"
+            save_context_property CODE_COMMIT_LIST "${CODE_COMMIT_ARRAY[*]}"
+            save_context_property CODE_TAG_LIST "${CODE_TAG_ARRAY[*]}"
+            save_context_property IMAGE_FORMATS_LIST "${IMAGE_FORMATS_ARRAY[*]}"
+            save_context_property REGISTRY_SCOPE_LIST "${REGISTRY_SCOPE_ARRAY[*]}"
+            save_context_property DETAIL_MESSAGE "${DETAIL_MESSAGE}"
+            ;;
+
+        ${REFERENCE_OPERATION_VERIFY})
+            save_context_property CODE_COMMIT_LIST "${CODE_COMMIT_ARRAY[*]}"
             ;;
 
     esac
-done
+}
 
-# Capture any changes to context
-case ${REFERENCE_OPERATION} in
-    ${REFERENCE_OPERATION_LIST})
-        save_context_property DETAIL_MESSAGE
-        ;;
-
-    ${REFERENCE_OPERATION_LISTFULL})
-        save_context_property DEPLOYMENT_UNIT_LIST "${DEPLOYMENT_UNIT_ARRAY[*]}"
-        save_context_property CODE_COMMIT_LIST "${CODE_COMMIT_ARRAY[*]}"
-        save_context_property CODE_TAG_LIST "${CODE_TAG_ARRAY[*]}"
-        save_context_property IMAGE_FORMATS_LIST "${IMAGE_FORMATS_ARRAY[*]}"
-        save_context_property REGISTRY_SCOPE_LIST "${REGISTRY_SCOPE_ARRAY[*]}"
-        save_context_property DETAIL_MESSAGE "${DETAIL_MESSAGE}"
-        ;;
-
-    ${REFERENCE_OPERATION_VERIFY})
-        save_context_property CODE_COMMIT_LIST "${CODE_COMMIT_ARRAY[*]}"
-        ;;
-
-esac
-
-# All good
-RESULT=0
+main "$@"

@@ -109,18 +109,6 @@ function push() {
         return 0
     fi
 
-    commit_stage_file="${COMMIT_CACHE_DIR}/commit_details.json"
-
-    if [[ -f "${commit_stage_file}" ]]; then
-        commit_details="$(cat "${commit_stage_file}" )"
-    else
-        mkdir -p "${COMMIT_CACHE_DIR}"
-    fi
-
-    if [[ -z "${commit_details}" ]]; then
-        commit_details="{}"
-    fi
-
     # Break the message in name/value pairs
     conventional_commit_base_body="$(format_conventional_commit_body "${REPO_MESSAGE}")"
 
@@ -136,45 +124,22 @@ function push() {
         "${conventional_commit_description:-automation}" \
         "${conventional_commit_body}" )"
 
-    if [[ "${DEFER_REPO_PUSH,,}" == "true" ]]; then
-        info "Deferred push saving details for the next requested push"
+    repo_event_log="$( getTempFile XXXXXXX )"
+    pull_events_from_state "directory" "$(git -C "${REPO_DIR}" rev-parse --show-toplevel)" "${repo_event_log}" "starts_with"
 
-        commit_time="$( date -u +"%Y-%m-%dT%H:%M:%SZ" )"
-        echo "${commit_details}" | jq --arg dir "${REPO_DIR}" --arg commit_time "${commit_time}" --arg msg "${REPO_MESSAGE}" '.dirs += [{"dir": $dir, "commit_time": $commit_time, "message": $msg }]' > "${commit_stage_file}"
+    if [[ -s "${repo_event_log}" ]]; then
 
-        return 0
-    else
-        if [[ -s "${commit_stage_file}" ]]; then
+        commit_logs=("$( jq -rc '.events[] | del(._id, .directory)' "${repo_event_log}")")
 
-            commit_msg_file="$( getTempFile XXXXXXX )"
-            staged_commits="$( jq -r --arg dir "${REPO_DIR}" '.dirs[] | select(.dir == $dir) | .message' "${commit_stage_file}")"
+        if [[ -n "${commit_logs}" ]]; then
 
-            if [[ -n "${staged_commits}" ]]; then
+            formatted_commit_message+=$'\n\n'
 
-                echo "${REPO_MESSAGE}" > "${commit_msg_file}"
-                echo "${staged_commits}" >> "${commit_msg_file}"
+            while read msg; do
+                formatted_commit_message+="$(echo "${msg}" | jq -r 'to_entries|map("\(.key):  \(.value|tostring)")|.[]')"
+                formatted_commit_message+=$'\n--------\n\n'
 
-                formatted_commit_message+=$'\n\n'
-
-                while read msg; do
-                    # Break the message in name/value pairs
-                    conventional_commit_base_body="$(format_conventional_commit_body "${msg}")"
-
-                    # Separate the values based on the conventional commit format
-                    conventional_commit_type="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "cctype" )"
-                    conventional_commit_scope="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "account product environment segment" )"
-                    conventional_commit_description="$( format_conventional_commit_body_summary "${conventional_commit_base_body}" "ccdesc" )"
-                    conventional_commit_body="$( format_conventional_commit_body_subset "${conventional_commit_base_body}" "cctype ccdesc account product environment segment" )"
-
-                    formatted_commit_message+="$(format_conventional_commit \
-                        "${conventional_commit_type:-hamlet}" \
-                        "${conventional_commit_scope}" \
-                        "${conventional_commit_description:-automation}" \
-                        "${conventional_commit_body}" )"
-                    formatted_commit_message+=$'\n--------\n'
-
-                done < "${commit_msg_file}"
-            fi
+            done <<< "${commit_logs}"
         fi
     fi
 

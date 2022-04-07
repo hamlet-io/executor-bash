@@ -107,6 +107,28 @@ function register_resource_providers() {
   done
 }
 
+function log_deployment_event {
+    local cf_dir="$1"; shift
+    local operation="$1"; shift
+    local region="$1"; shift
+    local deployment_scope="$1"; shift
+    local deployment_name="$1"; shift
+    local level="$1"; shift
+    local deployment_unit="$1"; shift
+
+    local sub_id="$(az account show --query id | jq -r )"
+    local sub_name="$(az account show --query name | jq -r )"
+
+    local event_id="deployment_${operation}_${deployment_name}_${sub_id}"
+    local event_type="manage_deployment"
+    local directory="$(dirname ${cf_dir})"
+
+    log_write_event "${event_id}" "${event_type}" "${directory}"  \
+                      "azure_sub_id=${sub_id}" "azure_sub_name=${sub_name}" \
+                      "deployment_unit=${deployment_unit}" "level=${level}" "region=${region}" \
+                      "deployment_scope=${deployment_scope}" "operation=${operation}" "deployment_name=${deployment_name}"
+}
+
 function wait_for_deployment_execution() {
 
   monitor_header="0"
@@ -294,7 +316,8 @@ function process_deployment() {
         return 0
       fi
 
-      wait_for_deployment_execution
+      wait_for_deployment_execution || return $?
+      log_deployment_event "${CF_DIR}" "${DEPLOYMENT_OPERATION}" "${REGION}" "${DEPLOYMENT_SCOPE}" "${DEPLOYMENT_NAME}" "${LEVEL}" "${DEPLOYMENT_UNIT}"
       ;;
 
     delete)
@@ -305,7 +328,8 @@ function process_deployment() {
         info "Deleting the ${RESOURCE_GROUP} resource group"
         az group delete --resource-group "${RESOURCE_GROUP}" --no-wait --yes
 
-        wait_for_deployment_execution
+        wait_for_deployment_execution || return $?
+        log_deployment_event "${CF_DIR}" "${DEPLOYMENT_OPERATION}" "${REGION}" "${DEPLOYMENT_SCOPE}" "${DEPLOYMENT_NAME}" "${LEVEL}" "${DEPLOYMENT_UNIT}"
 
         # Clean up the stack if required
         if [[ ("${exit_status}" -eq 0) || !( -s "${STACK}" ) ]]; then
