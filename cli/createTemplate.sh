@@ -973,6 +973,11 @@ function process_template() {
       fi
     fi
 
+    log_write_event "create_output_${run_id}" "create_output" "${cf_dir}" "entrance=${entrance}" \
+        "entrance_parameters=${entranceParameters}" "flows=${flows}" "run_id=${run_id}" \
+        "deployment_unit=${deployment_unit}" "deployment_group=${deployment_group}" \
+        "deployment_mode=${deployment_mode}"
+
   else
     info " ~ no differences detected"
   fi

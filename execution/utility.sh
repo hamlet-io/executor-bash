@@ -163,6 +163,131 @@ function fatalMandatory() {
   fatal "Mandatory argument missing: \"${name}\". Check usage via -h option."
 }
 
+# -- Event logging
+function setup_event_log() {
+    local event_log_file="$1"; shift
+
+    if [[ ! -s "${event_log_file}" ]]; then
+        mkdir -p "$( dirname ${event_log_file} )"
+        echo '{"events":[]}' > "${event_log_file}"
+    fi
+}
+
+## Adds a new key value pair to a given event id
+function update_event_state() {
+    local event_id="$1"; shift
+    local event_type="$1"; shift
+    local event_key="$1"; shift
+    local event_value="$1"; shift
+
+    setup_event_log "${HAMLET_EVENT_LOG}"
+
+    event_time="$( date -u +"%Y-%m-%dT%H:%M:%SZ" )"
+    events="$(cat "${HAMLET_EVENT_LOG}")"
+
+    event="$( jq -r --arg event_id "${event_id}" '.events[] | select(._id == $event_id) | select (.!=null)' "${HAMLET_EVENT_LOG}")"
+    [[ -z "${event}" ]] && event="{}"
+
+    event="$( echo "${event}" | jq --arg event_type "${event_type}" --arg event_id "${event_id}" --arg event_key "${event_key}" \
+                                    --arg event_value "${event_value}" --arg event_time "${event_time}" \
+                '. += { "_type": $event_type, "_id": $event_id, "_time": $event_time, ($event_key): $event_value }')"
+
+    existing_events="$(jq --arg event_id "${event_id}" 'del(.events[] | select(._id == $event_id))' "${HAMLET_EVENT_LOG}")"
+    echo "${existing_events}" > "${HAMLET_EVENT_LOG}"
+
+    echo "${existing_events}" | jq --sort-keys --argjson event "${event}" \
+        '.events += [$event]' > "${HAMLET_EVENT_LOG}"
+}
+
+# Get all events that match a given key value pair
+function get_events_from_state() {
+    local event_key="$1"; shift
+    local event_value="$1"; shift
+    local output_file="$1"; shift
+    local match_type="$1"; shift
+
+    if [[ ! -s "${HAMLET_EVENT_LOG}" ]]; then
+        return 0
+    fi
+
+    events="$( cat "${HAMLET_EVENT_LOG}" )"
+
+    [[ -z "${match_type}" ]] && match_type="equal"
+    case "${match_type}" in
+      "equal")
+        matched_events="$(echo "${events}" | jq -r --arg event_key "${event_key}" --arg event_value "${event_value}" \
+            '[ .events[] | select(.[$event_key] == $event_value)]')"
+        ;;
+      "starts_with")
+        matched_events="$(echo "${events}" | jq -r --arg event_key "${event_key}" --arg event_value "${event_value}" \
+            '[ .events[] | select(.[$event_key] | startswith($event_value))]')"
+        ;;
+
+      *)
+        fatal "Invalid event match format type ${match_type}"
+        return 1
+        ;;
+    esac
+
+    if [[ -n "$( echo "${matched_events}" | jq -r '. | select(length!=0)')" ]]; then
+        echo "{}" | jq --argjson events "${matched_events}" '.events = $events' > "${output_file}"
+    fi
+}
+
+# Get all events that match a given key/value pair and remove the event from the logs
+function pull_events_from_state() {
+    local event_key="$1"; shift
+    local event_value="$1"; shift
+    local output_file="$1"; shift
+    local match_type="$1"; shift
+
+    if [[ ! -s "${HAMLET_EVENT_LOG}" ]]; then
+        return 0
+    fi
+
+    matched_event_file="$( getTempFile XXXXXXX )"
+    get_events_from_state "${event_key}" "${event_value}" "${matched_event_file}" "${match_type}" || return 1
+
+    if [[ -s "${matched_event_file}" ]]; then
+        cp "${matched_event_file}" "${output_file}" || return 1
+
+        matched_ids=( $(jq -r '[.events[]._id | select (.!=null) ] | join(" ")' "${matched_event_file}") )
+        events="$( cat "${HAMLET_EVENT_LOG}" )"
+
+        for id in "${matched_ids[@]}"; do
+            events="$(echo "${events}" | jq --arg id "${id}" 'del(.events[] | select(._id == $id))')"
+        done
+        echo "${events}" > "${HAMLET_EVENT_LOG}"
+    fi
+}
+
+# Log an event using the standard context for generation
+function log_write_event() {
+    local event_id="$1"; shift
+    local type="$1"; shift
+    local directory="$1"; shift
+    local messages=("$@"); shift
+
+    # Set the directory where the write event occurred
+    update_event_state "${event_id}" "${type}" "directory" "$(realpath "${directory}")"
+
+    # Set the basic context
+    [[ -n "${TENANT}" ]] && update_event_state "${event_id}" "${type}" "tenant" "${TENANT}"
+    [[ -n "${ACCOUNT}" ]] && update_event_state "${event_id}" "${type}" "account" "${ACCOUNT}"
+    [[ -n "${PRODUCT}" ]] && update_event_state "${event_id}" "${type}" "product" "${PRODUCT}"
+    [[ -n "${ENVIRONMENT}" ]] && update_event_state "${event_id}" "${type}" "environment" "${ENVIRONMENT}"
+    [[ -n "${SEGMENT}" ]] && update_event_state "${event_id}" "${type}" "segment" "${SEGMENT}"
+
+    [[ -n "${DISTRICT_TYPE}" ]] && update_event_state "${event_id}" "${type}" "district_type" "${DISTRICT_TYPE}"
+
+    # Log who made the call for the write
+    [[ -n "$(caller)" ]] && update_event_state "${event_id}" "${type}" "calling_script" "$(basename "$(caller)")"
+
+    for message in "${messages[@]}"; do
+        update_event_state "${event_id}" "${type}" "${message%%=*}" "${message#*=}"
+    done
+}
+
 # -- String manipulation --
 
 function join() {
@@ -926,10 +1051,13 @@ function save_context_property() {
     fi
   fi
 
+  export ${name}="${property_value}"
+
   case "${AUTOMATION_PROVIDER}" in
     jenkins|hamletcli)
       echo "${name}=${property_value}" >> "${file}"
       ;;
+
     azurepipelines)
       # remove trailing whitespace from any var about to be set
       property_value_nospace=$(echo "${property_value}" | sed -e 's/[[:space:]]*$//')
@@ -2923,7 +3051,7 @@ format_conventional_commit_body_subset() {
   local body="$1"; shift
   local exclusions=($1); shift
 
-  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]].*$'
 
   local subset=
   readarray -t pairArray <<< "${body}"

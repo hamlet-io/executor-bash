@@ -83,6 +83,28 @@ function options() {
   return 0
 }
 
+function log_stack_event {
+    local cf_dir="$1"; shift
+    local operation="$1"; shift
+    local region="$1"; shift
+    local stack_name="$1"; shift
+    local level="$1"; shift
+    local deployment_unit="$1"; shift
+    local change_set="$1"; shift
+
+    local account="$(aws sts get-caller-identity --query 'Account' --output text)"
+    local event_id="stack_${operation}_${stack_name}_${account}"
+    local event_type="manage_stack"
+    local directory="$(dirname ${cf_dir})"
+
+    log_write_event "${event_id}" "${event_type}" "${directory}"  \
+                      "aws_account=${account}" \
+                      "deployment_unit=${deployment_unit}" "level=${level}" "region=${region}" \
+                      "operation=${operation}" "stack_name=${stack_name}"
+
+    [[ -n "${change_set}" ]] && log_write_event "${event_id}" "${event_type}" "${directory}" "change_set=${change_set}"
+}
+
 function submit_change_set {
   local region="$1"; shift
   local change_set_name="$1"; shift
@@ -245,6 +267,7 @@ function process_stack() {
 
       # For delete, we don't check result as stack may not exist
       wait_for_stack_execution "${DELETE_CLIENT_TOKEN}" "${STACK_OPERATION}" || return $?
+      log_stack_event "${CF_DIR}" "${STACK_OPERATION}" "${REGION}" "${STACK_NAME}" "${LEVEL}" "${DEPLOYMENT_UNIT}"
       ;;
 
     update|create)
@@ -358,6 +381,7 @@ function process_stack() {
                       --client-request-token "${REPLACE_CHANGE_SET}" > /dev/null || return $?
 
                   wait_for_stack_execution "${REPLACE_CHANGE_SET}" "${STACK_OPERATION}" "${change_set_state}" || { exit_status=$?; break; }
+                  log_stack_event "${CF_DIR}" "${STACK_OPERATION}" "${REGION}" "${STACK_NAME}" "${LEVEL}" "${DEPLOYMENT_UNIT}" "${REPLACE_CHANGE_SET}"
                 fi
               done
 
@@ -371,7 +395,7 @@ function process_stack() {
                   --client-request-token "${PRIMARY_CHANGE_SET}" > /dev/null || return $?
 
             wait_for_stack_execution "${PRIMARY_CHANGE_SET}" "${STACK_OPERATION}" "${change_set_state}" || return $?
-
+            log_stack_event "${CF_DIR}" "${STACK_OPERATION}" "${REGION}" "${STACK_NAME}" "${LEVEL}" "${DEPLOYMENT_UNIT}" "${PRIMARY_CHANGE_SET}"
           fi
         fi
       fi

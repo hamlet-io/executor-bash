@@ -347,6 +347,11 @@ case ${REGISTRY_OPERATION} in
                 removeSource "${REGISTRY_ADDITIONAL_DIRECTORY}"
             fi
         fi
+
+        log_write_event "s3_reg_save_${REGISTRY_FILENAME//\//_}" "registry_save_s3" "$(dirname ${REGISTRY_FILENAME})" \
+                    "aws_account=$(aws sts get-caller-identity --query 'Account' --output text)" \
+                    "image=${FULL_REGISTRY_IMAGE_PATH}" "registry_commit=${REGISTRY_CODE_COMMIT}" \
+                    "registry_tag=${REGISTRY_TAG}" "registry_type=${REGISTRY_TYPE}"
         ;;
 
     ${REGISTRY_OPERATION_VERIFY})
@@ -418,6 +423,11 @@ case ${REGISTRY_OPERATION} in
                 copyToRegistry "${REGISTRY_ADDITIONAL_DIRECTORY}"
             fi
         fi
+
+        log_write_event "s3_reg_pull_${IMAGE_FILE//\//_}" "registry_save_s3" "$(dirname ${IMAGE_FILE})" \
+                    "aws_account=$(aws sts get-caller-identity --query 'Account' --output text)" \
+                    "image=${FULL_REGISTRY_IMAGE_PATH}" "remote_registry_image=${FULL_REMOTE_REGISTRY_IMAGE}" \
+                    "registry_type=${REGISTRY_TYPE}"
         ;;
 
     *)

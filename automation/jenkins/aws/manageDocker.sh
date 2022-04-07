@@ -374,6 +374,10 @@ function main() {
             RESULT=$?
             [[ $RESULT -ne 0 ]] &&
                 fatal "Unable to push ${DOCKER_IMAGE} to the local registry" && RESULT=1 && exit
+
+            log_write_event "docker_reg_save_${FULL_DOCKER_IMAGE}" "registry_save_docker" "$(realpath ${DOCKER_CONTEXT_DIR})" \
+                "docker_registry=${DOCKER_PROVIDER_DNS}" "docker_registry_image=${FULL_DOCKER_IMAGE}" \
+                "code_commit=${DOCKER_CODE_COMMIT}" "local_image=${DOCKER_LOCAL_REPO}"
             ;;
 
         ${DOCKER_OPERATION_VERIFY})
@@ -471,6 +475,10 @@ function main() {
                         RESULT=$?
                         [[ "$RESULT" -ne 0 ]] &&
                             error "Unable to push ${DOCKER_IMAGE} to the local registry"
+
+                        log_write_event "docker_reg_pull_${FULL_DOCKER_IMAGE}" "registry_pull_docker" "$(realpath ${DOCKER_CONTEXT_DIR})" \
+                            "docker_registry=${DOCKER_PROVIDER_DNS}" "docker_registry_image=${FULL_DOCKER_IMAGE}" \
+                            "remote_registry=${REMOTE_DOCKER_PROVIDER_DNS}" "reomote_image=${FULL_REMOTE_DOCKER_IMAGE}"
                     fi
                 fi
             fi
