@@ -748,7 +748,7 @@ function process_template() {
   if [[ -z "${OUTPUT_DIR}" ]]; then
     local deployment_unit_state_subdirectories="false"
     case "${entrance}" in
-      loader|unitlist|blueprint|buildblueprint|runbook|runbookinfo)
+      loader|unitlist|blueprint|buildblueprint|runbook|runbookinfo|imagedetails)
         # No subdirectories for deployment units
         ;;
       *)
