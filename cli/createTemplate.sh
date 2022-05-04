@@ -125,12 +125,6 @@ function options() {
 
   ENTRANCE_PARAMETERS="$(listFromArray "ENTRANCE_PARAMETERS_ARRAY" "||")"
 
-  # Ensure other mandatory arguments have been provided
-  if [[ (-z "${REQUEST_REFERENCE}") || (-z "${CONFIGURATION_REFERENCE}") ]]; then
-    fatalMandatory
-    return 1
-  fi
-
   # Input control for composite/CMDB input
   if [[ "${GENERATION_INPUT_SOURCE}" == "composite" || "${GENERATION_INPUT_SOURCE}" == "whatif" ]]; then
 
@@ -223,7 +217,7 @@ function options() {
         declare -ga "${composite}_array"
 
         # Legacy start fragments
-        for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start*.ftl; do
+        for fragment in "${GENERATION_ENGINE_DIR}"/legacy/${composite}/start.ftl; do
             $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
             addToArray "${composite}_array" "${fragment}"
         done
@@ -250,7 +244,7 @@ function options() {
         done
 
         # Legacy end fragments
-        for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/*end.ftl; do
+        for fragment in ${GENERATION_ENGINE_DIR}/legacy/${composite}/end.ftl; do
             $(inArray "${composite}_array" $(fileName "${fragment}")) && continue
             addToArray "${composite}_array" "${fragment}"
         done
@@ -421,13 +415,13 @@ function process_template_pass() {
   done
 
   # Composites
-  [[ -f "${COMPOSITE_BLUEPRINT}" ]] && args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
-  [[ -f "${COMPOSITE_SETTINGS}" ]] && args+=("-v" "settings=${COMPOSITE_SETTINGS}")
-  [[ -f "${COMPOSITE_DEFINITIONS}" ]] && args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
-  [[ -f "${COMPOSITE_STACK_OUTPUTS}" ]] && args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
+  [[ -f "${COMPOSITE_BLUEPRINT}" ]]       && args+=("-v" "blueprint=${COMPOSITE_BLUEPRINT}")
+  [[ -f "${COMPOSITE_SETTINGS}" ]]        && args+=("-v" "settings=${COMPOSITE_SETTINGS}")
+  [[ -f "${COMPOSITE_DEFINITIONS}" ]]     && args+=("-v" "definitions=${COMPOSITE_DEFINITIONS}")
+  [[ -f "${COMPOSITE_STACK_OUTPUTS}" ]]   && args+=("-v" "stackOutputs=${COMPOSITE_STACK_OUTPUTS}")
 
   # Deployment Handling
-  [[ -n "${DEPLOYMENT_MODE}" ]] && args+=("-r" "deploymentMode=${DEPLOYMENT_MODE}")
+  [[ -n "${DEPLOYMENT_MODE}" ]]           && args+=("-r" "deploymentMode=${DEPLOYMENT_MODE}")
   [[ -n "${deployment_unit}" ]]           && args+=("-r" "deploymentUnit=${deployment_unit}")
   [[ -n "${deployment_group}" ]]          && args+=("-r" "deploymentGroup=${deployment_group}")
 
@@ -436,16 +430,16 @@ function process_template_pass() {
   [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
 
   # Starting layers
-  [[ -n "${DISTRICT_TYPE}" ]] && args+=("-r" "districtType=${DISTRICT_TYPE}")
-  [[ -n "${TENANT}" ]] && args+=("-r" "tenant=${TENANT}")
-  [[ -n "${ACCOUNT}" ]] && args+=("-r" "account=${ACCOUNT}")
-  [[ -n "${region}" ]] && args+=("-r" "region=${region}")
-  [[ -n "${PRODUCT}" ]] && args+=("-r" "product=${PRODUCT}")
-  [[ -n "${ENVIRONMENT}" ]] && args+=("-r" "environment=${ENVIRONMENT}")
-  [[ -n "${SEGMENT}" ]] && args+=("-r" "segment=${SEGMENT}")
+  [[ -n "${DISTRICT_TYPE}" ]]             && args+=("-r" "districtType=${DISTRICT_TYPE}")
+  [[ -n "${TENANT}" ]]                    && args+=("-r" "tenant=${TENANT}")
+  [[ -n "${ACCOUNT}" ]]                   && args+=("-r" "account=${ACCOUNT}")
+  [[ -n "${region}" ]]                    && args+=("-r" "region=${region}")
+  [[ -n "${PRODUCT}" ]]                   && args+=("-r" "product=${PRODUCT}")
+  [[ -n "${ENVIRONMENT}" ]]               && args+=("-r" "environment=${ENVIRONMENT}")
+  [[ -n "${SEGMENT}" ]]                   && args+=("-r" "segment=${SEGMENT}")
 
   # Account Override
-  [[ -n "${account_region}" ]] && args+=("-r" "accountRegion=${account_region}")
+  [[ -n "${account_region}" ]]            && args+=("-r" "accountRegion=${account_region}")
 
   # Entrance parameters
   arrayFromList entranceParametersArray "${entrance_parameters}" "||"

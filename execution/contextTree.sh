@@ -183,99 +183,106 @@ function assemble_settings() {
   local tmp_file
   local return_status
 
-  # Process accounts
-  readarray -t account_files < <(find "${root_dir}" \( \
-    -name account.json \
-    -and -not -path "*/.*/*" \) | sort)
+  if [[ -n "${ACCOUNT}" ]]; then
+    # Process accounts
+    readarray -t account_files < <(find "${root_dir}" \( \
+      -name account.json \
+      -and -not -path '*/.*' \
+      -and -path "*/${ACCOUNT}/*" \) | sort)
 
-  # debug "Account=${account_files[@]}"
-
-  # Settings
-  for account_file in "${account_files[@]}"; do
-
-    id="$(getJSONValue "${account_file}" ".Account.Id")"
-    name="$(getJSONValue "${account_file}" ".Account.Name")"
-    [[ -z "${name}" ]] && name="${id}"
-    [[ (-n "${ACCOUNT}") && ("${ACCOUNT,,}" != "${name,,}") ]] && continue
-
-    local account_dir="$(findGen3AccountSettingsDir "${root_dir}" "${name}")"
-    debug "Processing account dir ${account_dir} ..."
-    pushd "${account_dir}" > /dev/null 2>&1 || continue
-
-    readarray -t setting_files < <(find . -type f -name "*.json" )
-    if ! arrayIsEmpty "setting_files" ; then
-      tmp_file="${tmp_dir}/accounts_settings_${name}.json"
-      convertFilesToJSONObject "Accounts Settings ${name}" "${root_dir}" "${account_dir}" "${tmp_file}" "${setting_files[@]}" || return 1
-      tmp_file_list+=("${tmp_file}")
-    fi
-    popd > /dev/null
-  done
-
-  # Process products
-  readarray -t product_files < <(find "${root_dir}" \( \
-    -name product.json \
-    -and -not -path "*/.*/*" \) | sort)
-
-  # debug "Products=${product_files[@]}"
-
-  for product_file in "${product_files[@]}"; do
-
-    id="$(getJSONValue "${product_file}" ".Product.Id")"
-    name="$(getJSONValue "${product_file}" ".Product.Name")"
-    [[ -z "${name}" ]] && name="${id}"
-    [[ (-n "${PRODUCT}") && ("${PRODUCT,,}" != "${name,,}") ]] && continue
+    # debug "Account=${account_files[@]}"
 
     # Settings
-    local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${name}")"
-    if [[ -d "${settings_dir}" ]]; then
-      debug "Processing settings dir ${settings_dir} ..."
-      pushd "${settings_dir}" > /dev/null 2>&1 || continue
+    for account_file in "${account_files[@]}"; do
 
-      readarray -t setting_files < <(find . -type f \( \
-        -not \( -name ".*" -or -path "*/.*/*" \) \) )
+      id="$(getJSONValue "${account_file}" ".Account.Id")"
+      name="$(getJSONValue "${account_file}" ".Account.Name")"
+      [[ -z "${name}" ]] && name="${id}"
+
+      [[ "${ACCOUNT,,}" != "${name,,}" ]] && continue
+
+      local account_dir="$(findGen3AccountSettingsDir "${root_dir}" "${name}")"
+      debug "Processing account dir ${account_dir} ..."
+      pushd "${account_dir}" > /dev/null 2>&1 || continue
+
+      readarray -t setting_files < <(find . -type f -name "*.json" )
       if ! arrayIsEmpty "setting_files" ; then
-        tmp_file="${tmp_dir}/products_settings_${name}.json"
-        convertFilesToJSONObject "Products Settings ${name}" "${root_dir}" "${settings_dir}" "${tmp_file}" "${setting_files[@]}"  || return 1
+        tmp_file="${tmp_dir}/accounts_settings_${name}.json"
+        convertFilesToJSONObject "Accounts Settings ${name}" "${root_dir}" "${account_dir}" "${tmp_file}" "${setting_files[@]}" || return 1
         tmp_file_list+=("${tmp_file}")
       fi
-
       popd > /dev/null
-    fi
+    done
+  fi
 
-    # Builds
-    local builds_dir="$(findGen3ProductBuildsDir "${root_dir}" "${name}")"
-    if [[ (-d "${builds_dir}") && ("${settings_dir}" != "${builds_dir}") ]]; then
-      debug "Processing builds dir ${builds_dir} ..."
-      pushd "${builds_dir}" > /dev/null
+  # Process products
+  if [[ -n "${PRODUCT}" ]]; then
+    readarray -t product_files < <(find "${root_dir}" \( \
+      -name product.json \
+      -and -not -path '*/.*' \
+      -and -path "*/${PRODUCT}/*" \) | sort)
 
-      readarray -t build_files < <(find . -type f \( \
-        -not \( -name ".*" -or -path "*/.*/*" \) \) )
-      if ! arrayIsEmpty "build_files" ; then
-        tmp_file="${tmp_dir}/products_builds_${name}.json"
-        convertFilesToJSONObject "Products Builds ${name}" "${root_dir}" "${builds_dir}" "${tmp_file}" "${build_files[@]}"  || return 1
-        tmp_file_list+=("${tmp_file}")
+    # debug "Products=${product_files[@]}"
+
+    for product_file in "${product_files[@]}"; do
+
+      id="$(getJSONValue "${product_file}" ".Product.Id")"
+      name="$(getJSONValue "${product_file}" ".Product.Name")"
+      [[ -z "${name}" ]] && name="${id}"
+      [[ "${PRODUCT,,}" != "${name,,}" ]] && continue
+
+      # Settings
+      local settings_dir="$(findGen3ProductSettingsDir "${root_dir}" "${name}")"
+      if [[ -d "${settings_dir}" ]]; then
+        debug "Processing settings dir ${settings_dir} ..."
+        pushd "${settings_dir}" > /dev/null 2>&1 || continue
+
+        readarray -t setting_files < <(find . -type f \( \
+          -not \( -name ".*" -or -path "*/.*/*" \) \) )
+        if ! arrayIsEmpty "setting_files" ; then
+          tmp_file="${tmp_dir}/products_settings_${name}.json"
+          convertFilesToJSONObject "Products Settings ${name}" "${root_dir}" "${settings_dir}" "${tmp_file}" "${setting_files[@]}"  || return 1
+          tmp_file_list+=("${tmp_file}")
+        fi
+
+        popd > /dev/null
       fi
 
-      popd > /dev/null
-    fi
+      # Builds
+      local builds_dir="$(findGen3ProductBuildsDir "${root_dir}" "${name}")"
+      if [[ (-d "${builds_dir}") && ("${settings_dir}" != "${builds_dir}") ]]; then
+        debug "Processing builds dir ${builds_dir} ..."
+        pushd "${builds_dir}" > /dev/null
 
-    # Operations
-    local operations_dir="$(findGen3ProductOperationsDir "${root_dir}" "${name}")"
-    if [[ -d "${operations_dir}" ]]; then
-      debug "Processing operations dir ${operations_dir} ..."
-      pushd "${operations_dir}" > /dev/null
+        readarray -t build_files < <(find . -type f \( \
+          -not \( -name ".*" -or -path "*/.*/*" \) \) )
+        if ! arrayIsEmpty "build_files" ; then
+          tmp_file="${tmp_dir}/products_builds_${name}.json"
+          convertFilesToJSONObject "Products Builds ${name}" "${root_dir}" "${builds_dir}" "${tmp_file}" "${build_files[@]}"  || return 1
+          tmp_file_list+=("${tmp_file}")
+        fi
 
-      readarray -t operations_files < <(find . -type f \( \
-        -not \( -name ".*" -or -path "*/.*/*" \) \) )
-      if ! arrayIsEmpty "operations_files" ; then
-        tmp_file="${tmp_dir}/products_operations_${name}.json"
-        convertFilesToJSONObject "Products Operations ${name}" "${root_dir}" "${operations_dir}" "${tmp_file}" "${operations_files[@]}"  || return 1
-        tmp_file_list+=("${tmp_file}")
+        popd > /dev/null
       fi
 
-      popd > /dev/null
-    fi
-  done
+      # Operations
+      local operations_dir="$(findGen3ProductOperationsDir "${root_dir}" "${name}")"
+      if [[ -d "${operations_dir}" ]]; then
+        debug "Processing operations dir ${operations_dir} ..."
+        pushd "${operations_dir}" > /dev/null
+
+        readarray -t operations_files < <(find . -type f \( \
+          -not \( -name ".*" -or -path "*/.*/*" \) \) )
+        if ! arrayIsEmpty "operations_files" ; then
+          tmp_file="${tmp_dir}/products_operations_${name}.json"
+          convertFilesToJSONObject "Products Operations ${name}" "${root_dir}" "${operations_dir}" "${tmp_file}" "${operations_files[@]}"  || return 1
+          tmp_file_list+=("${tmp_file}")
+        fi
+
+        popd > /dev/null
+      fi
+    done
+  fi
 
   # Generate the merged output
   debug "Generating ${result_file} ..."
@@ -328,7 +335,7 @@ function assemble_composite_stack_outputs() {
   local stack_array=()
   [[ (-n "${ACCOUNT}") ]] &&
       addToArray "stack_array" "${ACCOUNT_STATE_DIR}"/*/shared/**/acc*-stack.json
-  [[ (-n "${ENVIRONMENT}") && (-n "${SEGMENT}") && (-n "${REGION}") ]] &&
+  [[ (-n "${ENVIRONMENT}") && (-n "${SEGMENT}") && (-n "${ACCOUNT}") ]] &&
       addToArray "stack_array" "${PRODUCT_STATE_DIR}"/*/"${ENVIRONMENT}/${SEGMENT}"/**/*${ACCOUNT}*-stack.json
 
   ${restore_globstar}
@@ -378,14 +385,6 @@ function findGen3TenantDir() {
     "${tenant}/tenant.json" \
     "${tenant}/config/tenant.json" \
     "tenant.json"
-}
-
-function findGen3TenantInfrastructureDir() {
-  local root_dir="$1"; shift
-  local tenant="$1"; shift
-
-  findDir "${root_dir}" \
-    "${tenant}/infrastructure"
 }
 
 function findGen3AccountDir() {
