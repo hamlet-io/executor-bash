@@ -215,7 +215,7 @@ function main() {
                 fi
                 ;;
 
-            lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+            lambda|scripts|openapi|swagger|spa|contentnode)
                 IMAGE_FILENAME="${FORMAT,,}.zip"
                 if [[ -n "${PATHS[index]}" ]]; then
                     pushd "$(pwd)" > /dev/null
