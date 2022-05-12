@@ -581,8 +581,8 @@ function process_template_pass() {
     # Clean up the output file and check for change
     case "$(fileExtension "${template_result_file}")" in
       json)
-        # Capture the result
-        jq --indent 2 '.' < "${template_result_file}" > "${result_file}"
+        # Capture the result - sort attributes to assist in manual review (e.g. sorted environment variable definitions)
+        jq --sort-keys --indent 2 '.' < "${template_result_file}" > "${result_file}"
 
         if [[ ! -f "${output_file}" ]]; then
           # First generation
