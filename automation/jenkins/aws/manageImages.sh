@@ -232,7 +232,11 @@ function main() {
 
                     if [[ -d "${USER_IMAGE}" ]]; then
                         pushd "${USER_IMAGE}" > /dev/null
-                        zip -r "${IMAGE_FILE}" *
+                        if [[ -f "${IMAGE_FILENAME}" ]]; then
+                            cp "${IMAGE_FILENAME}" "${IMAGE_FILE}"
+                        else
+                            zip -r "${IMAGE_FILE}" *
+                        fi
                         popd > /dev/null
                     fi
                 else
