@@ -3,6 +3,8 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") && (-d "${NVM_DIR}") ]] && nvm deactivate; rm -rf "${NVM_DIR}" ; exit $?' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
 
 function runTask() {
     local REQUIRED_TASK=$1; shift

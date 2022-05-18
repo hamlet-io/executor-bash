@@ -4,6 +4,9 @@
 trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 function main() {
   # Add conventional commit and deploy/release tag to details
   DETAIL_MESSAGE="deployment=${DEPLOYMENT_TAG}, release=${RELEASE_TAG}, ${DETAIL_MESSAGE}, cctype=deploy, ccdesc=${AUTOMATION_JOB_IDENTIFIER}"

@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 cd "${SEGMENT_SOLUTIONS_DIR}"
 
 # Build up the additional enviroment variables required

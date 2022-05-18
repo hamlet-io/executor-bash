@@ -4,7 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Include the build information in the detail message
 ${AUTOMATION_DIR}/manageBuildReferences.sh -l
 RESULT=$?
-

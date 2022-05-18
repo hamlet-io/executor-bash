@@ -6,6 +6,9 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") && (-d "${tmpdir}") ]] && rm -rf "${tmpdir}";exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Determine the registry - it impacts some file names
 IMAGE_FORMATS_ARRAY=(${IMAGE_FORMATS_LIST})
 REGISTRY_TYPE="${IMAGE_FORMATS_ARRAY[0]}"

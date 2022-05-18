@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Add release number to details
 DETAIL_MESSAGE="release=${RELEASE_TAG}, ${DETAIL_MESSAGE}"
 save_context_property DETAIL_MESSAGE

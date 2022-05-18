@@ -4,13 +4,16 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") ; exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 dockerstagedir="$(getTempDir "cota_docker_XXXXXX" "${DOCKER_STAGE_DIR}")"
 chmod a+rwx "${dockerstagedir}"
 
 function main() {
   # Make sure we are in the build source directory
   cd ${AUTOMATION_BUILD_SRC_DIR}
-  
+
   # Create Build folders for Jenkins Permissions
   mkdir -p ${AUTOMATION_BUILD_SRC_DIR}/stage
   mkdir -p "${dockerstagedir}/indir"
@@ -18,7 +21,7 @@ function main() {
 
   cp -r "${AUTOMATION_BUILD_SRC_DIR}"/* "${dockerstagedir}/indir/"
 
-  # run Model Bender build using Docker Build image 
+  # run Model Bender build using Docker Build image
   info "Running ModelBender enterprise tasks..."
   docker run --rm \
     --volume="${dockerstagedir}/indir:/work/indir" \
@@ -35,11 +38,10 @@ function main() {
   cd "${dockerstagedir}/stage"
 
   mkdir -p "${AUTOMATION_BUILD_SRC_DIR}/dist"
-  zip -r "${AUTOMATION_BUILD_SRC_DIR}/dist/contentnode.zip" * 
+  zip -r "${AUTOMATION_BUILD_SRC_DIR}/dist/contentnode.zip" *
 
   # All good
   return 0
 }
 
 main "$@"
-

@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Ensure mandatory arguments have been provided
 exit_on_invalid_environment_variables "RELEASE_MODE" "ACCEPTANCE_TAG"
 

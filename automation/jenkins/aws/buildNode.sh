@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Make sure we are in the build source directory
 cd ${AUTOMATION_BUILD_SRC_DIR}
 

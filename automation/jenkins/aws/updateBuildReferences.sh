@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Update build references
 ${AUTOMATION_DIR}/manageBuildReferences.sh -u
 RESULT=$? && [[ ${RESULT} -ne 0 ]] && exit
@@ -29,5 +32,3 @@ save_chain_property DEPLOYMENT_UNITS "${DEPLOYMENT_UNIT_LIST}"
 
 # All good
 RESULT=0
-
-
