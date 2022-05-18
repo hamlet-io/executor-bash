@@ -44,25 +44,32 @@ function findAndDefineSetting() {
     TLNV_LEVEL2="${4^^}"
     TLNV_DECLARE="${5,,}"
     TLNV_DEFAULT="${6}"
+    TLNV_LEVEL3="${7^^}"
 
     # Variables to check
     declare NAME_VAR="${TLNV_NAME}"
+    declare NAME_LEVEL3_VAR="${TLNV_LEVEL1}_${TLNV_LEVEL2}_${TLNV_LEVEL3}_${TLNV_SUFFIX}"
     declare NAME_LEVEL2_VAR="${TLNV_LEVEL1}_${TLNV_LEVEL2}_${TLNV_SUFFIX}"
     declare NAME_LEVEL1_VAR="${TLNV_LEVEL1}_${TLNV_SUFFIX}"
 
     # Already defined?
     if [[ (-z "${NAME_VAR}") || (-z "${!NAME_VAR}") ]]; then
 
-        # Two level definition?
-        if [[ (-n "${TLNV_LEVEL2}") && (-n "${!NAME_LEVEL2_VAR}") ]]; then
-            NAME_VAR="${NAME_LEVEL2_VAR}"
+        # Three level definition?
+        if [[ (-n "${TLNV_LEVEL3}") && (-n "${!NAME_LEVEL3_VAR}") ]]; then
+            NAME_VAR="${NAME_LEVEL3_VAR}"
         else
-            # One level definition?
-            if [[ (-n "${TLNV_LEVEL1}") && (-n "${!NAME_LEVEL1_VAR}") ]]; then
-                NAME_VAR="${NAME_LEVEL1_VAR}"
+            # Two level definition?
+            if [[ (-n "${TLNV_LEVEL2}") && (-n "${!NAME_LEVEL2_VAR}") ]]; then
+                NAME_VAR="${NAME_LEVEL2_VAR}"
+            else
+                # One level definition?
+                if [[ (-n "${TLNV_LEVEL1}") && (-n "${!NAME_LEVEL1_VAR}") ]]; then
+                    NAME_VAR="${NAME_LEVEL1_VAR}"
+                fi
             fi
         fi
-    fi
+     fi
 
     if [[ -n "${!NAME_VAR}" ]]; then
         # Value found
@@ -391,8 +398,7 @@ function main() {
   # Determine the account from the product/segment combination
   # if not already defined or provided on the command line
   arrayFromList accounts_list "${ACCOUNTS_LIST}"
-  findAndDefineSetting "ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}" "value" "${accounts_list[0]}"
-  [[ -z "${ACCOUNT}" ]] && findAndDefineSetting "ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}_${SEGMENT}" "value" "${accounts_list[0]}"
+  findAndDefineSetting "ACCOUNT" "ACCOUNT" "${PRODUCT}" "${ENVIRONMENT}" "value" "${accounts_list[0]}" "${SEGMENT}"
 
   # Default account/product git provider - "github"
   # ORG is product specific so not defaulted here
