@@ -4,6 +4,9 @@
 trap 'exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 function main() {
   # Add conventional commit details
   DETAIL_MESSAGE="${DETAIL_MESSAGE}, cctype=manenv, ccdesc=${AUTOMATION_JOB_IDENTIFIER}"
@@ -20,4 +23,3 @@ function main() {
 }
 
 main "$@"
-

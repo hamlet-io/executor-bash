@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Formulate parameters - any provided to this script are also passed trhough
 SNAPSHOT_OPTS=
 if [[ -n "${SNAPSHOT_COUNT}" ]]; then

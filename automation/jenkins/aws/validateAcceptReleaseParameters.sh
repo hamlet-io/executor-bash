@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Ensure RELEASE_IDENTIFIER have been provided
 [[ -z "${RELEASE_IDENTIFIER}" ]] &&
     fatal "Job requires the identifier of the release to be accepted" && exit
@@ -12,5 +15,3 @@ trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 
 # All good
 RESULT=0
-
-

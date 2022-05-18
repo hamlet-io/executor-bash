@@ -4,6 +4,9 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") && (-d "${venv_dir}") ]] && rm -rf "${venv_dir}"; exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 function main() {
   # Make sure we are in the build source directory
   cd ${AUTOMATION_BUILD_SRC_DIR}
@@ -232,4 +235,3 @@ function main() {
 }
 
 main "$@"
-

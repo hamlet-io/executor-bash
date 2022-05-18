@@ -2,6 +2,9 @@
 
 # Trigger the creation of a CSR
 
+# DEPRECATED
+deprecated_script
+
 certificate_name="$1"; shift
 cn="$1"; shift
 san="$1"; shift

@@ -288,6 +288,14 @@ function log_write_event() {
     done
 }
 
+# -- Deprecation Handling
+
+function deprecated_script() {
+  warn ""
+  warn "The script ${caller} has been depreated and will be removed in the next release \n See https://docs.hamlet.io/blog for details on the replacement"
+  warn ""
+}
+
 # -- String manipulation --
 
 function join() {

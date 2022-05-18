@@ -4,6 +4,9 @@
 trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
+# DEPRECATED
+deprecated_script
+
 # Ensure mandatory arguments have been provided
 [[ (-z "${RELEASE_MODE}") ||
     (-z "${ACCEPTANCE_TAG}") ]] && fatalMandatory

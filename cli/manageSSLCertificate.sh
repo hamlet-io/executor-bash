@@ -4,6 +4,10 @@
 trap '. ${GENERATION_BASE_DIR}/execution/cleanupContext.sh; exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
+
+# DEPRECATED
+deprecated_script
+
 CERTIFICATE_OPERATION_LIST="list"
 CERTIFICATE_OPERATION_DELETE="delete"
 CERTIFICATE_OPERATION_UPLOAD="upload"
