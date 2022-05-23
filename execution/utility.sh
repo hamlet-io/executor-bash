@@ -292,7 +292,7 @@ function log_write_event() {
 
 function deprecated_script() {
   warn ""
-  warn "The script ${caller} has been depreated and will be removed in the next release \n See https://docs.hamlet.io/blog for details on the replacement"
+  warn "The script ${caller} has been deprecated and will be removed in the next major release \n See https://docs.hamlet.io/blog for details on the replacement"
   warn ""
 }
 
