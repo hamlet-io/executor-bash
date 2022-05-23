@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased (2022-03-22)
+## Unreleased (2022-05-23)
+
+#### New Features
+
+* detect existing images ([#326](https://github.com/hamlet-io/executor-bash/issues/326))
+* add entrance output dir for imagedetails
+* add HAMLET_EVENT_DIR
+* event logging for write events
+#### Fixes
+
+* spelling in messages
+* three level context properties ([#327](https://github.com/hamlet-io/executor-bash/issues/327))
+#### Refactorings
+
+* Add deprecation warnings for bash executor
+* sort template objects
+* scope settings search and remove legacy
+* remove deprecated integrator commands
+* remove blueprint doc generation
+* remove reference to slices
+* automation setContext updates
+
+Full set of changes: [`8.5.0...a7a368d`](https://github.com/hamlet-io/executor-bash/compare/8.5.0...a7a368d)
+
+## 8.5.0 (2022-03-25)
 
 #### New Features
 
@@ -18,8 +42,11 @@
 * district rename to district type
 * handling of bundled vs jar wrapper
 * use weird seperate for user provided paramters
+#### Others
 
-Full set of changes: [`8.4.0...183f478`](https://github.com/hamlet-io/executor-bash/compare/8.4.0...183f478)
+* changelog bump ([#307](https://github.com/hamlet-io/executor-bash/issues/307))
+
+Full set of changes: [`8.4.0...8.5.0`](https://github.com/hamlet-io/executor-bash/compare/8.4.0...8.5.0)
 
 ## 8.4.0 (2022-01-06)
 
