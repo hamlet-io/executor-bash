@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (2022-05-23)
+## Unreleased (2022-05-26)
+
+#### Others
+
+* changelog bump
+
+Full set of changes: [`8.6.0...56a25af`](https://github.com/hamlet-io/executor-bash/compare/8.6.0...56a25af)
+
+## 8.6.0 (2022-05-24)
 
 #### New Features
 
@@ -22,7 +30,7 @@
 * remove reference to slices
 * automation setContext updates
 
-Full set of changes: [`8.5.0...a7a368d`](https://github.com/hamlet-io/executor-bash/compare/8.5.0...a7a368d)
+Full set of changes: [`8.5.0...8.6.0`](https://github.com/hamlet-io/executor-bash/compare/8.5.0...8.6.0)
 
 ## 8.5.0 (2022-03-25)
 
