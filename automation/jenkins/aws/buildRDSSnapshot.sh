@@ -3,8 +3,6 @@
 trap '[[ (-z "${AUTOMATION_DEBUG}") ; exit 1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
-# DEPRECATED
-deprecated_script
 
 function main() {
 
