@@ -291,8 +291,9 @@ function log_write_event() {
 # -- Deprecation Handling
 
 function deprecated_script() {
+  local callReference="$(caller)"
   warn ""
-  warn "The script ${caller} has been deprecated and will be removed in the next major release \n See https://docs.hamlet.io/blog for details on the replacement"
+  warn "The script \"${callReference##* }\" has been deprecated and will be removed in the next major release.\nSee https://docs.hamlet.io/blog for details on the replacement"
   warn ""
 }
 
