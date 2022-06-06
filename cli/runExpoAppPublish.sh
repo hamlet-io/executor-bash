@@ -116,7 +116,7 @@ function decrypt_kms_file() {
     local encrypted_file_path="$1"; shift
 
     base64 --decode < "${encrypted_file_path}" > "${encrypted_file_path}.base64"
-    BASE64_CLEARTEXT_VALUE="$(aws --region ${region} kms decrypt --ciphertext-blob "${encrypted_file_path}.base64"  --output text --query Plaintext)"
+    BASE64_CLEARTEXT_VALUE="$(aws --region ${region} kms decrypt --ciphertext-blob "fileb://${encrypted_file_path}.base64"  --output text --query Plaintext)"
     echo "${BASE64_CLEARTEXT_VALUE}" | base64 --decode > "${encrypted_file_path%".kms"}"
     rm -rf "${encrypted_file_path}.base64"
 
@@ -138,6 +138,7 @@ function set_android_manifest_property() {
     android_manifest_properties="$( echo "{}" | jq -c --arg name "${name}" --arg propValue "${value}"  '{ "@android:name" : $name, "@android:value" : $propValue }' )"
 
     # Set the Url if its not there
+    # xq is an jq port for xml based files - https://pypi.org/project/yq/
     manifest_content="$( echo "${manifest_content}" | xq --xml-output \
         --arg propName "${name}" \
         --argjson manifest_props "${android_manifest_properties}" \
@@ -362,7 +363,7 @@ function main() {
   OPS_PATH="${WORKSPACE_DIR}/ops"
   REPORTS_PATH="${WORKSPACE_DIR}/reports"
 
-  if [ "$(ls -A $SRC_PATH)" ]; then
+  if [[ -d "${SRC_PATH}" ]]; then
     rm -rf "${SRC_PATH}"
   fi
 
@@ -435,7 +436,7 @@ function main() {
   # Decrypt secrets from credentials store
   info "Getting credentials from s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}"
   aws --region "${AWS_REGION}" s3 sync --only-show-errors "s3://${OPSDATA_BUCKET}/${CREDENTIALS_PREFIX}" "${OPS_PATH}" || return $?
-  find "${OPS_PATH}" -name \*.kms -exec decrypt_kms_file "${AWS_REGION}" "{}" \;
+  for i in "${OPS_PATH}"/*.kms; do decrypt_kms_file "${AWS_REGION}" "${i}"; done
 
   # Get the version of the expo SDK which is required
   EXPO_SDK_VERSION="$(jq -r '.expo.sdkVersion | select (.!=null)' < ./app.json)"
@@ -781,6 +782,12 @@ function main() {
                     # Handle Google Id formatting rules ( https://developer.android.com/studio/publish/versioning.html )
                     export ANDROID_VERSION_CODE="$( echo "${BUILD_NUMBER//".1"}" | cut -c 3- | rev | cut -c 3- | rev | cut -c -9)"
                     export ANDROID_VERSION_NAME="${EXPO_APP_VERSION}"
+
+                    # Create google_services account file
+                    if [[ -f "${OPS_PATH}/google-services.json" ]]; then
+                        info "Updating google services ${OPS_PATH}/google-services.json -> ${SRC_PATH}/android/app/google-services.json"
+                        cp "${OPS_PATH}/google-services.json" "${SRC_PATH}/android/app/google-services.json"
+                    fi
 
                     if [[ -e "${SRC_PATH}/android/app/src/main/AndroidManifest.xml" ]]; then
 
