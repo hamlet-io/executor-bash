@@ -1,12 +1,22 @@
 # Changelog
 
-## Unreleased (2022-05-26)
+## latest (2022-06-06)
 
+#### New Features
+
+* (expo): support for google services file overrides ([#334](https://github.com/hamlet-io/executor-bash/issues/334))
+#### Fixes
+
+* script deprecation warning ([#332](https://github.com/hamlet-io/executor-bash/issues/332))
+#### Refactorings
+
+* changelog generation
 #### Others
 
 * changelog bump
+* changelog bump
 
-Full set of changes: [`8.6.0...56a25af`](https://github.com/hamlet-io/executor-bash/compare/8.6.0...56a25af)
+Full set of changes: [`8.6.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.6.0...latest)
 
 ## 8.6.0 (2022-05-24)
 
