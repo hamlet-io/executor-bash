@@ -429,6 +429,9 @@ function process_template_pass() {
   [[ -n "${providers}" ]]                 && args+=("-r" "providers=${providers}")
   [[ -n "${deployment_framework}" ]]      && args+=("-r" "deploymentFramework=${deployment_framework}")
 
+  # CMDB Root
+  [[ -n "${ROOT_DIR}" ]]                  && args+=("-r" "rootDir=${ROOT_DIR}")
+
   # Starting layers
   [[ -n "${DISTRICT_TYPE}" ]]             && args+=("-r" "districtType=${DISTRICT_TYPE}")
   [[ -n "${TENANT}" ]]                    && args+=("-r" "tenant=${TENANT}")
@@ -719,6 +722,38 @@ function process_template() {
 
         *)
           local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="${deployment_group}"
+          ;;
+      esac
+      ;;
+
+    stackoutput)
+      case "${deployment_group}" in
+        account)
+          local cf_dir_default="${ACCOUNT_STATE_DIR}/stackoutput/shared"
+          ;;
+
+        product)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/stackoutput/shared"
+          ;;
+
+        application)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/stackoutput/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="app"
+          ;;
+
+        solution)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/stackoutput/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="soln"
+          ;;
+
+        segment)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/stackoutput/${ENVIRONMENT}/${SEGMENT}"
+          cleanup_level="seg"
+          ;;
+
+        *)
+          local cf_dir_default="${PRODUCT_STATE_DIR}/stackoutput/${ENVIRONMENT}/${SEGMENT}"
           cleanup_level="${deployment_group}"
           ;;
       esac
