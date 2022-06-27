@@ -38,23 +38,29 @@ if [[ -n "${OUTPUT_DIR}" ]]; then
 fi
 
 if [[ -z "${OUTPUT_DIR}" ]]; then
-    # First determine the CF_DIR so we can handle deployment unit subdirectories
-    case $LEVEL in
+
+     # First determine the CF_DIR so we can handle deployment unit subdirectories
+    case "${DISTRICT_TYPE}" in
         account)
+            PRODUCT_PREFIX="${ACCOUNT}"
+            ENVIRONMENT_SUFFIX=""
+            SEGMENT_SUFFIX=""
             CF_DIR="${ACCOUNT_STATE_DIR}/cf/shared"
-            REGION="${ACCOUNT_REGION}"
-            REGION_PREFIX="${ACCOUNT_REGION}-"
             ;;
 
-        product)
-            CF_DIR="${PRODUCT_STATE_DIR}/cf/shared"
-            ;;
-
-        solution|segment|application|multiple)
+        segment)
             CF_DIR="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
             ;;
+
         *)
-            fatalCantProceed "\"$LEVEL\" is not one of the known stack levels."
+            fatalCantProceed "\"${DISTRICT_TYPE}\" is not a supported district type - account or segment are currently supported"
+            ;;
+    esac
+
+    case "${LEVEL}" in
+        account)
+            REGION="${ACCOUNT_REGION}"
+            REGION_PREFIX="${ACCOUNT_REGION}-"
             ;;
     esac
 
@@ -70,12 +76,8 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
     fi
 fi
 
-case $LEVEL in
+case "${LEVEL}" in
     account)
-        PRODUCT_PREFIX="${ACCOUNT}"
-        ENVIRONMENT_SUFFIX=""
-        SEGMENT_SUFFIX=""
-
         # LEGACY: Support stacks created before deployment units added to account
         if [[ "${DEPLOYMENT_UNIT}" =~ s3 ]]; then
             if [[ -f "${CF_DIR}/${LEVEL_PREFIX}${REGION_PREFIX}template.json" ]]; then
@@ -88,19 +90,6 @@ case $LEVEL in
         if [[ ! -f "${CF_DIR}/${LEVEL_PREFIX}${DEPLOYMENT_UNIT_PREFIX}${REGION_PREFIX}stack.json" ]]; then
             PRODUCT_PREFIX=""
             LEVEL_SUFFIX="${LEVEL}"
-        fi
-        ;;
-
-    product)
-        ENVIRONMENT_SUFFIX=""
-        SEGMENT_SUFFIX=""
-
-        # LEGACY: Support stacks created before deployment units added to product
-        if [[ "${DEPLOYMENT_UNIT}" =~ cmk ]]; then
-            if [[ -f "${CF_DIR}/${LEVEL_PREFIX}${REGION_PREFIX}template.json" ]]; then
-                DEPLOYMENT_UNIT_PREFIX=""
-                DEPLOYMENT_UNIT_SUFFIX=""
-            fi
         fi
         ;;
 
@@ -119,26 +108,6 @@ case $LEVEL in
         LEVEL_PREFIX="seg-"
         LEVEL_SUFFIX="-seg"
 
-        # LEGACY: Support old formats for existing stacks so they can be updated
-        if [[ !("${DEPLOYMENT_UNIT}" =~ cmk|cert|dns ) ]]; then
-            if [[ -f "${CF_DIR}/cont-${DEPLOYMENT_UNIT_PREFIX}${REGION_PREFIX}template.json" ]]; then
-                LEVEL_PREFIX="cont-"
-                LEVEL_SUFFIX="-cont"
-            fi
-            if [[ -f "${CF_DIR}/container-${REGION}-template.json" ]]; then
-                LEVEL_PREFIX="container-"
-                LEVEL_SUFFIX="-container"
-                DEPLOYMENT_UNIT_PREFIX=""
-                DEPLOYMENT_UNIT_SUFFIX=""
-            fi
-            if [[ -f "${CF_DIR}/${SEGMENT}-container-template.json" ]]; then
-                LEVEL_PREFIX="${SEGMENT}-container-"
-                LEVEL_SUFFIX="-container"
-                DEPLOYMENT_UNIT_PREFIX=""
-                DEPLOYMENT_UNIT_SUFFIX=""
-                REGION_PREFIX=""
-            fi
-        fi
         # "cmk" now used instead of "key"
         if [[ "${DEPLOYMENT_UNIT}" == "cmk" ]]; then
             if [[ -f "${CF_DIR}/${LEVEL_PREFIX}key-${REGION_PREFIX}template.json" ]]; then
@@ -151,15 +120,6 @@ case $LEVEL in
     application)
         LEVEL_PREFIX="app-"
         LEVEL_SUFFIX="-app"
-        ;;
-
-    multiple)
-        LEVEL_PREFIX="multi-"
-        LEVEL_SUFFIX="-multi"
-        ;;
-
-    *)
-        fatalCantProceed "\"$LEVEL\" is not one of the known stack levels."
         ;;
 esac
 

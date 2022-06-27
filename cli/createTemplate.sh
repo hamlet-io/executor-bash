@@ -151,14 +151,14 @@ function options() {
     else
       debug "Using CMDB composites"
 
-      if [[ -n "${DEPLOYMENT_GROUP}" ]]; then
-        case "${DEPLOYMENT_GROUP}" in
+      if [[ -n "${DISTRICT_TYPE}" ]]; then
+        case "${DISTRICT_TYPE}" in
           account)
             [[ -z "${ACCOUNT_DIR}" ]] &&
               fatalLocation "Could not find ACCOUNT_DIR directory for account: \"${ACCOUNT}\"" && return 1
             ;;
 
-          *)
+          segment)
             [[ -z "${SEGMENT_SOLUTIONS_DIR}" ]] &&
               fatalLocation "Cound not find SEGMENT_SOLUTIONS_DIR directory for segment \"${SEGMENT}\"" && return 1
             ;;
@@ -669,13 +669,14 @@ function process_template_pass() {
 }
 
 function process_template() {
-  local entrance="${1,,}"; shift
-  local flows="${1,,}"; shift
-  local deployment_unit="${1,,}"; shift
-  local deployment_group="${1,,}"; shift
-  local account="$1"; shift
-  local account_region="${1,,}"; shift
-  local region="${1,,}"; shift
+  local entrance="${1}"; shift
+  local flows="${1}"; shift
+  local district_type="${1}"; shift
+  local deployment_unit="${1}"; shift
+  local deployment_group="${1}"; shift
+  local account="${1}"; shift
+  local account_region="${1}"; shift
+  local region="${1}"; shift
   local request_reference="${1}"; shift
   local configuration_reference="${1}"; shift
   local deployment_mode="${1}"; shift
@@ -686,47 +687,42 @@ function process_template() {
   local template_alternatives=("primary")
   local cleanup_level="${deployment_group}"
 
-  case "${entrance}" in
+  case "${district_type}" in
+    account)
+      local cf_dir_default="${ACCOUNT_STATE_DIR}/cf/shared"
+      ;;
 
+    segment)
+      local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
+      ;;
+  esac
+
+
+  case "${entrance}" in
     schema)
       local cf_dir_default="${PRODUCT_STATE_DIR}/hamlet"
       ;;
 
     deployment)
       case "${deployment_group}" in
-        account)
-          local cf_dir_default="${ACCOUNT_STATE_DIR}/cf/shared"
-          ;;
-
-        product)
-          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/shared"
-          ;;
-
         application)
-          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
           cleanup_level="app"
           ;;
 
         solution)
-          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
           cleanup_level="soln"
           ;;
 
         segment)
-          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
           cleanup_level="seg"
           ;;
 
         *)
-          local cf_dir_default="${PRODUCT_STATE_DIR}/cf/${ENVIRONMENT}/${SEGMENT}"
           cleanup_level="${deployment_group}"
           ;;
       esac
       ;;
 
-    *)
-      local cf_dir_default="${PRODUCT_STATE_DIR}/hamlet/${ENVIRONMENT}/${SEGMENT}"
-      ;;
   esac
 
   # Handle >=v2.0.1 cmdb where du/placement subdirectories were introduced for state
@@ -990,6 +986,7 @@ function main() {
   process_template \
     "${ENTRANCE}" \
     "${FLOWS}" \
+    "${DISTRICT_TYPE}" \
     "${DEPLOYMENT_UNIT}" "${DEPLOYMENT_GROUP}" \
     "${ACCOUNT}" "${ACCOUNT_REGION}" \
     "${REGION}" \
