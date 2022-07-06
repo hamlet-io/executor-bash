@@ -542,6 +542,9 @@ function main() {
     mv "${tmpdir}/ios-bundle-app.json" "./app.json"
   fi
 
+  # Override support for the display name used on the app
+  get_configfile_property "${CONFIG_FILE}" "IOS_DIST_DISPLAY_NAME" "${KMS_PREFIX}" "${AWS_REGION}"
+
   # IOS Non Exempt Encryption
   get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
   IOS_DIST_NON_EXEMPT_ENCRYPTION="${IOS_DIST_NON_EXEMPT_ENCRYPTION:-${DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION}}"
