@@ -697,6 +697,10 @@ function main() {
                         bundle exec fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"ios/${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
                     fi
 
+                    if [[ "${IOS_DIST_DISPLAY_NAME}" != "null" && -n "${IOS_DIST_DISPLAY_NAME}" ]]; then
+                        bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" plist_path:"${INFO_PLIST_PATH}" || return $?
+                    fi
+
                     if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
                         # Bare workflow support (SDK 37+)
 
