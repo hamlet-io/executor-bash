@@ -41,9 +41,6 @@ function set_aws_mfa_token_serial {
 case "${ACCOUNT_PROVIDER}" in
     aws)
 
-        # Disable AWS CLI paging
-        export AWS_PAGER=""
-        
         # Capture settings that have been set by the user
         # Then we can use them if required
         local_aws_user_profile="${local_aws_user_profile:-${AWS_PROFILE:-"__"}}"
