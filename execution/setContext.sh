@@ -28,9 +28,6 @@ debug "--- starting setContext.sh ---\n"
 # Much of the logic in this script relies on this setting
 shopt -s nullglob
 
-# Disable AWS CLI paging
-if [[ "${ACCOUNT_PROVIDER}" -eq "aws" ]] ; then export AWS_PAGER=""; fi
-        
 # Handle some MINGW peculiarities
 uname | grep -iq "MINGW64" && export MINGW64="true"
 
@@ -246,4 +243,7 @@ if [[ "${GENERATION_INPUT_SOURCE}" == "composite" || "${GENERATION_INPUT_SOURCE}
 
 fi
 
+# Disable AWS CLI paging
+if [[ "${ACCOUNT_PROVIDER}" -eq "aws" ]] ; then export AWS_PAGER=""; fi
+        
 debug "--- finished setContext.sh ---\n"
