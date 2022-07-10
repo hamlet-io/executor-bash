@@ -59,8 +59,6 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_EXPO_VERSION="4.1.6"
-DEFAULT_TURTLE_VERSION="0.20.7"
 DEFAULT_BINARY_EXPIRATION="1210000"
 
 DEFAULT_ENVIRONMENT_BADGE="false"
@@ -322,8 +320,17 @@ function options() {
     done
 
     #Defaults
+    if [[ -z "${EXPO_VERSION}" ]]; then
+        EXPO_VERSION="$(npm info expo-cli --json | jq -r ".version")"
+    fi
+    EXPO_PACKAGE="expo-cli@${EXPO_VERSION}"
+
+    if [[ -z "${TURTLE_VERSION}" ]]; then
+        TURTLE_VERSION="$(npm info turtle-cli --json | jq -r ".version")"
+    fi
+    TURTLE_PACKAGE="turtle-cli@${TURTLE_VERSION}"
+
     RUN_SETUP="${RUN_SETUP:-DEFAULT_RUN_SETUP}"
-    EXPO_VERSION="${EXPO_VERSION:-$DEFAULT_EXPO_VERSION}"
     BINARY_EXPIRATION="${BINARY_EXPIRATION:-$DEFAULT_BINARY_EXPIRATION}"
     FORCE_BINARY_BUILD="${FORCE_BINARY_BUILD:-$DEFAULT_FORCE_BINARY_BUILD}"
     SUBMIT_BINARY="${SUBMIT_BINARY:-DEFAULT_SUBMIT_BINARY}"
@@ -351,6 +358,7 @@ function main() {
   export LANG=en_US.UTF-8
   export FASTLANE_SKIP_UPDATE_CHECK="true"
   export FASTLANE_HIDE_CHANGELOG="true"
+  export FASTLANE_HIDE_PLUGINS_TABLE="true"
   export FASTLANE_DISABLE_COLORS=1
 
   # Add android SDK tools to path
@@ -542,6 +550,9 @@ function main() {
     mv "${tmpdir}/ios-bundle-app.json" "./app.json"
   fi
 
+  # Override support for the display name used on the app
+  get_configfile_property "${CONFIG_FILE}" "IOS_DIST_DISPLAY_NAME" "${KMS_PREFIX}" "${AWS_REGION}"
+
   # IOS Non Exempt Encryption
   get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
   IOS_DIST_NON_EXEMPT_ENCRYPTION="${IOS_DIST_NON_EXEMPT_ENCRYPTION:-${DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION}}"
@@ -558,7 +569,7 @@ function main() {
   # Create base OTA
   info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  yes | npx ${npx_base_args} --package expo-cli@"${EXPO_VERSION}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+  yes | npx ${npx_base_args} --package "${EXPO_PACKAGE}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
@@ -663,10 +674,10 @@ function main() {
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args="${extra_args} --sdk-version ${TURTLE_EXPO_SDK_VERSION}"
                 fi
-                yes | npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
+                yes | npx ${npx_base_args} --package "${TURTLE_PACKAGE}" turtle setup:"${build_format}" "${turtle_setup_extra_args}" || return $?
 
                 # Build using turtle
-                yes | npx ${npx_base_args} --package turtle-cli@"${TURTLE_VERSION}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
+                yes | npx ${npx_base_args} --package "${TURTLE_PACKAGE}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" ${TURTLE_EXTRA_BUILD_ARGS} "${SRC_PATH}" || return $?
                 ;;
 
             "fastlane")
@@ -694,7 +705,13 @@ function main() {
                     bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:ITSAppUsesNonExemptEncryption value:"${IOS_USES_NON_EXEMPT_ENCRYPTION}" || return $?
 
                     if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
-                        bundle exec fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"ios/${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
+                        pushd ios
+                        bundle exec fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
+                        popd
+                    fi
+
+                    if [[ "${IOS_DIST_DISPLAY_NAME}" != "null" && -n "${IOS_DIST_DISPLAY_NAME}" ]]; then
+                        bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" plist_path:"ios/${INFO_PLIST_PATH}" || return $?
                     fi
 
                     if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
