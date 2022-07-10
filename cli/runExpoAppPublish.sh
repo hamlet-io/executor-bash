@@ -711,7 +711,9 @@ function main() {
                     fi
 
                     if [[ "${IOS_DIST_DISPLAY_NAME}" != "null" && -n "${IOS_DIST_DISPLAY_NAME}" ]]; then
-                        bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" plist_path:"ios/${INFO_PLIST_PATH}" || return $?
+                        pushd ios
+                        bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
+                        popd
                     fi
 
                     if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
