@@ -3000,7 +3000,7 @@ function format_conventional_commit_body() {
   local result=""
   local pairArray=()
   local trimRegex='^[[:blank:]]*(.+)[[:blank:]]*$'
-  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*(.+)$'
 
   for pairsItem in "${pairsList[@]}"; do
     arrayFromList pairArray "${pairsItem}" ","
@@ -3027,7 +3027,7 @@ format_conventional_commit_body_summary() {
   local subset=($1); shift
   local match="${1:-all}"; shift
 
-  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*([^[:blank:]]+)$'
+  local pairRegex='^([^[:blank:]]+)[[:blank:]]*:[[:blank:]]*(.+)$'
 
   declare -A valueArray
 
@@ -3067,7 +3067,6 @@ format_conventional_commit_body_subset() {
   for pair in "${pairArray[@]}"; do
     if [[ "${pair}" =~ $pairRegex ]]; then
       local pairName="${BASH_REMATCH[1]}"
-      local pairValue="${BASH_REMATCH[2]}"
       if ! inArray "exclusions" "${pairName}"; then
         printf -v subset "%s%s\n" "${subset}" "${pair}"
       fi
