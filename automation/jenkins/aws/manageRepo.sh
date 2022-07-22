@@ -124,6 +124,7 @@ function push() {
         "${conventional_commit_description:-automation}" \
         "${conventional_commit_body}" )"
 
+    # Extract relevant events and remove the event log
     repo_event_log="$( getTempFile XXXXXXX )"
     pull_events_from_state "directory" "$(git -C "${REPO_DIR}" rev-parse --show-toplevel)" "${repo_event_log}" "starts_with"
 
@@ -185,7 +186,7 @@ function push() {
     GENERATION_REPO_PUSH_RETRIES="${GENERATION_REPO_PUSH_RETRIES:-6}"
     REPO_PUSHED=false
     HEAD_DETACHED=false
-    if [[ "${REPO_PUSH_REQUIRED}" == "true" ]]; then
+    if [[ ("${DEFER_REPO_PUSH}" != "true") && ("${REPO_PUSH_REQUIRED}" == "true") ]]; then
         for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
             # Check if remote branch exists
             EXISTING_BRANCH=$(git ls-remote --heads 2>/dev/null | grep "refs/heads/${REPO_BRANCH}$")
@@ -214,12 +215,6 @@ function push() {
         if [[ "${REPO_PUSHED}" == "false" ]]; then
             fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
         fi
-    fi
-
-    # Removing commits which have been pushed
-    if [[ -s "${commit_stage_file}" ]]; then
-        remaining_commits="$(jq --arg dir "${REPO_DIR}" 'del(.dirs[] | select(.dir == $dir))' "${commit_stage_file}")"
-        echo "${remaining_commits}" > "${commit_stage_file}"
     fi
 }
 
