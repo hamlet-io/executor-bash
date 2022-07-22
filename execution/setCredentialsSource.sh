@@ -73,9 +73,7 @@ case "${ACCOUNT_PROVIDER}" in
 
         local_aws_account_id="${local_aws_account_id:-${local_legacy_aws_account_id:-${PROVIDERID}}}"
 
-        if [[ -z "${HAMET_AWS_AUTH_ROLE}" ]]; then
-            find_env_config "local_aws_auth_role" "HAMLET" "AWS_AUTH_ROLE" "${CRED_ACCOUNT}"
-        fi
+        find_env_config "local_aws_auth_role" "HAMLET" "AWS_AUTH_ROLE" "${CRED_ACCOUNT}"
 
         find_env_config "local_aws_auth_mfa_serial" "HAMLET" "AWS_AUTH_MFA_SERIAL" "${CRED_ACCOUNT}"
 
