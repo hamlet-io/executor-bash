@@ -1,6 +1,26 @@
 # Changelog
 
-## latest (2022-06-06)
+## latest (2022-07-22)
+
+#### New Features
+
+* (expo): add support for app display name on IOS apps ([#340](https://github.com/hamlet-io/executor-bash/issues/340))
+* add stackoutput entrance support
+* (expo): add support for firebase and plugins
+#### Fixes
+
+* conventional commit support ([#342](https://github.com/hamlet-io/executor-bash/issues/342))
+* incorporate feedback
+* incorporate feedback
+* (cli): disable paging for aws cli v2
+* (expo): include project details for plist ([#341](https://github.com/hamlet-io/executor-bash/issues/341))
+#### Refactorings
+
+* set credentials ([#343](https://github.com/hamlet-io/executor-bash/issues/343))
+
+Full set of changes: [`8.6.2...latest`](https://github.com/hamlet-io/executor-bash/compare/8.6.2...latest)
+
+## 8.6.2 (2022-06-07)
 
 #### New Features
 
@@ -13,10 +33,11 @@
 * changelog generation
 #### Others
 
+* update changelog ([#330](https://github.com/hamlet-io/executor-bash/issues/330))
 * changelog bump
 * changelog bump
 
-Full set of changes: [`8.6.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.6.0...latest)
+Full set of changes: [`8.6.0...8.6.2`](https://github.com/hamlet-io/executor-bash/compare/8.6.0...8.6.2)
 
 ## 8.6.0 (2022-05-24)
 
