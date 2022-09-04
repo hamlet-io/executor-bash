@@ -1149,7 +1149,14 @@ function encrypt_kms_string() {
   local value="$1"; shift
   local kms_key_id="$1"; shift
 
-  aws --region "${region}" kms encrypt --key-id "${kms_key_id}" --plaintext "${value}" --query CiphertextBlob --output text
+  local cli_v1=$(awsv1 --version | grep "aws-cli/1.")
+  if [ -n "$cli_v1" ] ; then
+    local cli_encrypt="kms encrypt"
+  else
+    local cli_encrypt="kms encrypt --cli-binary-format raw-in-base64-out"
+  fi
+
+  aws --region "${region}" ${cli_encrypt} --key-id "${kms_key_id}" --plaintext "${value}" --query CiphertextBlob --output text
 }
 
 function encrypt_kms_file() {
