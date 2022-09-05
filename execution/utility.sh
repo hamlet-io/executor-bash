@@ -1149,7 +1149,7 @@ function encrypt_kms_string() {
   local value="$1"; shift
   local kms_key_id="$1"; shift
 
-  local cli_v1=$(awsv1 --version | grep "aws-cli/1.")
+  local cli_v1="$(awsv1 --version | grep 'aws-cli/1.')"
   if [ -n "$cli_v1" ] ; then
     local cli_encrypt="kms encrypt"
   else
@@ -1169,10 +1169,17 @@ function encrypt_kms_file() {
   local tmp_dir="$(getTopTempDir)"
   local return_status
 
+  local cli_v1="$(awsv1 --version | grep 'aws-cli/1.')"
+  if [ -n "$cli_v1" ] ; then
+    local cli_encrypt="kms encrypt"
+  else
+    local cli_encrypt="kms encrypt --cli-binary-format raw-in-base64-out"
+  fi
+
   cp "${input_file}" "${tmp_dir}/encrypt_file" || return_status=255
 
   if [[ -z "${return_status}" ]]; then
-    (cd "${tmp_dir}"; aws --region "${region}" --output text kms encrypt \
+    (cd "${tmp_dir}"; aws --region "${region}" --output text ${cli_encrypt} \
       --key-id "${kms_key_id}" --query CiphertextBlob \
       --plaintext "fileb://encrypt_file" > "${output_file}"; return_status=$?)
   fi
