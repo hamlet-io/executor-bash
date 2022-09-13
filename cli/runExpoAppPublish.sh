@@ -500,7 +500,6 @@ function main() {
         OTA_VERSION="${EXPO_SDK_VERSION}"
     fi
 
-
   # Define an archive based on build references to allow for source map replays and troubleshooting
   EXPO_ARCHIVE_S3_URL="s3://${PUBLIC_BUCKET}/${PUBLIC_PREFIX}/archive/${BUILD_REFERENCE}/"
 
@@ -569,7 +568,16 @@ function main() {
   # Create base OTA
   info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION}"
   EXPO_VERSION_PUBLIC_URL="${PUBLIC_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
-  yes | npx ${npx_base_args} --package "${EXPO_PACKAGE}" expo export --dump-sourcemap --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}" --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
+
+  if [[ "${EXPO_MAJOR_VERSION}" -gt "45" ]]; then
+    expo_npx_base_args=""
+    expo_url_args=""
+  else
+    expo_npx_base_args="${npx_base_args} --package "${EXPO_PACKAGE}""
+    expo_url_args="${expo_args} --public-url "${EXPO_VERSION_PUBLIC_URL}" --asset-url "${PUBLIC_ASSETS_PATH}""
+  fi
+
+  yes | npx ${expo_npx_base_args} expo export ${expo_url_args} --dump-sourcemap --dump-assetmap --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}"  || return $?
 
   EXPO_ID_OVERRIDE="$( jq -r '.BuildConfig.EXPO_ID_OVERRIDE' < "${CONFIG_FILE}" )"
   if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
