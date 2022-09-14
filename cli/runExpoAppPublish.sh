@@ -264,8 +264,14 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":d:efg:hk:lmn:o:su:v:" opt; do
+    while getopts ":b:d:efg:hk:lmn:o:st:u:v:" opt; do
         case $opt in
+        b)
+            echo "-b has been deprecated and can be removed"
+            ;;
+        t)
+            echo "-t has been deprecated and can be removed"
+            ;;
         d)
             ENVIRONMENT_BADGE_CONTENT="${OPTARG}"
             ;;
