@@ -203,6 +203,7 @@ eval_gemfile(plugins_path) if File.exist?(plugins_path)
 EOF
 
     mkdir -p "${work_dir}/fastlane"
+    bundle install
 
     cat <<EOF >"${work_dir}/fastlane/Pluginfile"
 gem 'fastlane-plugin-firebase_app_distribution', '~> 0.3.4'
@@ -582,7 +583,16 @@ function main() {
     # Support using prebuild service or require that ejected directorries exist
     if [[ ! -d "${SRC_PATH}/ios" && ! -d "${SRC_PATH}/android" ]]; then
         if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
-            expo_prebuild_args=("--no-install" "--clean")
+            expo_prebuild_args=("--clean")
+            case "${NODE_PACKAGE_MANAGER}" in
+            "yarn")
+                expo_prebuild_args=("${expo_prebuild_args[@]}" "--yarn")
+                ;;
+
+            "npm")
+                expo_prebuild_args=("${expo_prebuild_args[@]}" "--npm")
+                ;;
+            esac
             npx expo prebuild "${expo_prebuild_args[@]}" || return $?
         else
             fatal "Native folders could not be found for mobile builds ensure android and ios dirs exist"
