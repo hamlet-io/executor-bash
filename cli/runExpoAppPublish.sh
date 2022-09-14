@@ -59,15 +59,11 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 . "${GENERATION_BASE_DIR}/execution/common.sh"
 
 #Defaults
-DEFAULT_BINARY_EXPIRATION="1210000"
-
 DEFAULT_ENVIRONMENT_BADGE="false"
 
 DEFAULT_RUN_SETUP="false"
 DEFAULT_FORCE_BINARY_BUILD="false"
 DEFAULT_SUBMIT_BINARY="false"
-
-DEFAULT_BINARY_BUILD_PROCESS="turtle"
 
 DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 
@@ -230,11 +226,9 @@ where
 (m) -u DEPLOYMENT_UNIT              is the mobile app deployment unit
 (o) -g DEPLOYMENT_GROUP             is the group the deployment unit belongs to
 (o) -s RUN_SETUP                    run setup installation to prepare
-(o) -t BINARY_EXPIRATION            how long presigned urls are active for once created ( seconds )
 (o) -f FORCE_BINARY_BUILD           force the build of binary images
 (o) -n NODE_PACKAGE_MANAGER         Set the node package manager for app installation
 (o) -m SUBMIT_BINARY                submit the binary for testing
-(o) -b BINARY_BUILD_PROCESS         sets the build process to create the binary
 (o) -v APP_VERSION_SOURCE           sets what to use for the app version ( cmdb | manifest)
 (o) -l BUILD_LOGS                   show the build logs for binary builds
 (o) -e ENVIRONMENT_BADGE            add a badge to the app icons with the environment
@@ -244,12 +238,9 @@ where
 (m) mandatory, (o) optional, (d) deprecated
 
 DEFAULTS:
-BINARY_EXPIRATION = ${DEFAULT_BINARY_EXPIRATION}
 BUILD_FORMATS = ${DEFAULT_BUILD_FORMATS}
-BINARY_EXPIRATION = ${DEFAULT_BINARY_EXPIRATION}
 RUN_SETUP = ${DEFAULT_RUN_SETUP}
 SUBMIT_BINARY = ${DEFAULT_SUBMIT_BINARY}
-BINARY_BUILD_PROCESS = ${DEFAULT_BINARY_BUILD_PROCESS}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
 BUILD_LOGS = ${DEFAULT_BUILD_LOGS}
@@ -273,11 +264,8 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":b:d:efg:hk:lmn:o:st:u:v:" opt; do
+    while getopts ":d:efg:hk:lmn:o:su:v:" opt; do
         case $opt in
-        b)
-            BINARY_BUILD_PROCESS="${OPTARG}"
-            ;;
         d)
             ENVIRONMENT_BADGE_CONTENT="${OPTARG}"
             ;;
@@ -314,9 +302,6 @@ function options() {
         s)
             RUN_SETUP="true"
             ;;
-        t)
-            BINARY_EXPIRATION="${OPTARG}"
-            ;;
         v)
             APP_VERSION_SOURCE="${OPTARG}"
             ;;
@@ -335,16 +320,9 @@ function options() {
     fi
     EXPO_PACKAGE="expo-cli@${EXPO_VERSION}"
 
-    if [[ -z "${TURTLE_VERSION}" ]]; then
-        TURTLE_VERSION="$(npm info turtle-cli --json | jq -r ".version")"
-    fi
-    TURTLE_PACKAGE="turtle-cli@${TURTLE_VERSION}"
-
     RUN_SETUP="${RUN_SETUP:-DEFAULT_RUN_SETUP}"
-    BINARY_EXPIRATION="${BINARY_EXPIRATION:-$DEFAULT_BINARY_EXPIRATION}"
     FORCE_BINARY_BUILD="${FORCE_BINARY_BUILD:-$DEFAULT_FORCE_BINARY_BUILD}"
     SUBMIT_BINARY="${SUBMIT_BINARY:-DEFAULT_SUBMIT_BINARY}"
-    BINARY_BUILD_PROCESS="${BINARY_BUILD_PROCESS:-$DEFAULT_BINARY_BUILD_PROCESS}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
@@ -390,7 +368,7 @@ function main() {
     WORKSPACE_DIR="${AUTOMATION_DATA_DIR:-$(getTempDir "cote_expo_XXXXX")}"
 
     # Generate a build blueprint so that we can find out the source S3 bucket
-    info "Generating blueprint to find details..."
+    info "Collecting build info"
     "${GENERATION_DIR}"/createTemplate.sh -e "buildblueprint" -p "aws" -l "${DEPLOYMENT_GROUP}" -u "${DEPLOYMENT_UNIT}" -o "${tmpdir}" >/dev/null
     BUILD_BLUEPRINT="${tmpdir}/buildblueprint-${DEPLOYMENT_GROUP}-${DEPLOYMENT_UNIT}-config.json"
 
@@ -450,10 +428,6 @@ function main() {
     BUILD_REFERENCE="$(jq -r '.BuildConfig.BUILD_REFERENCE' <"${CONFIG_FILE}")"
     BUILD_NUMBER="$(date +"%Y%m%d.1%H%M%S")"
     RELEASE_CHANNEL="$(jq -r '.BuildConfig.RELEASE_CHANNEL' <"${CONFIG_FILE}")"
-
-    BUILD_BINARY="false"
-
-    TURTLE_EXTRA_BUILD_ARGS=("--release-channel" "${RELEASE_CHANNEL}")
 
     # Prepare the code build environment
     info "Getting source code from from s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip"
@@ -523,29 +497,6 @@ function main() {
     save_context_property "BUILD_REFERENCE" "${BUILD_REFERENCE}"
     save_context_property "DEPLOYMENT_UNIT" "${DEPLOYMENT_UNIT}"
     save_context_property "DEPLOYMENT_GROUP" "${DEPLOYMENT_GROUP}"
-
-    # Determine Binary Build status
-    EXPO_CURRENT_OTA_BUILD="$(aws s3api list-objects-v2 --bucket "${PUBLIC_BUCKET}" --prefix "${PUBLIC_PREFIX}/packages/${OTA_VERSION}" --query "join(',', Contents[*].Key)" --output text)"
-    arrayFromList EXPO_CURRENT_OTA_FILES "${EXPO_CURRENT_OTA_BUILD}"
-
-    # Determine if App Version has been incremented
-    if [[ -n "${EXPO_CURRENT_OTA_BUILD}" ]]; then
-        for sdk_file in "${EXPO_CURRENT_OTA_FILES[@]}"; do
-            if [[ "${sdk_file}" == */${BUILD_FORMATS[0]}-index.json ]]; then
-                aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${PUBLIC_BUCKET}/${sdk_file}" "${WORKSPACE_DIR}/current-app-manifest.json"
-                break
-            fi
-        done
-
-        if [[ -f "${WORKSPACE_DIR}/current-app-manifest.json" ]]; then
-            EXPO_CURRENT_APP_VERSION="$(jq -r '.version' <"${WORKSPACE_DIR}/current-app-manifest.json")"
-        fi
-    fi
-
-    # If not built before, or the app version has changed, or forced to, build the binary
-    if [[ -z "${EXPO_CURRENT_OTA_BUILD}" || "${FORCE_BINARY_BUILD}" == "true" || "${EXPO_CURRENT_APP_VERSION}" != "${EXPO_APP_VERSION}" ]]; then
-        BUILD_BINARY="true"
-    fi
 
     # Update the app.json with build context information - Also ensure we always have a unique IOS build number
     # filter out the credentials used for the build process
@@ -622,8 +573,28 @@ function main() {
     info "Creating archive copy based on build reference ${BUILD_REFERENCE}"
     aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "${EXPO_ARCHIVE_S3_URL}" || return $?
 
+    # Support using prebuild service or require that ejected directorries exist
+    if [[ ! -d "${SRC_PATH}/ios" && ! -d "${SRC_PATH}/android" ]]; then
+        if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
+            expo_prebuild_args=("--no-install" "--clean")
+            case "${NODE_PACKAGE_MANAGER}" in
+            "yarn")
+                expo_prebuild_args=("${expo_prebuild_args[@]}" "--yarn")
+                ;;
+
+            "npm")
+                expo_prebuild_args=("${expo_prebuild_args[@]}" "--npm")
+                ;;
+            esac
+            npx expo prebuild "${expo_prebuild_args[@]}" || return $?
+        else
+            fatal "Native folders could not be found for mobile builds ensure android and ios dirs exist"
+            return 1
+        fi
+    fi
+
     # Add a shield to the App icons with the environment for the app
-    if [[ "${BINARY_BUILD_PROCESS}" == "fastlane" && "${ENVIRONMENT_BADGE}" == "true" ]]; then
+    if [[ "${ENVIRONMENT_BADGE}" == "true" ]]; then
         BADGE_CONTENT="${ENVIRONMENT_BADGE_CONTENT:-${ENVIRONMENT}}"
         badge_args=("shield:${BADGE_CONTENT}-blue" "shield_scale:0.5" "no_badge;true" "shield_gravity:South" "shield_parameters:style=flat")
 
@@ -656,8 +627,6 @@ function main() {
 
             get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_FIREBASE_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             FIREBASE_JSON_KEY_FILE="${OPS_PATH}/firebase_json_key.json"
-
-            TURTLE_EXTRA_BUILD_ARGS=("${TURTLE_EXTRA_BUILD_ARGS[@]}" "--keystore-path" "${ANDROID_DIST_KEYSTORE_FILE}" "--keystore-alias" "${ANDROID_DIST_KEY_ALIAS}" "--type" "apk" "-mode" "release")
             ;;
 
         "ios")
@@ -679,262 +648,233 @@ function main() {
 
             # Setting Defaults
             IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
-
-            # Turtle Specific overrides
-            TURTLE_EXTRA_BUILD_ARGS=("${TURTLE_EXTRA_BUILD_ARGS[@]}" "--team-id" "${IOS_DIST_APPLE_ID}" "--dist-p12-path" "${IOS_DIST_P12_FILE}" "--provisioning-profile-path" "${IOS_DIST_PROVISIONING_PROFILE}")
-            export EXPO_IOS_DIST_P12_PASSWORD="${IOS_DIST_P12_PASSWORD}"
             ;;
         "*")
             echo "Unkown build format" && return 128
             ;;
         esac
 
-        if [[ "${BUILD_BINARY}" == "true" ]]; then
+        info "Building App Binary for ${build_format}"
 
-            info "Building App Binary for ${build_format}"
+        EXPO_BINARY_FILE_NAME="${BINARY_FILE_PREFIX}-${EXPO_APP_VERSION}-${BUILD_NUMBER}.${BINARY_FILE_EXTENSION}"
+        EXPO_BINARY_FILE_PATH="${BINARY_PATH}/${EXPO_BINARY_FILE_NAME}"
 
-            EXPO_BINARY_FILE_NAME="${BINARY_FILE_PREFIX}-${EXPO_APP_VERSION}-${BUILD_NUMBER}.${BINARY_FILE_EXTENSION}"
-            EXPO_BINARY_FILE_PATH="${BINARY_PATH}/${EXPO_BINARY_FILE_NAME}"
+        if [[ "${build_format}" == "ios" ]]; then
+            FASTLANE_KEYCHAIN_PATH="${OPS_PATH}/${BUILD_NUMBER}.keychain"
+            FASTLANE_KEYCHAIN_NAME="${BUILD_NUMBER}"
+            FASTLANE_IOS_PROJECT_FILE="ios/${EXPO_PROJECT_SLUG}.xcodeproj"
+            FASTLANE_IOS_WORKSPACE_FILE="ios/${EXPO_PROJECT_SLUG}.xcworkspace"
+            FASTLANE_IOS_PODFILE="ios/Podfile"
 
-            case "${BINARY_BUILD_PROCESS}" in
-            "turtle")
-                echo "Using turtle to build the binary image | turtle-cli version: ${TURTLE_VERSION}"
+            # Update App details
+            # Pre SDK37, Expokit maintained an Info.plist in Supporting
+            INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Supporting/Info.plist"
+            [[ ! -e "ios/${INFO_PLIST_PATH}" ]] && INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Info.plist"
+            bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
+            bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
 
-                turtle_setup_extra_args=()
-                if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
-                    turtle_setup_extra_args=("${turtle_setup_extra_args[@]}" "--sdk-version" "${TURTLE_EXPO_SDK_VERSION}")
+            if [[ "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" == "false" ]]; then
+                IOS_USES_NON_EXEMPT_ENCRYPTION="NO"
+            else
+                IOS_USES_NON_EXEMPT_ENCRYPTION="YES"
+            fi
+            bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:ITSAppUsesNonExemptEncryption value:"${IOS_USES_NON_EXEMPT_ENCRYPTION}" || return $?
+
+            if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
+                pushd ios || { fatal "could not change to ios dir"; return $?; }
+                bundle exec fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
+                popd || return $?
+            fi
+
+            if [[ "${IOS_DIST_DISPLAY_NAME}" != "null" && -n "${IOS_DIST_DISPLAY_NAME}" ]]; then
+                pushd ios || { fatal "could not change to ios dir"; return $?; }
+                bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
+                popd || return $?
+            fi
+
+            if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
+                # Bare workflow support (SDK 37+)
+
+                # Updates URL
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${EXPO_MANIFEST_URL}" || return $?
+
+                # SDK Version
+                if [[ -n "${EXPO_SDK_VERSION}" ]]; then
+                    bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
                 fi
-                yes | npx "${npx_base_args[@]}" --package "${TURTLE_PACKAGE}" turtle setup:"${build_format}" "${turtle_setup_extra_args[@]}" || return $?
 
-                # Build using turtle
-                yes | npx "${npx_base_args[@]}" --package "${TURTLE_PACKAGE}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" "${TURTLE_EXTRA_BUILD_ARGS[@]}" "${SRC_PATH}" || return $?
-                ;;
+                # Release channel
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesReleaseChannel value:"${RELEASE_CHANNEL}" || return $?
 
-            "fastlane")
-                echo "Using fastlane to build the binary image"
+                # Check for updates
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesCheckOnLaunch value:"ALWAYS" || return $?
 
-                if [[ "${build_format}" == "ios" ]]; then
-                    FASTLANE_KEYCHAIN_PATH="${OPS_PATH}/${BUILD_NUMBER}.keychain"
-                    FASTLANE_KEYCHAIN_NAME="${BUILD_NUMBER}"
-                    FASTLANE_IOS_PROJECT_FILE="ios/${EXPO_PROJECT_SLUG}.xcodeproj"
-                    FASTLANE_IOS_WORKSPACE_FILE="ios/${EXPO_PROJECT_SLUG}.xcworkspace"
-                    FASTLANE_IOS_PODFILE="ios/Podfile"
+                # Wait up to 10s for updates to download
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesLaunchWaitMs value:"10000" || return $?
 
-                    # Update App details
-                    # Pre SDK37, Expokit maintained an Info.plist in Supporting
-                    INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Supporting/Info.plist"
-                    [[ ! -e "ios/${INFO_PLIST_PATH}" ]] && INFO_PLIST_PATH="${EXPO_PROJECT_SLUG}/Info.plist"
-                    bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
-                    bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
+            else
+                # Legacy Expokit support
+                # Update Expo Details and seed with latest expo bundles
+                BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
+                cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
 
-                    if [[ "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" == "false" ]]; then
-                        IOS_USES_NON_EXEMPT_ENCRYPTION="NO"
-                    else
-                        IOS_USES_NON_EXEMPT_ENCRYPTION="YES"
-                    fi
-                    bundle exec fastlane run set_info_plist_value path:"ios/${INFO_PLIST_PATH}" key:ITSAppUsesNonExemptEncryption value:"${IOS_USES_NON_EXEMPT_ENCRYPTION}" || return $?
+                # Get the bundle file name from the manifest
+                BUNDLE_URL="$(jq -r '.bundleUrl' <"${BINARY_BUNDLE_FILE}")"
+                BUNDLE_FILE_NAME="$(basename "${BUNDLE_URL}")"
 
+                cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
+
+                jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" >"${tmpdir}/EXShell.json"
+                mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
+
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:manifestUrl value:"${EXPO_MANIFEST_URL}" || return $?
+                bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:releaseChannel value:"${RELEASE_CHANNEL}" || return $?
+            fi
+
+            # Keychain setup - Create a temporary keychain
+            bundle exec fastlane run create_keychain path:"${FASTLANE_KEYCHAIN_PATH}" password:"${FASTLANE_KEYCHAIN_NAME}" add_to_search_list:"true" unlock:"true" timeout:3600 || return $?
+
+            # Codesigning setup
+            bundle exec fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
+            CODESIGN_IDENTITY="$(security find-certificate -c "${IOS_DIST_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}" | openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p')"
+            if [[ -z "${CODESIGN_IDENTITY}" ]]; then
+                fatal "Could not find code signing identity matching type: ${IOS_DIST_CODESIGN_IDENTITY} - To get the identity download the distribution certificate and get the commonName. The IOS_DIST_CODESIGN_IDENTITY is the bit before the : ( will be Apple Distribution or iPhone Distribution"
+                return 255
+            fi
+
+            # Load the app provisioning profile
+            bundle exec fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
+            bundle exec fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
+
+            # Load extension profiles
+            # Extension target name is assumed to be the string appended to "ios_profile" in the profile name
+            # ios_profile_xxx.mobileprovision -> target is xxx
+            for PROFILE in "${OPS_PATH}"/"${IOS_DIST_PROVISIONING_PROFILE_BASE}"*"${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"; do
+                TARGET="${PROFILE%"${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"}"
+                TARGET="${TARGET#"${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}"}"
+                # Ignore the app provisioning profile
+                [[ -z "${TARGET}" ]] && continue
+                # Update the extension target
+                TARGET="${TARGET#_}"
+                echo "Updating target ${TARGET} ..."
+                bundle exec fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
+                bundle exec fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
+                # Update the plist file as well if present
+                TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
+                if [[ -f "${TARGET_PLIST_PATH}" ]]; then
+                    bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
+                    bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
                     if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
-                        pushd ios || { fatal "could not change to ios dir"; return $?; }
-                        bundle exec fastlane run update_app_identifier app_identifier:"${IOS_DIST_BUNDLE_ID}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
-                        popd || return $?
-                    fi
-
-                    if [[ "${IOS_DIST_DISPLAY_NAME}" != "null" && -n "${IOS_DIST_DISPLAY_NAME}" ]]; then
-                        pushd ios || { fatal "could not change to ios dir"; return $?; }
-                        bundle exec fastlane run update_info_plist display_name:"${IOS_DIST_DISPLAY_NAME}" xcodeproj:"${EXPO_PROJECT_SLUG}.xcodeproj" plist_path:"${INFO_PLIST_PATH}" || return $?
-                        popd || return $?
-                    fi
-
-                    if [[ -e "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" ]]; then
-                        # Bare workflow support (SDK 37+)
-
-                        # Updates URL
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesURL value:"${EXPO_MANIFEST_URL}" || return $?
-
-                        # SDK Version
-                        if [[ -n "${EXPO_SDK_VERSION}" ]]; then
-                            bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesSDKVersion value:"${EXPO_SDK_VERSION}" || return $?
-                        fi
-
-                        # Release channel
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesReleaseChannel value:"${RELEASE_CHANNEL}" || return $?
-
-                        # Check for updates
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesCheckOnLaunch value:"ALWAYS" || return $?
-
-                        # Wait up to 10s for updates to download
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/Expo.plist" key:EXUpdatesLaunchWaitMs value:"10000" || return $?
-
-                    else
-                        # Legacy Expokit support
-                        # Update Expo Details and seed with latest expo bundles
-                        BINARY_BUNDLE_FILE="${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app-manifest.json"
-                        cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" "${BINARY_BUNDLE_FILE}"
-
-                        # Get the bundle file name from the manifest
-                        BUNDLE_URL="$(jq -r '.bundleUrl' <"${BINARY_BUNDLE_FILE}")"
-                        BUNDLE_FILE_NAME="$(basename "${BUNDLE_URL}")"
-
-                        cp "${SRC_PATH}/app/dist/build/${OTA_VERSION}/bundles/${BUNDLE_FILE_NAME}" "${SRC_PATH}/ios/${EXPO_PROJECT_SLUG}/Supporting/shell-app.bundle"
-
-                        jq --arg RELEASE_CHANNEL "${RELEASE_CHANNEL}" --arg MANIFEST_URL "${EXPO_MANIFEST_URL}" '.manifestUrl=$MANIFEST_URL | .releaseChannel=$RELEASE_CHANNEL' <"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json" >"${tmpdir}/EXShell.json"
-                        mv "${tmpdir}/EXShell.json" "ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.json"
-
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:manifestUrl value:"${EXPO_MANIFEST_URL}" || return $?
-                        bundle exec fastlane run set_info_plist_value path:"ios/${EXPO_PROJECT_SLUG}/Supporting/EXShell.plist" key:releaseChannel value:"${RELEASE_CHANNEL}" || return $?
-                    fi
-
-                    # Keychain setup - Create a temporary keychain
-                    bundle exec fastlane run create_keychain path:"${FASTLANE_KEYCHAIN_PATH}" password:"${FASTLANE_KEYCHAIN_NAME}" add_to_search_list:"true" unlock:"true" timeout:3600 || return $?
-
-                    # Codesigning setup
-                    bundle exec fastlane run import_certificate certificate_path:"${OPS_PATH}/ios_distribution.p12" certificate_password:"${IOS_DIST_P12_PASSWORD}" keychain_path:"${FASTLANE_KEYCHAIN_PATH}" keychain_password:"${FASTLANE_KEYCHAIN_NAME}" log_output:"true" || return $?
-                    CODESIGN_IDENTITY="$(security find-certificate -c "${IOS_DIST_CODESIGN_IDENTITY}" -p "${FASTLANE_KEYCHAIN_PATH}" | openssl x509 -noout -subject -nameopt multiline | grep commonName | sed -n 's/ *commonName *= //p')"
-                    if [[ -z "${CODESIGN_IDENTITY}" ]]; then
-                        fatal "Could not find code signing identity matching type: ${IOS_DIST_CODESIGN_IDENTITY} - To get the identity download the distribution certificate and get the commonName. The IOS_DIST_CODESIGN_IDENTITY is the bit before the : ( will be Apple Distribution or iPhone Distribution"
-                        return 255
-                    fi
-
-                    # Load the app provisioning profile
-                    bundle exec fastlane run install_provisioning_profile path:"${IOS_DIST_PROVISIONING_PROFILE}" || return $?
-                    bundle exec fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${IOS_DIST_PROVISIONING_PROFILE}" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
-
-                    # Load extension profiles
-                    # Extension target name is assumed to be the string appended to "ios_profile" in the profile name
-                    # ios_profile_xxx.mobileprovision -> target is xxx
-                    for PROFILE in "${OPS_PATH}"/"${IOS_DIST_PROVISIONING_PROFILE_BASE}"*"${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"; do
-                        TARGET="${PROFILE%"${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"}"
-                        TARGET="${TARGET#"${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}"}"
-                        # Ignore the app provisioning profile
-                        [[ -z "${TARGET}" ]] && continue
-                        # Update the extension target
-                        TARGET="${TARGET#_}"
-                        echo "Updating target ${TARGET} ..."
-                        bundle exec fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
-                        bundle exec fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
-                        # Update the plist file as well if present
-                        TARGET_PLIST_PATH="ios/${TARGET}/Info.plist"
-                        if [[ -f "${TARGET_PLIST_PATH}" ]]; then
-                            bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleVersion value:"${BUILD_NUMBER}" || return $?
-                            bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleShortVersionString value:"${EXPO_APP_VERSION}" || return $?
-                            if [[ "${IOS_DIST_BUNDLE_ID}" != "null" && -n "${IOS_DIST_BUNDLE_ID}" ]]; then
-                                bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleIdentifier value:"${IOS_DIST_BUNDLE_ID}.${TARGET}" || return $?
-                            fi
-                        fi
-                    done
-
-                    bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
-
-                    if [[ "${BUILD_LOGS}" == "true" ]]; then
-                        FASTLANE_IOS_SILENT="false"
-                    else
-                        FASTLANE_IOS_SILENT="true"
-                    fi
-
-                    # Build App
-                    bundle exec fastlane run cocoapods silent:"${FASTLANE_IOS_SILENT}" podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
-                    bundle exec fastlane run build_ios_app suppress_xcode_output:"${FASTLANE_IOS_SILENT}" silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" include_symbols:"true" include_bitcode:"true" || return $?
-                fi
-
-                if [[ "${build_format}" == "android" ]]; then
-
-                    # Bundle Overrides
-                    export ANDROID_DIST_BUNDLE_ID
-
-                    # Handle Google Id formatting rules ( https://developer.android.com/studio/publish/versioning.html )
-                    ANDROID_VERSION_CODE="$(echo "${BUILD_NUMBER//".1"/}" | cut -c 3- | rev | cut -c 3- | rev | cut -c -9)"
-                    export ANDROID_VERSION_CODE
-
-                    ANDROID_VERSION_NAME="${EXPO_APP_VERSION}"
-                    export ANDROID_VERSION_NAME
-
-                    # Create google_services account file
-                    if [[ -f "${OPS_PATH}/google-services.json" ]]; then
-                        info "Updating google services ${OPS_PATH}/google-services.json -> ${SRC_PATH}/android/app/google-services.json"
-                        cp "${OPS_PATH}/google-services.json" "${SRC_PATH}/android/app/google-services.json"
-                    fi
-
-                    if [[ -e "${SRC_PATH}/android/app/src/main/AndroidManifest.xml" ]]; then
-
-                        # Update Expo Details
-                        manifest_content="$(cat "${SRC_PATH}/android/app/src/main/AndroidManifest.xml")"
-
-                        # Update Url
-                        manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${EXPO_MANIFEST_URL}")"
-
-                        # Sdk Version
-                        manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_SDK_VERSION" "${EXPO_SDK_VERSION}")"
-
-                        # Check for updates
-                        manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" "ALWAYS")"
-
-                        # Check for updates
-                        manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" "10000")"
-
-                        if [[ -n "${manifest_content}" ]]; then
-                            echo "${manifest_content}" >"${SRC_PATH}/android/app/src/main/AndroidManifest.xml"
-                        else
-                            error "Couldn't update manifest details for expo Updates"
-                            exit 128
-                        fi
-
-                        gradle_args="--console=plain"
-                        if [[ "${BUILD_LOGS}" == "false" ]]; then
-                            gradle_args="${gradle_args} --quiet"
-                        fi
-
-                        # Run the react build
-                        cd "${SRC_PATH}/android" || { fatal "Could not change to android src dir"; return $?; }
-                        ./gradlew "${gradle_args}" -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
-                        cd "${SRC_PATH}" || { fatal "Could not change to src dir"; return $?; }
-
-                        if [[ -f "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" ]]; then
-                            cp "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" "${EXPO_BINARY_FILE_PATH}"
-                        else
-                            error "Could not find android build file"
-                            return 128
-                        fi
+                        bundle exec fastlane run set_info_plist_value path:"${TARGET_PLIST_PATH}" key:CFBundleIdentifier value:"${IOS_DIST_BUNDLE_ID}.${TARGET}" || return $?
                     fi
                 fi
+            done
 
-                ;;
-            esac
+            bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
-            if [[ -f "${EXPO_BINARY_FILE_PATH}" ]]; then
-                aws --region "${AWS_REGION}" s3 sync --only-show-errors --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
+            if [[ "${BUILD_LOGS}" == "true" ]]; then
+                FASTLANE_IOS_SILENT="false"
+            else
+                FASTLANE_IOS_SILENT="true"
+            fi
 
-                if [[ "${SUBMIT_BINARY}" == "true" ]]; then
-                    case "${build_format}" in
-                    "ios")
+            # Build App
+            bundle exec fastlane run cocoapods silent:"${FASTLANE_IOS_SILENT}" podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
+            bundle exec fastlane run build_ios_app suppress_xcode_output:"${FASTLANE_IOS_SILENT}" silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" include_symbols:"true" include_bitcode:"true" || return $?
+        fi
 
-                        # Ensure mandatory arguments have been provided
-                        if [[ -z "${IOS_TESTFLIGHT_USERNAME}" || -z "${IOS_TESTFLIGHT_PASSWORD}" || -z "${IOS_DIST_APP_ID}" ]]; then
-                            warning "IOS - TestFlight details not found please provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID - Skipping push"
-                            continue
-                        fi
+        if [[ "${build_format}" == "android" ]]; then
 
-                        info "Submitting IOS binary to testflight"
-                        export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
-                        bundle exec fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
-                        ;;
+            # Bundle Overrides
+            export ANDROID_DIST_BUNDLE_ID
 
-                    "android")
-                        if [[ -n "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
-                            info "Submitting android build to play store"
-                            bundle exec fastlane run upload_to_play_store apk:"${EXPO_BINARY_FILE_PATH}" track:"beta" json_key_data:"${ANDROID_PLAYSTORE_JSON_KEY}"
-                        fi
+            # Handle Google Id formatting rules ( https://developer.android.com/studio/publish/versioning.html )
+            ANDROID_VERSION_CODE="$(echo "${BUILD_NUMBER//".1"/}" | cut -c 3- | rev | cut -c 3- | rev | cut -c -9)"
+            export ANDROID_VERSION_CODE
 
-                        if [[ -f "${FIREBASE_JSON_KEY_FILE}" ]]; then
-                            info "Submitting android build to firebase"
-                            bundle exec fastlane run firebase_app_distribution app:"${ANDROID_DIST_FIREBASE_APP_ID}" service_credentials_file:"${FIREBASE_JSON_KEY_FILE}" apk_path:"${EXPO_BINARY_FILE_PATH}"
-                        fi
-                        ;;
-                    esac
+            ANDROID_VERSION_NAME="${EXPO_APP_VERSION}"
+            export ANDROID_VERSION_NAME
+
+            # Create google_services account file
+            if [[ -f "${OPS_PATH}/google-services.json" ]]; then
+                info "Updating google services ${OPS_PATH}/google-services.json -> ${SRC_PATH}/android/app/google-services.json"
+                cp "${OPS_PATH}/google-services.json" "${SRC_PATH}/android/app/google-services.json"
+            fi
+
+            if [[ -e "${SRC_PATH}/android/app/src/main/AndroidManifest.xml" ]]; then
+
+                # Update Expo Details
+                manifest_content="$(cat "${SRC_PATH}/android/app/src/main/AndroidManifest.xml")"
+
+                # Update Url
+                manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATE_URL" "${EXPO_MANIFEST_URL}")"
+
+                # Sdk Version
+                manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_SDK_VERSION" "${EXPO_SDK_VERSION}")"
+
+                # Check for updates
+                manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" "ALWAYS")"
+
+                # Check for updates
+                manifest_content="$(set_android_manifest_property "${manifest_content}" "expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" "10000")"
+
+                if [[ -n "${manifest_content}" ]]; then
+                    echo "${manifest_content}" >"${SRC_PATH}/android/app/src/main/AndroidManifest.xml"
+                else
+                    error "Couldn't update manifest details for expo Updates"
+                    exit 128
+                fi
+
+                gradle_args="--console=plain"
+                if [[ "${BUILD_LOGS}" == "false" ]]; then
+                    gradle_args="${gradle_args} --quiet"
+                fi
+
+                # Run the react build
+                cd "${SRC_PATH}/android" || { fatal "Could not change to android src dir"; return $?; }
+                ./gradlew "${gradle_args}" -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
+                cd "${SRC_PATH}" || { fatal "Could not change to src dir"; return $?; }
+
+                if [[ -f "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" ]]; then
+                    cp "${SRC_PATH}/android/app/build/outputs/apk/release/app-release.apk" "${EXPO_BINARY_FILE_PATH}"
+                else
+                    error "Could not find android build file"
+                    return 128
                 fi
             fi
-        else
-            info "Skipping build of app binary for ${build_format}"
+        fi
+
+        if [[ -f "${EXPO_BINARY_FILE_PATH}" ]]; then
+            aws --region "${AWS_REGION}" s3 sync --only-show-errors --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
+
+            if [[ "${SUBMIT_BINARY}" == "true" ]]; then
+                case "${build_format}" in
+                "ios")
+
+                    # Ensure mandatory arguments have been provided
+                    if [[ -z "${IOS_TESTFLIGHT_USERNAME}" || -z "${IOS_TESTFLIGHT_PASSWORD}" || -z "${IOS_DIST_APP_ID}" ]]; then
+                        warning "IOS - TestFlight details not found please provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID - Skipping push"
+                        continue
+                    fi
+
+                    info "Submitting IOS binary to testflight"
+                    export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
+                    bundle exec fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
+                    ;;
+
+                "android")
+                    if [[ -n "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
+                        info "Submitting android build to play store"
+                        bundle exec fastlane run upload_to_play_store apk:"${EXPO_BINARY_FILE_PATH}" track:"beta" json_key_data:"${ANDROID_PLAYSTORE_JSON_KEY}"
+                    fi
+
+                    if [[ -f "${FIREBASE_JSON_KEY_FILE}" ]]; then
+                        info "Submitting android build to firebase"
+                        bundle exec fastlane run firebase_app_distribution app:"${ANDROID_DIST_FIREBASE_APP_ID}" service_credentials_file:"${FIREBASE_JSON_KEY_FILE}" apk_path:"${EXPO_BINARY_FILE_PATH}"
+                    fi
+                    ;;
+                esac
+            fi
         fi
 
     done
