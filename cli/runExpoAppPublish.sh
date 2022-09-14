@@ -593,24 +593,27 @@ function main() {
 
     yes | npx "${expo_npx_base_args[@]}" expo export "${expo_url_args[@]}" --dump-sourcemap --dump-assetmap --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}" || return $?
 
-    EXPO_ID_OVERRIDE="$(jq -r '.BuildConfig.EXPO_ID_OVERRIDE' <"${CONFIG_FILE}")"
-    if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
+    if [[ "${EXPO_SDK_MAJOR_VERSION}" -lt "45" ]]; then
 
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
-        mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+        EXPO_ID_OVERRIDE="$(jq -r '.BuildConfig.EXPO_ID_OVERRIDE' <"${CONFIG_FILE}")"
+        if [[ "${EXPO_ID_OVERRIDE}" != "null" && -n "${EXPO_ID_OVERRIDE}" ]]; then
 
-        jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
-        mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
+            mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
 
-    fi
+            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
+            mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
 
-    if [[ -n "${BUILD_REFERENCE}" ]]; then
-        info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
-        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
-        mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+        fi
 
-        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
-        mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+        if [[ -n "${BUILD_REFERENCE}" ]]; then
+            info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
+            jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
+            mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+
+            jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
+            mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+        fi
     fi
 
     info "Copying OTA to CDN"
@@ -633,7 +636,12 @@ function main() {
     for build_format in "${BUILD_FORMATS[@]}"; do
 
         BINARY_FILE_PREFIX="${build_format}"
-        EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
+
+        if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
+            EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/metadata.json"
+        else
+            EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
+        fi
 
         case "${build_format}" in
         "android")
