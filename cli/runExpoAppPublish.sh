@@ -583,15 +583,6 @@ function main() {
     if [[ ! -d "${SRC_PATH}/ios" && ! -d "${SRC_PATH}/android" ]]; then
         if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
             expo_prebuild_args=("--no-install" "--clean")
-            case "${NODE_PACKAGE_MANAGER}" in
-            "yarn")
-                expo_prebuild_args=("${expo_prebuild_args[@]}" "--yarn")
-                ;;
-
-            "npm")
-                expo_prebuild_args=("${expo_prebuild_args[@]}" "--npm")
-                ;;
-            esac
             npx expo prebuild "${expo_prebuild_args[@]}" || return $?
         else
             fatal "Native folders could not be found for mobile builds ensure android and ios dirs exist"
