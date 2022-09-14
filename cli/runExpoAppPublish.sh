@@ -84,7 +84,7 @@ DEFAULT_IOS_DIST_NON_EXEMPT_ENCRYPTION="false"
 tmpdir="$(getTempDir "cote_inf_XXX")"
 npm_tool_cache="$(getTempDir "cote_npm_XXX")"
 
-npx_base_args="--quiet --cache ${npm_tool_cache}"
+npx_base_args=("--quiet" "--cache" "${npm_tool_cache}")
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -453,7 +453,7 @@ function main() {
 
     BUILD_BINARY="false"
 
-    TURTLE_EXTRA_BUILD_ARGS="--release-channel ${RELEASE_CHANNEL}"
+    TURTLE_EXTRA_BUILD_ARGS=("--release-channel" "${RELEASE_CHANNEL}")
 
     # Prepare the code build environment
     info "Getting source code from from s3://${SRC_BUCKET}/${SRC_PREFIX}/scripts.zip"
@@ -587,7 +587,7 @@ function main() {
         expo_npx_base_args=()
         expo_url_args=()
     else
-        expo_npx_base_args=("${npx_base_args}" "--package" "${EXPO_PACKAGE}")
+        expo_npx_base_args=("${npx_base_args[@]}" "--package" "${EXPO_PACKAGE}")
         expo_url_args=("--public-url" "${EXPO_VERSION_PUBLIC_URL}" "--asset-url" "${PUBLIC_ASSETS_PATH}")
     fi
 
@@ -649,7 +649,7 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_FIREBASE_APP_ID" "${KMS_PREFIX}" "${AWS_REGION}"
             FIREBASE_JSON_KEY_FILE="${OPS_PATH}/firebase_json_key.json"
 
-            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --keystore-path ${ANDROID_DIST_KEYSTORE_FILE} --keystore-alias ${ANDROID_DIST_KEY_ALIAS} --type apk -mode release"
+            TURTLE_EXTRA_BUILD_ARGS=("${TURTLE_EXTRA_BUILD_ARGS[@]}" "--keystore-path" "${ANDROID_DIST_KEYSTORE_FILE}" "--keystore-alias" "${ANDROID_DIST_KEY_ALIAS}" "--type" "apk" "-mode" "release")
             ;;
 
         "ios")
@@ -673,7 +673,7 @@ function main() {
             IOS_DIST_CODESIGN_IDENTITY="${IOS_DIST_CODESIGN_IDENTITY:-${DEFAULT_IOS_DIST_CODESIGN_IDENTITY}}"
 
             # Turtle Specific overrides
-            TURTLE_EXTRA_BUILD_ARGS="${TURTLE_EXTRA_BUILD_ARGS} --team-id ${IOS_DIST_APPLE_ID} --dist-p12-path ${IOS_DIST_P12_FILE} --provisioning-profile-path ${IOS_DIST_PROVISIONING_PROFILE}"
+            TURTLE_EXTRA_BUILD_ARGS=("${TURTLE_EXTRA_BUILD_ARGS[@]}" "--team-id" "${IOS_DIST_APPLE_ID}" "--dist-p12-path" "${IOS_DIST_P12_FILE}" "--provisioning-profile-path" "${IOS_DIST_PROVISIONING_PROFILE}")
             export EXPO_IOS_DIST_P12_PASSWORD="${IOS_DIST_P12_PASSWORD}"
             ;;
         "*")
@@ -696,10 +696,10 @@ function main() {
                 if [[ -n "${TURTLE_EXPO_SDK_VERSION}" ]]; then
                     turtle_setup_extra_args=("${turtle_setup_extra_args[@]}" "--sdk-version" "${TURTLE_EXPO_SDK_VERSION}")
                 fi
-                yes | npx "${npx_base_args}" --package "${TURTLE_PACKAGE}" turtle setup:"${build_format}" "${turtle_setup_extra_args[@]}" || return $?
+                yes | npx "${npx_base_args[@]}" --package "${TURTLE_PACKAGE}" turtle setup:"${build_format}" "${turtle_setup_extra_args[@]}" || return $?
 
                 # Build using turtle
-                yes | npx "${npx_base_args}" --package "${TURTLE_PACKAGE}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" "${TURTLE_EXTRA_BUILD_ARGS}" "${SRC_PATH}" || return $?
+                yes | npx "${npx_base_args[@]}" --package "${TURTLE_PACKAGE}" turtle build:"${build_format}" --public-url "${EXPO_MANIFEST_URL}" --output "${EXPO_BINARY_FILE_PATH}" "${TURTLE_EXTRA_BUILD_ARGS[@]}" "${SRC_PATH}" || return $?
                 ;;
 
             "fastlane")
