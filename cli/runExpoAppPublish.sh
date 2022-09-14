@@ -581,6 +581,8 @@ function main() {
     # Support using prebuild service or require that ejected directorries exist
     if [[ ! -d "${SRC_PATH}/ios" && ! -d "${SRC_PATH}/android" ]]; then
         if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
+            EXPO_PROJECT_SLUG="$(jq -r '.expo.name' <./app.json)"
+
             expo_prebuild_args=("--clean")
             case "${NODE_PACKAGE_MANAGER}" in
             "yarn")
