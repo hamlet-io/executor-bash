@@ -212,32 +212,6 @@ EOF
     bundle exec fastlane install_plugins || return $?
 }
 
-function update_podfile_signing() {
-    local pod_file="$1"
-    shift
-
-    if ! (grep "CODE_SIGNING_ALLOWED" "${pod_file}" | grep -q "NO"); then
-        if grep -Fq "post_install do |installer|" "${pod_file}"; then
-            sed -i '' '/[:space:]*post_install do |installer|/a \
-                installer.pods_project.targets.each do |target|\
-                    target.build_configurations.each do |config|\
-                        config.build_settings['"'"'CODE_SIGNING_ALLOWED'"'"'] = "NO"\
-                    end\
-                end\
-            ' "${pod_file}"
-        else
-            cat <<EOF >>"${pod_file}"
-post_install do |installer|
-    installer.pods_project.targets.each do |target|
-        target.build_configurations.each do |config|
-            config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
-        end
-    end
-end
-EOF
-        fi
-    fi
-}
 
 function usage() {
     cat <<EOF
@@ -814,8 +788,6 @@ function main() {
             done
 
             bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
-
-            update_podfile_signing "${FASTLANE_IOS_PODFILE}" || return $?
 
             if [[ "${BUILD_LOGS}" == "true" ]]; then
                 FASTLANE_IOS_SILENT="false"
