@@ -214,7 +214,7 @@ EOF
 function update_podfile_signing() {
     local pod_file="$1"; shift
 
-    cat <<EOF  > ${pod_file}
+    cat <<EOF  >> "${pod_file}"
 post_install do |installer|
     installer.pods_project.targets.each do |target|
         target.build_configurations.each do |config|
@@ -689,7 +689,6 @@ function main() {
             FASTLANE_IOS_PROJECT_FILE="ios/${EXPO_PROJECT_SLUG}.xcodeproj"
             FASTLANE_IOS_WORKSPACE_FILE="ios/${EXPO_PROJECT_SLUG}.xcworkspace"
             FASTLANE_IOS_PODFILE="ios/Podfile"
-            FASTLANE_IOS_PODS_PROJECT_FILE="ios/Pods/Pods.xcodeproj"
 
             # Update App details
             # Pre SDK37, Expokit maintained an Info.plist in Supporting
