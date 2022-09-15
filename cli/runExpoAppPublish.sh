@@ -241,38 +241,6 @@ EOF
     fi
 }
 
-function update_podfile_bitcode() {
-    local pod_file="$1"; shift
-
-    if ! grep -Fq "['ENABLE_BITCODE'] = \"YES\"" "${pod_file}"; then
-        if grep -Fq "post_install do |installer|" "${pod_file}"; then
-            sed -i '' '/[:space:]*post_install do |installer|/a \
-                installer.pods_project.targets.each do |target|\
-                    target.build_configurations.each do |config|\
-                        cflags = config.build_settings['"'"'OTHER_CFLAGS'"'"'] || ['"'"'$(inherited)'"'"']\
-                        cflags << '"'"'-fembed-bitcode'"'"'\
-                        config.build_settings['"'"'OTHER_CFLAGS'"'"'] = cflags\
-                        config.build_settings['"'"'ENABLE_BITCODE'"'"'] = "YES"\
-                    end\
-                end\
-            ' "${pod_file}"
-        else
-            cat <<EOF  >> "${pod_file}"
-post_install do |installer|
-    installer.pods_project.targets.each do |target|
-        target.build_configurations.each do |config|
-            cflags = config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']
-            cflags << '-fembed-bitcode'
-            config.build_settings['OTHER_CFLAGS'] = cflags
-            config.build_settings['ENABLE_BITCODE'] = 'YES'
-        end
-    end
-end
-EOF
-        fi
-    fi
-}
-
 
 function usage() {
     cat <<EOF
@@ -841,8 +809,7 @@ function main() {
 
             bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
-            update_podfile_signing "${FASTLANE_IOS_PODFILE}"
-            update_podfile_bitcode "${FASTLANE_IOS_PODFILE}"
+            update_podfile_signing "${FASTLANE_IOS_PODFILE}" || return $?
 
             if [[ "${BUILD_LOGS}" == "true" ]]; then
                 FASTLANE_IOS_SILENT="false"
@@ -852,7 +819,7 @@ function main() {
 
             # Build App
             bundle exec fastlane run cocoapods silent:"${FASTLANE_IOS_SILENT}" podfile:"${FASTLANE_IOS_PODFILE}" try_repo_update_on_error:"true" || return $?
-            bundle exec fastlane run build_ios_app suppress_xcode_output:"${FASTLANE_IOS_SILENT}" silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" include_symbols:"true" include_bitcode:"true" || return $?
+            bundle exec fastlane run build_ios_app suppress_xcode_output:"${FASTLANE_IOS_SILENT}" silent:"${FASTLANE_IOS_SILENT}" workspace:"${FASTLANE_IOS_WORKSPACE_FILE}" output_directory:"${BINARY_PATH}" output_name:"${EXPO_BINARY_FILE_NAME}" export_method:"${IOS_DIST_EXPORT_METHOD}" codesigning_identity:"${CODESIGN_IDENTITY}" || return $?
         fi
 
         if [[ "${build_format}" == "android" ]]; then
