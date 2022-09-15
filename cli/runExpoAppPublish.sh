@@ -241,6 +241,38 @@ EOF
     fi
 }
 
+function update_podfile_bitcode() {
+    local pod_file="$1"; shift
+
+    if ! grep -Fq "['ENABLE_BITCODE'] = \"YES\"" "${pod_file}"; then
+        if grep -Fq "post_install do |installer|" "${pod_file}"; then
+            sed -i '' '/[:space:]*post_install do |installer|/a \
+                installer.pods_project.targets.each do |target|\
+                    target.build_configurations.each do |config|\
+                        cflags = config.build_settings['"'"'OTHER_CFLAGS'"'"'] || ['"'"'$(inherited)'"'"']\
+                        cflags << '"'"'-fembed-bitcode'"'"'\
+                        config.build_settings['"'"'OTHER_CFLAGS'"'"'] = cflags\
+                        config.build_settings['"'"'ENABLE_BITCODE'"'"'] = "YES"\
+                    end\
+                end\
+            ' "${pod_file}"
+        else
+            cat <<EOF  >> "${pod_file}"
+post_install do |installer|
+    installer.pods_project.targets.each do |target|
+        target.build_configurations.each do |config|
+            cflags = config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']
+            cflags << '-fembed-bitcode'
+            config.build_settings['OTHER_CFLAGS'] = cflags
+            config.build_settings['ENABLE_BITCODE'] = 'YES'
+        end
+    end
+end
+EOF
+        fi
+    fi
+}
+
 
 function usage() {
     cat <<EOF
@@ -810,6 +842,7 @@ function main() {
             bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
             update_podfile_signing "${FASTLANE_IOS_PODFILE}"
+            update_podfile_bitcode "${FASTLANE_IOS_PODFILE}"
 
             if [[ "${BUILD_LOGS}" == "true" ]]; then
                 FASTLANE_IOS_SILENT="false"
