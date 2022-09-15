@@ -672,6 +672,7 @@ function main() {
             FASTLANE_IOS_PROJECT_FILE="ios/${EXPO_PROJECT_SLUG}.xcodeproj"
             FASTLANE_IOS_WORKSPACE_FILE="ios/${EXPO_PROJECT_SLUG}.xcworkspace"
             FASTLANE_IOS_PODFILE="ios/Podfile"
+            FASTLANE_IOS_PODS_PROJECT_FILE="ios/Pods/Pods.xcodeproj"
 
             # Update App details
             # Pre SDK37, Expokit maintained an Info.plist in Supporting
@@ -778,6 +779,8 @@ function main() {
             done
 
             bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
+            # Update code signinig across Pods projects to ensure they are ready for use with distribution signing
+            bundle exec fastlane run update_code_signing_settings use_automatic_signing:false path:"${FASTLANE_IOS_PODS_PROJECT_FILE}" team_id:"${IOS_DIST_APPLE_ID}" code_sign_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
 
             if [[ "${BUILD_LOGS}" == "true" ]]; then
                 FASTLANE_IOS_SILENT="false"
