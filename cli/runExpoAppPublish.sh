@@ -214,7 +214,18 @@ EOF
 function update_podfile_signing() {
     local pod_file="$1"; shift
 
-    cat <<EOF  >> "${pod_file}"
+    if grep "\s*post_install do |installer|$" ; then
+        sed '/\s*post_install do |installer|$/a \
+            installer.pods_project.targets.each do |target|\
+                target.build_configurations.each do |config|\
+                    config.build_settings['"'"'EXPANDED_CODE_SIGN_IDENTITY'"'"'] = ""\
+                    config.build_settings['"'"'CODE_SIGNING_REQUIRED'"'"'] = "NO"\
+                    config.build_settings['"'"'CODE_SIGNING_ALLOWED'"'"'] = "NO"\
+                end\
+            end\
+        ' "${pod_file}"
+    else
+        cat <<EOF  >> "${pod_file}"
 post_install do |installer|
     installer.pods_project.targets.each do |target|
         target.build_configurations.each do |config|
@@ -226,6 +237,7 @@ post_install do |installer|
 end
 EOF
 
+    fi
 }
 
 
