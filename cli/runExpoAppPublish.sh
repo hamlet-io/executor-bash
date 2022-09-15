@@ -61,10 +61,6 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 #Defaults
 DEFAULT_ENVIRONMENT_BADGE="false"
 
-DEFAULT_RUN_SETUP="false"
-DEFAULT_FORCE_BINARY_BUILD="false"
-DEFAULT_SUBMIT_BINARY="false"
-
 DEFAULT_NODE_PACKAGE_MANAGER="yarn"
 
 DEFAULT_APP_VERSION_SOURCE="manifest"
@@ -157,37 +153,23 @@ function set_android_manifest_property() {
     return 0
 }
 
-function env_setup() {
-
-    # Homebrew install
-    brew upgrade || return $?
-    brew install \
-        jq \
-        yarn \
-        python || return $?
-
-    brew cask upgrade || return $?
-    brew cask install fastlane android-studio || return $?
-    brew link --overwrite fastlane
-
-    # Install android sdk components
-    # - Download the command line tools so that we can then install the appropriate tools in a shared location
-    export ANDROID_HOME=$HOME/Library/Android/sdk
-    rm -rf /usr/local/share/android-commandlinetools
-    mkdir -p /usr/local/share/android-commandlinetools
-    curl -o /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip --url https://dl.google.com/android/repository/commandlinetools-mac-6609375_latest.zip
-    unzip /usr/local/share/android-commandlinetools/commandlinetools-mac-6609375_latest.zip -d /usr/local/share/android-commandlinetools/
-
-    # - Accept Licenses
-    yes | /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root="${ANDROID_HOME}" --licenses
-
-    # - Install required packages
-    /usr/local/share/android-commandlinetools/tools/bin/sdkmanager --sdk_root="${ANDROID_HOME}" 'cmdline-tools;latest' 'platforms;android-30' 'platforms;android-10' 'build-tools;30.0.2'
-
-    # Make sure we have required software installed
-    pip3 install \
-        awscli \
-        yq || return $?
+function check_deps() {
+    which jq || {
+        fatal "Could not find jq on PATH - make sure that jq is installed"
+        return 1
+    }
+    which yq || {
+        fatal "Could not find yq on PATH - ensure https://pypi.org/project/yq/ is installed"
+        return 1
+    }
+    which aws || {
+        fatal "Could not find the aws cli on PATH - ensure that it is installed"
+        return 1
+    }
+    which bundle || {
+        fatal "Could not find the ruby gem bundle command on PATH - ensure that ruby is installed"
+        return 1
+    }
 }
 
 function setup_fastlane_plugins() {
@@ -212,7 +194,6 @@ EOF
     bundle exec fastlane install_plugins || return $?
 }
 
-
 function usage() {
     cat <<EOF
 
@@ -225,10 +206,7 @@ where
     -h                              shows this text
 (m) -u DEPLOYMENT_UNIT              is the mobile app deployment unit
 (o) -g DEPLOYMENT_GROUP             is the group the deployment unit belongs to
-(o) -s RUN_SETUP                    run setup installation to prepare
-(o) -f FORCE_BINARY_BUILD           force the build of binary images
 (o) -n NODE_PACKAGE_MANAGER         Set the node package manager for app installation
-(o) -m SUBMIT_BINARY                submit the binary for testing
 (o) -v APP_VERSION_SOURCE           sets what to use for the app version ( cmdb | manifest)
 (o) -l BUILD_LOGS                   show the build logs for binary builds
 (o) -e ENVIRONMENT_BADGE            add a badge to the app icons with the environment
@@ -239,8 +217,6 @@ where
 
 DEFAULTS:
 BUILD_FORMATS = ${DEFAULT_BUILD_FORMATS}
-RUN_SETUP = ${DEFAULT_RUN_SETUP}
-SUBMIT_BINARY = ${DEFAULT_SUBMIT_BINARY}
 NODE_PACKAGE_MANAGER = ${DEFAULT_NODE_PACKAGE_MANAGER}
 APP_VERSION_SOURCE = ${DEFAULT_APP_VERSION_SOURCE}
 BUILD_LOGS = ${DEFAULT_BUILD_LOGS}
@@ -264,22 +240,13 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":b:d:efg:hk:lmn:o:st:u:v:" opt; do
+    while getopts ":d:eg:hk:ln:o:u:v:" opt; do
         case $opt in
-        b)
-            echo "-b has been deprecated and can be removed"
-            ;;
-        t)
-            echo "-t has been deprecated and can be removed"
-            ;;
         d)
             ENVIRONMENT_BADGE_CONTENT="${OPTARG}"
             ;;
         e)
             ENVIRONMENT_BADGE="true"
-            ;;
-        f)
-            FORCE_BINARY_BUILD="true"
             ;;
         g)
             DEPLOYMENT_GROUP="${OPTARG}"
@@ -293,9 +260,6 @@ function options() {
         l)
             BUILD_LOGS="true"
             ;;
-        m)
-            SUBMIT_BINARY="true"
-            ;;
         n)
             NODE_PACKAGE_MANAGER="${OPTARG}"
             ;;
@@ -304,9 +268,6 @@ function options() {
             ;;
         u)
             DEPLOYMENT_UNIT="${OPTARG}"
-            ;;
-        s)
-            RUN_SETUP="true"
             ;;
         v)
             APP_VERSION_SOURCE="${OPTARG}"
@@ -326,9 +287,6 @@ function options() {
     fi
     EXPO_PACKAGE="expo-cli@${EXPO_VERSION}"
 
-    RUN_SETUP="${RUN_SETUP:-DEFAULT_RUN_SETUP}"
-    FORCE_BINARY_BUILD="${FORCE_BINARY_BUILD:-$DEFAULT_FORCE_BINARY_BUILD}"
-    SUBMIT_BINARY="${SUBMIT_BINARY:-DEFAULT_SUBMIT_BINARY}"
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     APP_VERSION_SOURCE="${APP_VERSION_SOURCE:-${DEFAULT_APP_VERSION_SOURCE}}"
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
@@ -341,10 +299,7 @@ function options() {
 function main() {
 
     options "$@" || return $?
-
-    if [[ "${RUN_SETUP}" == "true" ]]; then
-        env_setup || return $?
-    fi
+    check_deps || return $?
 
     # Fastlane Standard config
     export LC_ALL=en_US.UTF-8
@@ -353,13 +308,6 @@ function main() {
     export FASTLANE_HIDE_CHANGELOG="true"
     export FASTLANE_HIDE_PLUGINS_TABLE="true"
     export FASTLANE_DISABLE_COLORS=1
-
-    # Add android SDK tools to path
-    export ANDROID_HOME=$HOME/Library/Android/sdk
-    export PATH=$PATH:$ANDROID_HOME/emulator
-    export PATH=$PATH:$ANDROID_HOME/tools
-    export PATH=$PATH:$ANDROID_HOME/tools/bin
-    export PATH=$PATH:$ANDROID_HOME/platform-tools
 
     # Ensure mandatory arguments have been provided
     check_for_invalid_environment_variables "DEPLOYMENT_UNIT" || return $?
@@ -395,7 +343,6 @@ function main() {
     mkdir -p "${BINARY_PATH}"
     mkdir -p "${SRC_PATH}"
     mkdir -p "${OPS_PATH}"
-    mkdir -p "${REPORTS_PATH}"
 
     # Get config file
     CONFIG_BUCKET="$(jq -r '.Occurrence.State.Attributes.CONFIG_BUCKET' <"${BUILD_BLUEPRINT}")"
@@ -451,11 +398,11 @@ function main() {
     # Support the usual node package manager preferences
     case "${NODE_PACKAGE_MANAGER}" in
     "yarn")
-        yarn install --production=false
+        yarn install --production=false || return $?
         ;;
 
     "npm")
-        npm ci
+        npm ci || return $?
         ;;
     esac
 
@@ -641,6 +588,12 @@ function main() {
             ;;
 
         "ios")
+
+            [[ $OSTYPE != 'darwin'* ]] && {
+                fatal "ios build format requires a macOS based host"
+                return 1
+            }
+
             BINARY_FILE_EXTENSION="ipa"
 
             export IOS_DIST_PROVISIONING_PROFILE_BASE="ios_profile"
@@ -868,16 +821,16 @@ function main() {
         fi
 
         if [[ -f "${EXPO_BINARY_FILE_PATH}" ]]; then
+            info "Copying app binary to s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/"
             aws --region "${AWS_REGION}" s3 sync --only-show-errors --exclude "*" --include "${BINARY_FILE_PREFIX}*" "${BINARY_PATH}" "s3://${APPDATA_BUCKET}/${EXPO_APPDATA_PREFIX}/" || return $?
 
-            if [[ "${SUBMIT_BINARY}" == "true" ]]; then
-                case "${build_format}" in
-                "ios")
-
+            case "${build_format}" in
+            "ios")
+                if [[ "${IOS_DIST_EXPORT_METHOD}" == "app-store" ]]; then
                     # Ensure mandatory arguments have been provided
                     if [[ -z "${IOS_TESTFLIGHT_USERNAME}" || -z "${IOS_TESTFLIGHT_PASSWORD}" || -z "${IOS_DIST_APP_ID}" ]]; then
-                        warning "IOS - TestFlight details not found please provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID - Skipping push"
-                        continue
+                        fatal "IOS - TestFlight details not found provide IOS_TESTFLIGHT_USERNAME, IOS_TESTFLIGHT_PASSWORD and IOS_DIST_APP_ID or change IOS_DIST_EXPORT_METHOD from app-store"
+                        return 255
                     fi
 
                     info "Submitting IOS binary to testflight"
@@ -888,21 +841,21 @@ function main() {
                         export FASTLANE_ITUNES_TRANSPORTER_PATH=/Applications/Transporter.app/Contents/itms
                     fi
                     bundle exec fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
-                    ;;
+                fi
+                ;;
 
-                "android")
-                    if [[ -n "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
-                        info "Submitting android build to play store"
-                        bundle exec fastlane run upload_to_play_store apk:"${EXPO_BINARY_FILE_PATH}" track:"beta" json_key_data:"${ANDROID_PLAYSTORE_JSON_KEY}"
-                    fi
+            "android")
+                if [[ -n "${ANDROID_PLAYSTORE_JSON_KEY}" ]]; then
+                    info "Submitting android build to play store"
+                    bundle exec fastlane run upload_to_play_store apk:"${EXPO_BINARY_FILE_PATH}" track:"beta" json_key_data:"${ANDROID_PLAYSTORE_JSON_KEY}"
+                fi
 
-                    if [[ -f "${FIREBASE_JSON_KEY_FILE}" ]]; then
-                        info "Submitting android build to firebase"
-                        bundle exec fastlane run firebase_app_distribution app:"${ANDROID_DIST_FIREBASE_APP_ID}" service_credentials_file:"${FIREBASE_JSON_KEY_FILE}" apk_path:"${EXPO_BINARY_FILE_PATH}"
-                    fi
-                    ;;
-                esac
-            fi
+                if [[ -f "${FIREBASE_JSON_KEY_FILE}" ]]; then
+                    info "Submitting android build to firebase"
+                    bundle exec fastlane run firebase_app_distribution app:"${ANDROID_DIST_FIREBASE_APP_ID}" service_credentials_file:"${FIREBASE_JSON_KEY_FILE}" apk_path:"${EXPO_BINARY_FILE_PATH}"
+                fi
+                ;;
+            esac
         fi
 
     done
