@@ -882,6 +882,11 @@ function main() {
 
                     info "Submitting IOS binary to testflight"
                     export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
+                    # Handle removal of Transporter from xcode/Developer tools
+                    if [[ -d "/Applications/Transporter.app/Contents/itms" ]]; then
+                        export FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT=1
+                        export FASTLANE_ITUNES_TRANSPORTER_PATH=/Applications/Transporter.app/Contents/itms
+                    fi
                     bundle exec fastlane run upload_to_testflight skip_waiting_for_build_processing:true apple_id:"${IOS_DIST_APP_ID}" ipa:"${EXPO_BINARY_FILE_PATH}" username:"${IOS_TESTFLIGHT_USERNAME}" || return $?
                     ;;
 
