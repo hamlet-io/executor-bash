@@ -216,13 +216,11 @@ function update_podfile_signing() {
     local pod_file="$1"
     shift
 
-    if ! grep -Fq "['CODE_SIGNING_REQUIRED'] = \"NO\"" "${pod_file}"; then
+    if ! grep -Fq "['CODE_SIGNING_ALLOWED'] = \"NO\"" "${pod_file}"; then
         if grep -Fq "post_install do |installer|" "${pod_file}"; then
             sed -i '' '/[:space:]*post_install do |installer|/a \
                 installer.pods_project.targets.each do |target|\
                     target.build_configurations.each do |config|\
-                        config.build_settings['"'"'EXPANDED_CODE_SIGN_IDENTITY'"'"'] = ""\
-                        config.build_settings['"'"'CODE_SIGNING_REQUIRED'"'"'] = "NO"\
                         config.build_settings['"'"'CODE_SIGNING_ALLOWED'"'"'] = "NO"\
                     end\
                 end\
@@ -232,8 +230,6 @@ function update_podfile_signing() {
 post_install do |installer|
     installer.pods_project.targets.each do |target|
         target.build_configurations.each do |config|
-            config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
-            config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
             config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
         end
     end
