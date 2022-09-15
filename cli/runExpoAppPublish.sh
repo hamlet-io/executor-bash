@@ -216,7 +216,7 @@ function update_podfile_signing() {
     local pod_file="$1"
     shift
 
-    if ! grep -Fq "['CODE_SIGNING_ALLOWED'] = \"NO\"" "${pod_file}"; then
+    if ! (grep "CODE_SIGNING_ALLOWED" "${pod_file}" | grep -q "NO"); then
         if grep -Fq "post_install do |installer|" "${pod_file}"; then
             sed -i '' '/[:space:]*post_install do |installer|/a \
                 installer.pods_project.targets.each do |target|\
