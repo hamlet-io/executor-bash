@@ -476,18 +476,17 @@ function main() {
 
         fi
 
-        if [[ -n "${BUILD_REFERENCE}" ]]; then
-            info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
-            jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
-            mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+        info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
+        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
+        mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
 
-            jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
-            mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
-        fi
+        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
+        mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
     fi
 
     info "Copying OTA to CDN"
     aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${OTA_ARTEFACT_BUCKET}/${OTA_ARTEFACT_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}" || return $?
+    aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${OTA_ARTEFACT_BUCKET}/${OTA_ARTEFACT_PREFIX}/archive/${BUILD_REFERENCE}" || return $?
 
     # Support using prebuild service or require that ejected directories exist
     if [[ ( "${BUILD_FORMATS[*]}" == *ios* && ! -d "${SRC_PATH}/${IOS_PROJECT_ROOT_DIR}" ) ||
