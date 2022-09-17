@@ -20,13 +20,11 @@ function cleanup_bundler {
     BUNDLER_PID=$(trim "$(lsof -i :8081 -t)")
     if [[ -n "${BUNDLER_PID}" ]]; then
         BUNDLER_PARENT=$(trim "$(ps -o ppid= "${BUNDLER_PID}")")
-        echo "Bundler found, pid=${BUNDLER_PID}, ppid=${BUNDLER_PARENT} ..."
+        echo "Bundler found, pid=${BUNDLER_PID}, ppid=${BUNDLER_PARENT}, cleaning up"
         if [[ -n "${BUNDLER_PID}" && (${BUNDLER_PID} != 1) ]]; then
-            echo "Killing bundler, pid=${BUNDLER_PID} ..."
             kill -9 "${BUNDLER_PID}" || return $?
         fi
         if [[ -n "${BUNDLER_PARENT}" && (${BUNDLER_PARENT} != 1) ]]; then
-            echo "Killing bundler parent, pid=${BUNDLER_PARENT} ..."
             kill -9 "${BUNDLER_PARENT}" || return $?
         fi
     fi
@@ -36,13 +34,13 @@ function cleanup_bundler {
 function cleanup {
     # Make sure we always remove keychains that we create
     if [[ -f "${FASTLANE_KEYCHAIN_PATH}" ]]; then
-        echo "Deleting keychain ${FASTLANE_KEYCHAIN_PATH} ..."
+        echo "Deleting keychain ${FASTLANE_KEYCHAIN_PATH}"
         security delete-keychain "${FASTLANE_KEYCHAIN_PATH}"
     fi
 
     if [[ -n "${OPS_PATH}" ]]; then
         for f in "${OPS_PATH}"/*.keychain; do
-            echo "Deleting keychain ${f} ..."
+            echo "Deleting keychain ${f}"
             security delete-keychain "${f}"
         done
     fi
@@ -64,9 +62,6 @@ DEFAULT_BUILD_LOGS="false"
 DEFAULT_DEPLOYMENT_GROUP="application"
 
 tmpdir="$(getTempDir "cote_inf_XXX")"
-npm_tool_cache="$(getTempDir "cote_npm_XXX")"
-
-npx_base_args=("--quiet" "--cache" "${npm_tool_cache}")
 
 # Get the generation context so we can run template generation
 . "${GENERATION_BASE_DIR}/execution/setContext.sh"
@@ -87,7 +82,7 @@ function get_configfile_property() {
     propertyValue="$(jq -r --arg propertyName "${propertyName}" '.BuildConfig[$propertyName] | select (.!=null)' <"${configfile}")"
 
     if [[ "${propertyValue}" == ${kmsPrefix}* ]]; then
-        echo "AWS KMS - Decrypting property ${propertyName}..."
+        echo "AWS KMS - Decrypting property ${propertyName}"
         propertyValue="$(decrypt_kms_string "${awsRegion}" "${propertyValue#"${kmsPrefix}"}" || return 128)"
     fi
 
@@ -144,19 +139,19 @@ function set_android_manifest_property() {
 }
 
 function check_deps() {
-    which jq || {
+    which -s jq || {
         fatal "Could not find jq on PATH - make sure that jq is installed"
         return 1
     }
-    which yq || {
+    which -s yq || {
         fatal "Could not find yq on PATH - ensure https://pypi.org/project/yq/ is installed"
         return 1
     }
-    which aws || {
+    which -s aws || {
         fatal "Could not find the aws cli on PATH - ensure that it is installed"
         return 1
     }
-    which bundle || {
+    which -s bundle || {
         fatal "Could not find the ruby gem bundle command on PATH - ensure that ruby is installed"
         return 1
     }
@@ -243,15 +238,6 @@ function options() {
         esac
     done
 
-    #Defaults
-    if [[ -z "${EXPO_VERSION}" ]]; then
-        EXPO_GLOBAL_CLI_VERSION="$(npm info expo-cli --json | jq -r ".version")"
-    fi
-    EXPO_PACKAGE="expo-cli@${EXPO_GLOBAL_CLI_VERSION}"
-
-    arrayFromList EXPO_GLOBAL_CLI_VERSION_PARTS "$(semver_valid "${EXPO_AEXPO_GLOBAL_CLI_VERSIONPP_VERSION}")"
-    EXPO_GLOBAL_CLI_MAJOR_VERSION="${EXPO_APP_VERSION_PARTS[0]}"
-
     NODE_PACKAGE_MANAGER="${NODE_PACKAGE_MANAGER:-${DEFAULT_NODE_PACKAGE_MANAGER}}"
     BUILD_LOGS="${BUILD_LOGS:-${DEFAULT_BUILD_LOGS}}"
     DEPLOYMENT_GROUP="${DEPLOYMENT_GROUP:-${DEFAULT_DEPLOYMENT_GROUP}}"
@@ -305,17 +291,18 @@ function main() {
     mkdir -p "${SRC_PATH}"
     mkdir -p "${OPS_PATH}"
 
+    placement_region="$(jq -r '.Occurrence.State.ResourceGroups.default.Placement.Region | select (.!=null)' <"${BUILD_BLUEPRINT}")"
+    AWS_REGION="${AWS_REGION:-${placement_region}}"
+
     # Get config file
     CONFIG_BUCKET="$(jq -r '.Occurrence.State.Attributes.CONFIG_BUCKET' <"${BUILD_BLUEPRINT}")"
     CONFIG_KEY="$(jq -r '.Occurrence.State.Attributes.CONFIG_FILE' <"${BUILD_BLUEPRINT}")"
     CONFIG_FILE="${OPS_PATH}/config.json"
-    KMS_PREFIX="$(jq -r '.BuildConfig.KMS_PREFIX' <"${CONFIG_FILE}")"
-
-    placement_region="$(jq -r '.Occurrence.State.ResourceGroups.default.Placement.Region | select (.!=null)' <"${BUILD_BLUEPRINT}")"
-    AWS_REGION="${AWS_REGION:-${placement_region}}"
 
     info "Getting configuration file from s3://${CONFIG_BUCKET}/${CONFIG_KEY}"
     aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CONFIG_BUCKET}/${CONFIG_KEY}" "${CONFIG_FILE}" || return $?
+
+    KMS_PREFIX="$(jq -r '.BuildConfig.KMS_PREFIX' <"${CONFIG_FILE}")"
 
     # Operations data - Credentials, config etc.
     get_configfile_property "${CONFIG_FILE}" "OPSDATA_BUCKET" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -344,6 +331,12 @@ function main() {
     get_configfile_property "${CONFIG_FILE}" "IOS_PROJECT_ROOT_DIR" "${KMS_PREFIX}" "${AWS_REGION}"
     get_configfile_property "${CONFIG_FILE}" "ANDROID_PROJECT_ROOT_DIR" "${KMS_PREFIX}" "${AWS_REGION}"
 
+    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_BUNDLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
+    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_DISPLAY_NAME" "${KMS_PREFIX}" "${AWS_REGION}"
+    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
+
+    get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_BUNDLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
+
     # Prepare the code build environment
     info "Getting source code from from s3://${CODE_SRC_BUCKET}/${CODE_SRC_PREFIX}/scripts.zip"
     aws --region "${AWS_REGION}" s3 cp --only-show-errors "s3://${CODE_SRC_BUCKET}/${CODE_SRC_PREFIX}/scripts.zip" "${tmpdir}/scripts.zip" || return $?
@@ -354,8 +347,6 @@ function main() {
         fatal "could not cd into ${SRC_PATH}"
         return $?
     }
-
-    setup_fastlane_plugins "${SRC_PATH}" || return $?
 
     # Support the usual node package manager preferences
     if [[ "${NODE_PACKAGE_MANAGER}" == "auto" ]]; then
@@ -428,71 +419,73 @@ function main() {
     mv "${tmpdir}/environment-app.json" "./app.json"
 
     # Optional app.json overrides
-    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_BUNDLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
     if [[ -n "${IOS_DIST_BUNDLE_ID}" ]]; then
         jq --arg IOS_DIST_BUNDLE_ID "${IOS_DIST_BUNDLE_ID}" '.expo.ios.bundleIdentifier=$IOS_DIST_BUNDLE_ID' <"./app.json" >"${tmpdir}/ios-bundle-app.json"
         mv "${tmpdir}/ios-bundle-app.json" "./app.json"
     fi
 
-    # Override support for the display name used on the app
-    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_DISPLAY_NAME" "${KMS_PREFIX}" "${AWS_REGION}"
-
-    # IOS Non Exempt Encryption
-    get_configfile_property "${CONFIG_FILE}" "IOS_DIST_NON_EXEMPT_ENCRYPTION" "${KMS_PREFIX}" "${AWS_REGION}"
-
     jq --arg IOS_NON_EXEMPT_ENCRYPTION "${IOS_DIST_NON_EXEMPT_ENCRYPTION}" '.expo.ios.config.usesNonExemptEncryption=($IOS_NON_EXEMPT_ENCRYPTION | test("true"))' <"./app.json" >"${tmpdir}/ios-encexempt-app.json"
     mv "${tmpdir}/ios-encexempt-app.json" "./app.json"
 
-    get_configfile_property "${CONFIG_FILE}" "ANDROID_DIST_BUNDLE_ID" "${KMS_PREFIX}" "${AWS_REGION}"
     if [[ -n "${ANDROID_DIST_BUNDLE_ID}" ]]; then
         jq --arg ANDROID_DIST_BUNDLE_ID "${ANDROID_DIST_BUNDLE_ID}" '.expo.android.package=$ANDROID_DIST_BUNDLE_ID' <"./app.json" >"${tmpdir}/android-bundle-app.json"
         mv "${tmpdir}/android-bundle-app.json" "./app.json"
     fi
 
     # Create base OTA
-    info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | expo-cli Version: ${EXPO_VERSION} | Expo SDK Version: ${EXPO_SDK_MAJOR_VERSION}"
+    info "Creating an OTA | App Version: ${EXPO_APP_MAJOR_VERSION} | OTA Version: ${OTA_VERSION} | Expo SDK Version: ${EXPO_SDK_MAJOR_VERSION}"
     EXPO_VERSION_PUBLIC_URL="${OTA_ARTEFACT_URL}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}"
 
-    if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" || "${EXPO_GLOBAL_CLI_MAJOR_VERSION}" -lt "6" ]]; then
+    if [[ "${EXPO_SDK_MAJOR_VERSION}" -ge "46" ]]; then
         expo_npx_base_args=()
         expo_url_args=()
     else
-        expo_npx_base_args=("${npx_base_args[@]}" "--package" "${EXPO_PACKAGE}")
+
+        EXPO_GLOBAL_CLI_VERSION="$(npm info expo-cli --json | jq -r '[.versions[] | select(startswith("5"))][-1]')"
+        EXPO_PACKAGE="expo-cli@${EXPO_GLOBAL_CLI_VERSION}"
+
+        npm_tool_cache="$(getTempDir "cote_npm_XXX")"
+        expo_npx_base_args=("--quiet" "--cache" "${npm_tool_cache}" "--package" "${EXPO_PACKAGE}")
         expo_url_args=("--public-url" "${EXPO_VERSION_PUBLIC_URL}" "--asset-url" "${PUBLIC_ASSETS_PATH}")
     fi
 
     yes | npx "${expo_npx_base_args[@]}" expo export "${expo_url_args[@]}" --dump-sourcemap --dump-assetmap --output-dir "${SRC_PATH}/app/dist/build/${OTA_VERSION}" || return $?
 
-    if [[ "${EXPO_SDK_MAJOR_VERSION}" -lt "46" || "${EXPO_GLOBAL_CLI_MAJOR_VERSION}" -lt "6" ]]; then
+    if [[ "${EXPO_SDK_MAJOR_VERSION}" -le "45" ]]; then
+
+        IOS_INDEX_FILE="${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+        ANDROID_INDEX_FILE="${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+
+        [[ -f "${IOS_INDEX_FILE}" ]] || { fatal "Could not find generated ios ota config file"; return 1;}
+        [[ -f "${ANDROID_INDEX_FILE}" ]] || { fatal "Could not find generated andorid ota config file"; return 1;}
 
         get_configfile_property "${CONFIG_FILE}" "EXPO_ID_OVERRIDE" "${KMS_PREFIX}" "${AWS_REGION}"
         if [[ -n "${EXPO_ID_OVERRIDE}" ]]; then
 
-            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
-            mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${IOS_INDEX_FILE}" >"${tmpdir}/ios-expo-override.json"
+            mv "${tmpdir}/ios-expo-override.json" "${IOS_INDEX_FILE}"
 
-            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
-            mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+            jq -c --arg EXPO_ID_OVERRIDE "${EXPO_ID_OVERRIDE}" '.id=$EXPO_ID_OVERRIDE' < "${ANDROID_INDEX_FILE}" >"${tmpdir}/android-expo-override.json"
+            mv "${tmpdir}/android-expo-override.json" "${ANDROID_INDEX_FILE}"
 
         fi
 
         info "Override revisionId to match the build reference ${BUILD_REFERENCE}"
-        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json" >"${tmpdir}/ios-expo-override.json"
-        mv "${tmpdir}/ios-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/ios-index.json"
+        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${IOS_INDEX_FILE}" >"${tmpdir}/ios-expo-override.json"
+        mv "${tmpdir}/ios-expo-override.json" "${IOS_INDEX_FILE}"
 
-        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json" >"${tmpdir}/android-expo-override.json"
-        mv "${tmpdir}/android-expo-override.json" "${SRC_PATH}/app/dist/build/${OTA_VERSION}/android-index.json"
+        jq -c --arg REVISION_ID "${BUILD_REFERENCE}" '.revisionId=$REVISION_ID' <"${ANDROID_INDEX_FILE}" >"${tmpdir}/android-expo-override.json"
+        mv "${tmpdir}/android-expo-override.json" "${ANDROID_INDEX_FILE}"
     fi
 
     info "Copying OTA to CDN"
     aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${OTA_ARTEFACT_BUCKET}/${OTA_ARTEFACT_PREFIX}/packages/${EXPO_APP_MAJOR_VERSION}/${OTA_VERSION}" || return $?
     aws --region "${AWS_REGION}" s3 sync --only-show-errors --delete "${SRC_PATH}/app/dist/build/${OTA_VERSION}" "s3://${OTA_ARTEFACT_BUCKET}/${OTA_ARTEFACT_PREFIX}/archive/${BUILD_REFERENCE}" || return $?
 
-    # Support using prebuild service or require that ejected directories exist
     if [[ ( "${BUILD_FORMATS[*]}" == *ios* && ! -d "${SRC_PATH}/${IOS_PROJECT_ROOT_DIR}" ) ||
-            ("${BUILD_FORMATS[*]}" == *android* && -d "${SRC_PATH}/${ANDROID_PROJECT_ROOT_DIR}") ]]; then
+            ("${BUILD_FORMATS[*]}" == *android* && ! -d "${SRC_PATH}/${ANDROID_PROJECT_ROOT_DIR}") ]]; then
 
-        if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" ]]; then
+        if [[ "${EXPO_SDK_MAJOR_VERSION}" -ge "46" ]]; then
             EXPO_PROJECT_SLUG="$(jq -r '.expo.name' <./app.json)"
 
             expo_prebuild_args=("--clean")
@@ -513,6 +506,10 @@ function main() {
         fi
     fi
 
+    #-- Fastlane based processes --
+    setup_fastlane_plugins "${SRC_PATH}" || return $?
+
+    #--- Icon Badges --
     # Add a shield to the App icons with the environment for the app
     get_configfile_property "${CONFIG_FILE}" "ENVIRONMENT_BADGE_CONTENT" "${KMS_PREFIX}" "${AWS_REGION}"
     get_configfile_property "${CONFIG_FILE}" "ENVIRONMENT_BADGE_COLOR" "${KMS_PREFIX}" "${AWS_REGION}"
@@ -526,11 +523,12 @@ function main() {
         bundle exec fastlane run add_badge "${badge_args[@]}" "shield_geometry:+0+20%" "glob:/**/src/main/res/mipmap-*/ic_launcher*.png"
     fi
 
+    #--- Run Builds --
     for build_format in "${BUILD_FORMATS[@]}"; do
 
         BINARY_FILE_PREFIX="${build_format}"
 
-        if [[ "${EXPO_SDK_MAJOR_VERSION}" -gt "45" || "${EXPO_GLOBAL_CLI_MAJOR_VERSION}" -lt "6" ]]; then
+        if [[ "${EXPO_SDK_MAJOR_VERSION}" -ge "46" ]]; then
             EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/metadata.json"
         else
             EXPO_MANIFEST_URL="${EXPO_VERSION_PUBLIC_URL}/${build_format}-index.json"
@@ -575,11 +573,11 @@ function main() {
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_FILENAME" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_P12_PASSWORD" "${KMS_PREFIX}" "${AWS_REGION}"
             get_configfile_property "${CONFIG_FILE}" "IOS_DIST_CODESIGN_IDENTITY" "${KMS_PREFIX}" "${AWS_REGION}"
-            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_PROVISIONING_PROFILE_FILENAME" "${KMS_{PREFIX}" "${AWS_REGION}"
+            get_configfile_property "${CONFIG_FILE}" "IOS_DIST_PROVISIONING_PROFILE_FILENAME" "${KMS_PREFIX}" "${AWS_REGION}"
 
             export IOS_DIST_PROVISIONING_PROFILE_BASE="${IOS_DIST_PROVISIONING_PROFILE_FILENAME%.*}"
             export IOS_DIST_PROVISIONING_PROFILE_EXTENSION="${IOS_DIST_PROVISIONING_PROFILE_FILENAME#*.}"
-            export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_BASE}${IOS_DIST_PROVISIONING_PROFILE_EXTENSION}"
+            export IOS_DIST_PROVISIONING_PROFILE="${OPS_PATH}/${IOS_DIST_PROVISIONING_PROFILE_FILENAME}"
             export IOS_DIST_P12_FILE="${OPS_PATH}/${IOS_DIST_P12_FILENAME}"
             ;;
         "*")
@@ -687,7 +685,7 @@ function main() {
                 [[ -z "${TARGET}" ]] && continue
                 # Update the extension target
                 TARGET="${TARGET#_}"
-                echo "Updating target ${TARGET} ..."
+                echo "Updating target ${TARGET}"
                 bundle exec fastlane run install_provisioning_profile path:"${PROFILE}" || return $?
                 bundle exec fastlane run update_project_provisioning xcodeproj:"${FASTLANE_IOS_PROJECT_FILE}" profile:"${PROFILE}" target_filter:".*${TARGET}.*" code_signing_identity:"${IOS_DIST_CODESIGN_IDENTITY}" || return $?
                 # Update the plist file as well if present
@@ -748,9 +746,9 @@ function main() {
                     exit 128
                 fi
 
-                gradle_args="--console=plain"
+                gradle_args=("--console=plain")
                 if [[ "${BUILD_LOGS}" == "false" ]]; then
-                    gradle_args="${gradle_args} --quiet"
+                    gradle_args=("${gradle_args[@]}" "--quiet")
                 fi
 
                 # Run the react build
@@ -758,7 +756,7 @@ function main() {
                     fatal "Could not change to android src dir"
                     return $?
                 }
-                ./gradlew "${gradle_args}" -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
+                ./gradlew "${gradle_args[@]}" -I "${GENERATION_BASE_DIR}/execution/expoAndroidSigning.gradle" assembleRelease || return $?
                 cd "${SRC_PATH}" || {
                     fatal "Could not change to src dir"
                     return $?
@@ -810,6 +808,7 @@ function main() {
 
     done
 
+    info "App Publish completed for ${DEPLOYMENT_GROUP}/${DEPLOYMENT_UNIT}"
     # All good
     return 0
 }
