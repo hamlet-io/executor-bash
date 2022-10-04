@@ -200,12 +200,12 @@ function main() {
         find "${SOURCE_MAP_PATH}" -type f -name "main.jsbundle*" -exec cp {} "${react_source_maps}" \;
         find "${SOURCE_MAP_PATH}" -type f -name "index.android.bundle*" -exec cp {} "${react_source_maps}" \;
 
-        # enfore the react native requirements around paths and url prefix
+        # enforce the react native requirements around paths and url prefix
         SOURCE_MAP_PATH="${react_source_maps}"
 
-        if [[ "${SENTRY_URL_PREFIX}" != "~/" ]]; then
-            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with ~/ to algin with react native requirements"
-            SENTRY_URL_PREFIX="~/"
+        if [[ "${SENTRY_URL_PREFIX}" != "app:///" ]]; then
+            warn "Overrding the provided URL prefix ${SENTRY_URL_PREFIX} with app:/// to align with react native requirements"
+            SENTRY_URL_PREFIX="app:///"
         fi
     ;;
 
