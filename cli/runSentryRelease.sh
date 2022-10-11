@@ -183,7 +183,7 @@ function main() {
         if [[ -n "${android_bundle}" ]]; then
             mv "${android_bundle}" "${SOURCE_MAP_PATH}/index.android.bundle"
             android_map_basename="$(basename "${android_map}")"
-            sed -i "s/${android_map_basename}/index.android.bundle.map/g" "${SOURCE_MAP_PATH}/index.android.bundle"
+            sed -i '' "s/${android_map_basename}/index.android.bundle.map/g" "${SOURCE_MAP_PATH}/index.android.bundle"
         fi
 
         ios_map="$( find "${SOURCE_MAP_PATH}" -type f -name "ios-*.map" )"
@@ -195,7 +195,7 @@ function main() {
         if [[ -n "${ios_bundle}" ]]; then
             mv "${ios_bundle}" "${SOURCE_MAP_PATH}/main.jsbundle"
             ios_map_basename="$(basename "${ios_map}")"
-            sed -i "s/${ios_map_basename}/main.jsbundle.map/g" "${SOURCE_MAP_PATH}/main.jsbundle"
+            sed -i '' "s/${ios_map_basename}/main.jsbundle.map/g" "${SOURCE_MAP_PATH}/main.jsbundle"
         fi
 
         # move the files into a dedicated directory to ensure we upload them as the root
