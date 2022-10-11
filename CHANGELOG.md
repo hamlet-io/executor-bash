@@ -1,6 +1,51 @@
 # Changelog
 
-## latest (2022-07-22)
+## latest (2022-10-11)
+
+#### New Features
+
+* ensure bitcode enabled on all deps
+* support adding to post
+* (expo): update cli usage for SDK 46+
+* support cliv2 kms encrypt ([#345](https://github.com/hamlet-io/executor-bash/issues/345))
+#### Fixes
+
+* add an empty suffix for running on MacOS ([#353](https://github.com/hamlet-io/executor-bash/issues/353))
+* update sourceMappingURL value after bundle rename
+* adjust sentry url prefix react-native apps ([#351](https://github.com/hamlet-io/executor-bash/issues/351))
+* (expo): testing updates for expo publish ([#350](https://github.com/hamlet-io/executor-bash/issues/350))
+* (expo): reinstate archive upload for sourcemaps ([#349](https://github.com/hamlet-io/executor-bash/issues/349))
+* workaround for fastlane missing support for transporter move
+* remove signing config
+* make search for signing more specific
+* limit updates on signing
+* include symbols disable and bitcode
+* remove bitcode and symbols overrides
+* update existing post install
+* pod file update
+* disable signing on 3rd party libraries
+* ensure manual signing enabled on pod project
+* use name instead of slug for project in prebuild
+* version handling for pods and fastlane
+* install of fastlane and install command
+* skip installs
+* add deprecte details for options
+* (expo): sdk differences in updates
+* arg expansion
+* shellcheck updates
+* (expo): use right app version when picking cli
+#### Refactorings
+
+* (expo): align publish script with engine
+* (expo): reduce command line options
+* deprecate turtle and move to prebuild process
+#### Others
+
+* formatting
+
+Full set of changes: [`8.7.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.7.0...latest)
+
+## 8.7.0 (2022-08-23)
 
 #### New Features
 
@@ -17,8 +62,11 @@
 #### Refactorings
 
 * set credentials ([#343](https://github.com/hamlet-io/executor-bash/issues/343))
+#### Others
 
-Full set of changes: [`8.6.2...latest`](https://github.com/hamlet-io/executor-bash/compare/8.6.2...latest)
+* update changelog ([#335](https://github.com/hamlet-io/executor-bash/issues/335))
+
+Full set of changes: [`8.6.2...8.7.0`](https://github.com/hamlet-io/executor-bash/compare/8.6.2...8.7.0)
 
 ## 8.6.2 (2022-06-07)
 
