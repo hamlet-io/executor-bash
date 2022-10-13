@@ -1819,13 +1819,11 @@ function cleanup_elbv2_rules() {
 # -- S3 --
 
 function isBucketAccessible() {
-  local region="$1"; shift
   local bucket="$1"; shift
   local prefix="$1"; shift
 
-  local result_file="$(getTopTempDir)/is_bucket_accessible_XXXXXX.txt"
-
-  aws --region ${region} s3 ls "s3://${bucket}/${prefix}${prefix:+/}" > "${result_file}" 2>&1
+  result_file="$(getTopTempDir)/is_bucket_accessible_XXXXXX.txt"
+  aws s3 ls "s3://${bucket}/${prefix}${prefix:+/}" > "${result_file}" 2>&1
 }
 
 function copyFilesFromBucket() {
@@ -1850,7 +1848,7 @@ function syncFilesToBucket() {
   local optional_arguments=("$@")
 
   # Does the bucket/prefix exist?
-  if isBucketAccessible "${region}" "${bucket}"; then
+  if isBucketAccessible "${bucket}"; then
     pushTempDir "${FUNCNAME[0]}_XXXXXX"
     local tmp_dir="$(getTopTempDir)"
     local return_status
@@ -1924,7 +1922,7 @@ function deleteTreeFromBucket() {
   local optional_arguments=("$@")
 
   # Does the bucket/prefix exist?
-  isBucketAccessible "${region}" "${bucket}" "${prefix}" || return 0
+  isBucketAccessible "${bucket}" "${prefix}" || return 0
 
   # Delete everything below the prefix
   aws --region "${region}" s3 rm "${optional_arguments[@]}" --recursive "s3://${bucket}/${prefix}${prefix:+/}"
@@ -1936,7 +1934,7 @@ function deleteBucket() {
   local optional_arguments=("$@")
 
   # Does the bucket exist?
-  isBucketAccessible "${region}" "${bucket}" || return 0
+  isBucketAccessible "${bucket}" || return 0
 
   # Delete the bucket
   aws --region "${region}" s3 rb "${optional_arguments[@]}" "s3://${bucket}" --force
@@ -3418,42 +3416,15 @@ function create_containter_registry_repository {
 
 
 #-- Image sourcing
-function update_build_reference_from_image {
-  local product="$1"; shift
-  local environment="$1"; shift
-  local segment="$1"; shift
-  local build_unit="$1"; shift
-  local build_reference="$1"; shift
-  local image_format="$1"; shift
-  local source="$1"; shift
-  local reference_unit="$1"; shift
-
-  local settings_dir="$(findGen3ProductSettingsDir "${ROOT_DIR}" "${product}" )"
-  local build_dir="$(findGen3ProductBuildsDir "${ROOT_DIR}" "${product}" )"
-
-  [[ "${build_dir}" == "${settings_dir}" ]] && build_dir="${settings_dir}"
-  local build_unit_path="${build_dir}/${environment}/${segment}/${build_unit}"
-  mkdir -p "${build_unit_path}"
-
-  build_details="$( echo "{ \"Commit\" : \"${build_reference}\", \"Source\" : \"${source}\", \"Formats\" : [ \"${image_format}\" ]}" | jq '.')"
-
-  if [[ -n "${reference_unit}" ]]; then
-    build_details="$( echo "${build_details}" | jq --arg ref "${reference_unit}" '. + { "Reference" : $ref}' )"
-  fi
-
-  echo "${build_details}" | jq --indent 2 "." > "${build_unit_path}/build.json"
-
-}
-
 function get_image_from_url() {
   local url="$1"; shift
   local local_dir="$1"; shift
   local registry_file_name="$1"; shift
 
   if [[ "$( fileExtension "${url}" )" != "zip" ]]; then
-    local local_file="${local_dir}/$(fileName "${url}")"
+    local_file="${local_dir}/$(fileName "${url}")"
   else
-    local local_file="${local_dir}/${registry_file_name}"
+    local_file="${local_dir}/${registry_file_name}"
   fi
 
   curl --fail --show-error -L -o "${local_file}" "${url}" || return $?
@@ -3461,7 +3432,7 @@ function get_image_from_url() {
 
   info "* Url Source image details"
   info "  - url: ${url}"
-  info "  - sha1: $(cat ${local_file}.sha1 )"
+  info "  - sha1: $(cat "${local_file}.sha1" )"
   info "  - local file: ${registry_file_name}"
   return 0
 }
@@ -3469,44 +3440,35 @@ function get_image_from_url() {
 function get_url_image_to_registry() {
   local source_url="$1"; shift
   local expected_hash="$1"; shift
-  local image_format="$1"; shift
-  local registry_region="$1"; shift
-  local registry_bucket="$1"; shift
-  local registry_path="$1"; shift
-  local registry_file_name="$1"; shift
-  local product="$1"; shift
-  local environment="$1"; shift
-  local segment="$1"; shift
-  local build_unit="$1"; shift
+  local registry_location="${1}"; shift
+  local image_file_name="$1"; shift
   local zip_image_content="${1}"; shift
 
   pushTempDir "hamlet_imageUrl_XXXXXX"
-  local local_dir="$(getTopTempDir)"
+  local_dir="$(getTopTempDir)"
 
-  get_image_from_url "${source_url}" "${local_dir}" "${registry_file_name}"
+  get_image_from_url "${source_url}" "${local_dir}" "${image_file_name}"
 
   if [[ "${zip_image_content}" == "true" && "$(fileExtension "${source_url}")" != "zip" ]]; then
-    local build_reference="$(cat ${local_dir}/$(fileName "${source_url}").sha1 )"
-    ( cd "${local_dir}" && zip -j "${local_dir}/${registry_file_name}" "${local_dir}/$(fileName "${source_url}")")
-    sha1sum "${local_dir}/${registry_file_name}" | cut -d " " -f 1  > "${local_dir}/${registry_file_name}.sha1"
+    image_hash="$(cat "${local_dir}/$(fileName "${source_url}").sha1" )"
+    ( cd "${local_dir}" && zip -j "${local_dir}/${image_file_name}" "${local_dir}/$(fileName "${source_url}")")
+    sha1sum "${local_dir}/${image_file_name}" | cut -d " " -f 1  > "${local_dir}/${image_file_name}.sha1"
   else
-    local build_reference="$(cat ${local_dir}/${registry_file_name}.sha1 )"
+    image_hash="$(cat "${local_dir}/${image_file_name}.sha1" )"
   fi
 
-  if [[ -n "${expected_hash}" && -n "${build_reference}" ]]; then
-    if [[ "${build_reference}" != "${expected_hash}" ]]; then
-      fatal "Image from url: ${source_url} sha1: ${build_reference} does not match expected sha1 hash: ${expected_hash}"
+  if [[ -n "${expected_hash}" ]]; then
+    if [[ "${image_hash}" != "${expected_hash}" ]]; then
+      fatal "Image from url: ${source_url} sha1: ${image_hash} does not match expected sha1 hash: ${expected_hash}"
       return 255
     fi
   fi
 
   popTempDir
 
-  update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_url}"
-
-  info "Uploading image to registry..."
-  if [[ -n "${build_reference}" && -f "${local_dir}/${registry_file_name}" ]]; then
-    aws --region "${registry_region}" s3 sync --no-progress --delete "${local_dir}" "s3://${registry_bucket}/${registry_path}/${build_reference}/"
+  info "Uploading image to registry ${registry_location}/${expected_hash}"
+  if [[ -f "${local_dir}/${image_file_name}" ]]; then
+    aws s3 sync --no-progress --delete "${local_dir}" "${registry_location}/${expected_hash}"
   else
     fatal "Could not get image from ${source_url}"
   fi
@@ -3515,14 +3477,10 @@ function get_url_image_to_registry() {
 
 function get_image_from_container_registry() {
   local source_image="$1"; shift
-  local image_format="$1"; shift
-  local product="$1"; shift
-  local environment="$1"; shift
-  local segment="$1"; shift
-  local build_unit="$1"; shift
   local registry_dns="$1"; shift
   local registry_provider="$1"; shift
   local ecr_region="$1"; shift
+  local registry_image="$1"; shift
 
   image_tool=""
 
@@ -3531,12 +3489,11 @@ function get_image_from_container_registry() {
     image_tool="docker"
     docker image pull "${source_image}"
 
-    # Create Registry Image
-    registry_image="${registry_dns}/${source_image}"
-
     # Establish the hamlet registry image
-    repository="${source_image%:*}"
-    create_containter_registry_repository "${repository}" "${registry_dns}" "${registry_provider}" "${ecr_region}" || return $?
+    repository_name="${registry_image#*/}"
+    repository_name="${repository_name%:*}"
+    repository_name="${repository_name%@*}"
+    create_containter_registry_repository "${repository_name}" "${registry_dns}" "${registry_provider}" "${ecr_region}" || return $?
 
     # Push into the hamlet registry
     login_to_container_registry "${registry_dns}" "${registry_provider}" "${ecr_region}" || return $?
@@ -3545,9 +3502,6 @@ function get_image_from_container_registry() {
 
     # Update build references to use the new image
     docker image prune --force
-    build_reference="$( docker image inspect "${source_image}" --format '{{join .RepoDigests ";"}}' )"
-
-    update_build_reference_from_image "${product}" "${environment}" "${segment}" "${build_unit}" "${build_reference}" "${image_format}" "${source_image}"
   fi
 
   if [[ -z "${image_tool}" ]]; then
