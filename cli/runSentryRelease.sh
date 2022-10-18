@@ -21,6 +21,7 @@ Usage: $(basename $0) -m SENTRY_SOURCE_MAP_S3_URL -r SENTRY_RELEASE -s -u DEPLOY
 where
 
 (o) -a APP_TYPE                     the app framework being used
+(o) -d DISTRIBUTION                 distribution for sentry release
 (m) -u DEPLOYMENT_UNIT              deployment unit for a build blueprint
 (o) -g DEPLOYMENT_GROUP             the deployment group the unit belongs to
     -h                              shows this text
@@ -50,6 +51,9 @@ function options() {
         case $opt in
             a)
                 APP_TYPE="${OPTARG}"
+                ;;
+            d)
+                DISTRIBUTION="${OPTARG}"
                 ;;
             g)
                 DEPLOYMENT_GROUP="${OPTARG}"
@@ -217,6 +221,10 @@ function main() {
 
   if [[ -n "${SENTRY_URL_PREFIX}" ]]; then
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
+  fi
+
+  if [[ -n "${DISTRIBUTION}" ]]; then
+    upload_args+=("--dist" "${DISTRIBUTION}")
   fi
 
   pushd "${SOURCE_MAP_PATH}" > /dev/null
