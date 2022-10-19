@@ -21,7 +21,7 @@ Usage: $(basename $0) -m SENTRY_SOURCE_MAP_S3_URL -r SENTRY_RELEASE -s -u DEPLOY
 where
 
 (o) -a APP_TYPE                     the app framework being used
-(o) -d DISTRIBUTION                 distribution for sentry release
+(o) -d SENTRY_DIST                 distribution for sentry release
 (m) -u DEPLOYMENT_UNIT              deployment unit for a build blueprint
 (o) -g DEPLOYMENT_GROUP             the deployment group the unit belongs to
     -h                              shows this text
@@ -47,13 +47,13 @@ EOF
 function options() {
 
     # Parse options
-    while getopts ":a:hg:m:p:r:u:w:" opt; do
+    while getopts ":a:d:hg:m:p:r:u:w:" opt; do
         case $opt in
             a)
                 APP_TYPE="${OPTARG}"
                 ;;
             d)
-                DISTRIBUTION="${OPTARG}"
+                SENTRY_DIST="${OPTARG}"
                 ;;
             g)
                 DEPLOYMENT_GROUP="${OPTARG}"
@@ -147,6 +147,7 @@ function main() {
   # there is no point duplicate expo sdk version as a setting in CMDB and it doesn't make sense to checkout the code to read it at this stage
   [[ -z "${SENTRY_URL_PREFIX}" && "${sentry_url_override}" != "true" ]] && SENTRY_URL_PREFIX="$( jq -r '.SENTRY_URL_PREFIX' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_RELEASE}" && "${sentry_release_override}" != "true" ]] && SENTRY_RELEASE="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_RELEASE else .SENTRY_RELEASE end' <"${CONFIG_FILE}" )"
+  [[ -z "${SENTRY_DIST}" ]] && SENTRY_DIST="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_DIST else .SENTRY_DIST end' <"${CONFIG_FILE}" )"
   [[ -z "${SENTRY_SOURCE_MAP_S3_URL}" && "${sentry_source_map_s3_url_override}" != "true" ]] && SENTRY_SOURCE_MAP_S3_URL="$( jq -r '.SENTRY_SOURCE_MAP_S3_URL' <"${CONFIG_FILE}" )"
 
   [[ -z "${SENTRY_PROJECT}" ]] && SENTRY_PROJECT="$( jq -r 'if .AppConfig? then .AppConfig.SENTRY_PROJECT else .SENTRY_PROJECT end' <"${CONFIG_FILE}" )"
@@ -223,8 +224,8 @@ function main() {
     upload_args+=("--url-prefix" "${SENTRY_URL_PREFIX}")
   fi
 
-  if [[ -n "${DISTRIBUTION}" ]]; then
-    upload_args+=("--dist" "${DISTRIBUTION}")
+  if [[ -n "${SENTRY_DIST}" ]]; then
+    upload_args+=("--dist" "${SENTRY_DIST}")
   fi
 
   pushd "${SOURCE_MAP_PATH}" > /dev/null
