@@ -26,7 +26,7 @@ export LOG_FORMAT_FULL="full"
 
 # -- Error tracing --
 # -- Output an errors source, line and function name --
-export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+export PS4='+(${BASH_SOURCE[0]}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 declare -A LOG_LEVEL_ORDER
 LOG_LEVEL_ORDER=(
@@ -1207,14 +1207,6 @@ function create_iam_accesskey() {
     fatal "Could not generate accesskey for ${username}"
     return 255
   fi
-}
-
-function get_iam_smtp_password() {
-  local secretkey="$1"; shift
-
-  (echo -en "\x02"; echo -n 'SendRawEmail' \
-  | openssl dgst -sha256 -hmac $secretkey -binary) \
-  | openssl enc -base64
 }
 
 function manage_iam_userpassword() {
