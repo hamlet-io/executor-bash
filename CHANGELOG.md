@@ -1,6 +1,18 @@
 # Changelog
 
-## latest (2022-10-11)
+## latest (2022-10-24)
+
+#### New Features
+
+* sentry distribution ([#357](https://github.com/hamlet-io/executor-bash/issues/357))
+* add -d option for sentry distribution ([#356](https://github.com/hamlet-io/executor-bash/issues/356))
+#### Refactorings
+
+* ses password util and BASH_SOURCE
+
+Full set of changes: [`8.8.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.8.0...latest)
+
+## 8.8.0 (2022-10-13)
 
 #### New Features
 
@@ -41,9 +53,10 @@
 * deprecate turtle and move to prebuild process
 #### Others
 
+* update changelog ([#344](https://github.com/hamlet-io/executor-bash/issues/344))
 * formatting
 
-Full set of changes: [`8.7.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.7.0...latest)
+Full set of changes: [`8.7.0...8.8.0`](https://github.com/hamlet-io/executor-bash/compare/8.7.0...8.8.0)
 
 ## 8.7.0 (2022-08-23)
 
