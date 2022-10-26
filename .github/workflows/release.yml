@@ -10,5 +10,6 @@ on:
   pull_request:
 
 jobs:
-  uses: hamlet-io/.github/.github/workflows/engine_image_release.yml@main
-  secrets: inherit
+  image_release:
+    uses: 'hamlet-io/.github/.github/workflows/engine_image_release.yml@main'
+    secrets: inherit
