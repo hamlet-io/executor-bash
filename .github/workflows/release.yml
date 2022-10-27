@@ -11,5 +11,5 @@ on:
 
 jobs:
   image_release:
-    uses: 'hamlet-io/.github/.github/workflows/engine_image_release.yml@main'
+    uses: 'hamlet-io/.github/.github/workflows/engine_image_release.yml@1.1.1'
     secrets: inherit
