@@ -1,6 +1,19 @@
 # Changelog
 
-## latest (2022-10-24)
+## latest (2022-11-08)
+
+#### New Features
+
+* (image): Update scripts for image support
+#### Fixes
+
+* update release package version
+* force ITMS package upload ([#362](https://github.com/hamlet-io/executor-bash/issues/362))
+* job name
+
+Full set of changes: [`8.8.2...latest`](https://github.com/hamlet-io/executor-bash/compare/8.8.2...latest)
+
+## 8.8.2 (2022-10-27)
 
 #### New Features
 
@@ -9,8 +22,11 @@
 #### Refactorings
 
 * ses password util and BASH_SOURCE
+#### Others
 
-Full set of changes: [`8.8.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.8.0...latest)
+* update changelog ([#355](https://github.com/hamlet-io/executor-bash/issues/355))
+
+Full set of changes: [`8.8.0...8.8.2`](https://github.com/hamlet-io/executor-bash/compare/8.8.0...8.8.2)
 
 ## 8.8.0 (2022-10-13)
 
