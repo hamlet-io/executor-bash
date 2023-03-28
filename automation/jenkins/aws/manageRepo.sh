@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 [[ -n "${AUTOMATION_DEBUG}" ]] && set ${AUTOMATION_DEBUG}
-trap 'exit ${RESULT:-1}' EXIT SIGHUP SIGINT SIGTERM
+trap 'exit -1' SIGHUP SIGINT SIGTERM
 . "${AUTOMATION_BASE_DIR}/common.sh"
 
 REPO_OPERATION_CLONE="clone"
@@ -76,10 +76,10 @@ function init() {
     if [[ $? -ne 0 ]]; then
         check_for_invalid_environment_variables "REPO_URL" || return $?
 
-        git remote add "${REPO_REMOTE}" "${REPO_URL}"
-        RESULT=$?
-        [[ ${RESULT} -ne 0 ]] &&
-            fatal "Can't add remote ${REPO_REMOTE} to ${REPO_LOG_NAME} repo" && return 1
+        if ! git remote add "${REPO_REMOTE}" "${REPO_URL}"; then
+            fatal "Can't add remote ${REPO_REMOTE} to ${REPO_LOG_NAME} repo"
+            return 1
+        fi
     fi
 
     git log -n 1 >/dev/null 2>&1
@@ -98,8 +98,10 @@ function clone() {
     debug "Cloning the ${REPO_LOG_NAME} repo and checking out the ${REPO_BRANCH} branch ..."
     check_for_invalid_environment_variables "REPO_URL" "REPO_BRANCH" || return $?
 
-    git clone -b "${REPO_BRANCH}" "${REPO_URL}" .
-    RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't clone ${REPO_LOG_NAME} repo" && return 1
+    if ! git clone -b "${REPO_BRANCH}" "${REPO_URL}" .; then
+        fatal "Can't clone ${REPO_LOG_NAME} repo"
+        return 1
+    fi
 }
 
 function push() {
@@ -160,8 +162,10 @@ function push() {
         # Commit changes
         debug "Committing to the ${REPO_LOG_NAME} repo..."
 
-        git commit -m "${formatted_commit_message}"
-        RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't commit to the ${REPO_LOG_NAME} repo" && return 1
+        if ! git commit -m "${formatted_commit_message}"; then
+            fatal "Can't commit to the ${REPO_LOG_NAME} repo"
+            return 1
+        fi
 
         REPO_PUSH_REQUIRED="true"
     else
@@ -175,8 +179,10 @@ function push() {
             warning "Tag ${REPO_TAG} not added to the ${REPO_LOG_NAME} repo - it is already present"
         else
             debug "Adding tag \"${REPO_TAG}\" to the ${REPO_LOG_NAME} repo..."
-            git tag -a "${REPO_TAG}" -m "${REPO_MESSAGE}"
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't tag the ${REPO_LOG_NAME} repo" && return 1
+            if ! git tag -a "${REPO_TAG}" -m "${REPO_MESSAGE}"; then
+                fatal "Can't tag the ${REPO_LOG_NAME} repo"
+                return 1
+            fi
 
             REPO_PUSH_REQUIRED="true"
         fi
@@ -185,24 +191,27 @@ function push() {
     # Update upstream repo
     GENERATION_REPO_PUSH_RETRIES="${GENERATION_REPO_PUSH_RETRIES:-6}"
     REPO_PUSHED=false
-    HEAD_DETACHED=false
     if [[ ("${DEFER_REPO_PUSH}" != "true") && ("${REPO_PUSH_REQUIRED}" == "true") ]]; then
         for TRY in $( seq 1 ${GENERATION_REPO_PUSH_RETRIES} ); do
             # Check if remote branch exists
             EXISTING_BRANCH=$(git ls-remote --heads 2>/dev/null | grep "refs/heads/${REPO_BRANCH}$")
             if [[ -n "${EXISTING_BRANCH}" ]]; then
                 debug "Rebasing ${REPO_LOG_NAME} in case of changes..."
-                git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}
-                RESULT=$? && [[ ${RESULT} -ne 0 ]] && \
-                    fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}" && return 1
+                if ! git pull --rebase ${REPO_REMOTE} ${REPO_BRANCH}; then
+                    fatal "Can't rebase the ${REPO_LOG_NAME} repo from upstream ${REPO_REMOTE}"
+                    return 1
+                fi
             fi
 
             debug "Pushing the ${REPO_LOG_NAME} repo upstream..."
-            git symbolic-ref -q HEAD
-            RESULT=$? && [[ ${RESULT} -ne 0 ]] && HEAD_DETACHED=true
-            if [[ "${HEAD_DETACHED}" == "false" ]]; then
-                git push --tags ${REPO_REMOTE} ${REPO_BRANCH} && REPO_PUSHED=true && break || \
-                  info "Waiting to retry push to ${REPO_LOG_NAME} repo ..." && sleep 5
+            if git symbolic-ref -q HEAD; then
+                if git push --tags ${REPO_REMOTE} ${REPO_BRANCH}; then
+                    REPO_PUSHED=true
+                    break
+                else
+                  info "Waiting to retry push to ${REPO_LOG_NAME} repo ..."
+                  sleep 5
+                fi
             else
               # If push failed HEAD might be detached. Create a temp branch and merge it to the target to fix it.
                 git branch temp-${REPO_BRANCH} && \
@@ -213,7 +222,8 @@ function push() {
             fi
         done
         if [[ "${REPO_PUSHED}" == "false" ]]; then
-            fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}" && return 1
+            fatal "Can't push the ${REPO_LOG_NAME} repo changes to upstream repo ${REPO_REMOTE}"
+            return 1
         fi
     fi
 }
@@ -279,8 +289,10 @@ function set_context() {
 
   # Ensure we are inside the repo directory
   if [[ ! -d "${REPO_DIR}" ]]; then
-    mkdir -p "${REPO_DIR}"
-    RESULT=$? && [[ ${RESULT} -ne 0 ]] && fatal "Can't create repo directory ${REPO_DIR}" && return 1
+    if ! mkdir -p "${REPO_DIR}"; then
+        fatal "Can't create repo directory ${REPO_DIR}"
+        return 1
+    fi
   fi
 
   return 0
@@ -300,7 +312,6 @@ function main() {
   esac
 
   # All good
-  RESULT=0
   return 0
 }
 
