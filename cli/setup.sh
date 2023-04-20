@@ -127,7 +127,7 @@ function main() {
           # Git validation
           git_ref="$( git check-ref-format --allow-onelevel --normalize "${git_ref}" || fatal "Invalid ref ${git_ref}" >&2 ; return $? )"
           remote_ref="$( git ls-remote -q "${git_auth_url}" "${git_ref}" || fatal "Could not find remote plugin - id: ${plugin_instance_id} - Url: ${git_url} - Ref: ${git_ref}"; return $? )"
-          remote_hash="$( echo "${remote_ref}" | cut -f 1 )"
+          remote_hash="$( echo "${remote_ref}" | head -1 | cut -f 1 )"
 
           update_existing="false"
 
