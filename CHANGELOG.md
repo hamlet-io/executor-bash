@@ -1,15 +1,24 @@
 # Changelog
 
-## latest (2022-11-08)
+## latest (2023-06-09)
 
 #### New Features
 
 * (image): Update scripts for image support
 #### Fixes
 
+* (expo): remove ITMSTRANSPORTER_FORCE_ITMS_PACKAGE_UPLOAD override ([#368](https://github.com/hamlet-io/executor-bash/issues/368))
+* (setup): handle multiple remote ref matches ([#367](https://github.com/hamlet-io/executor-bash/issues/367))
+* repo management return code handling ([#366](https://github.com/hamlet-io/executor-bash/issues/366))
 * update release package version
 * force ITMS package upload ([#362](https://github.com/hamlet-io/executor-bash/issues/362))
 * job name
+#### Refactorings
+
+* (waf): remove older waf logging setup ([#365](https://github.com/hamlet-io/executor-bash/issues/365))
+#### Others
+
+* update changelog ([#359](https://github.com/hamlet-io/executor-bash/issues/359))
 
 Full set of changes: [`8.8.2...latest`](https://github.com/hamlet-io/executor-bash/compare/8.8.2...latest)
 
