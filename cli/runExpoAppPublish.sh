@@ -782,8 +782,6 @@ function main() {
 
                         info "Submitting IOS binary to testflight"
                         export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD="${IOS_TESTFLIGHT_PASSWORD}"
-                        # see https://github.com/fastlane/fastlane/issues/20756#issuecomment-1286277976
-                        export ITMSTRANSPORTER_FORCE_ITMS_PACKAGE_UPLOAD=true
                         # Handle removal of Transporter from xcode/Developer tools
                         if [[ -d "/Applications/Transporter.app/Contents/itms" ]]; then
                             export FASTLANE_ITUNES_TRANSPORTER_USE_SHELL_SCRIPT=1
