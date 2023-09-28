@@ -1,1 +1,0 @@
-../../../execution/setCredentialsSource.sh
