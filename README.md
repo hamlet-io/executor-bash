@@ -28,8 +28,6 @@ These options must be set in order for Hamlet Deploy Executor to function correc
 
 | Variable                | Value                                  |
 |-------------------------|----------------------------------------|
-| AUTOMATION_BASE_DIR     | `<clone dir>/automation`               |
-| AUTOMATION_DIR          | `<clone dir>automation/jenkins/aws`    |
 | GENERATION_BASE_DIR     | `<clone dir>`                          |
 | GENERATION_DIR          | `<clone dir>/cli`                      |
 
