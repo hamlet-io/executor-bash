@@ -368,7 +368,7 @@ function main() {
                                     -r "${ACCEPTANCE_TAG}" \
                                     -c "${REGISTRY_SCOPE}" || return $?
                                 ;;
-                            lambda|spa|contentnode|scripts|pipeline|dataset|rdssnapshot|openapi|swagger)
+                            lambda|spa|contentnode|scripts|dataset|rdssnapshot|openapi|swagger)
                                 ${AUTOMATION_DIR}/manageS3Registry.sh -k \
                                     -a "${IMAGE_PROVIDER}" \
                                     -u "${REGISTRY_DEPLOYMENT_UNIT}" \
@@ -556,7 +556,7 @@ function main() {
                                 -g "${CODE_COMMIT}" \
                                 -c "${REGISTRY_SCOPE}" || local_image_available="false"
                             ;;
-                        lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                        lambda|scripts|openapi|swagger|spa|contentnode)
                             ${AUTOMATION_DIR}/manageS3Registry.sh -v \
                                 -y "${IMAGE_FORMAT,,}" \
                                 -f "${IMAGE_FORMAT,,}.zip" \
@@ -614,7 +614,7 @@ function main() {
                                         -z "${FROM_IMAGE_PROVIDER}" \
                                         -c "${REGISTRY_SCOPE}" || remote_image_avaialble="false"
                                     ;;
-                                lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+                                lambda|scripts|openapi|swagger|spa|contentnode)
                                     ${AUTOMATION_DIR}/manageS3Registry.sh -p \
                                         -y "${IMAGE_FORMAT,,}" \
                                         -f "${IMAGE_FORMAT,,}.zip" \

@@ -1549,51 +1549,6 @@ function get_cognito_userpool_custom_distribution() {
   aws --region "${region}" cognito-idp describe-user-pool-domain --domain ${domain} --query "DomainDescription.CloudFrontDistribution" --output text || return $?
 }
 
-# -- Data Pipeline --
-function create_data_pipeline() {
-  local region="$1"; shift
-  local configfile="$1"; shift
-
-  pipeline="$(aws --region "${region}" datapipeline create-pipeline --cli-input-json "file://${configfile}" || return $?)"
-  if [[ -n "${pipeline}" ]]; then
-    echo "${pipeline}" | jq -r '.pipelineId | select (.!=null)'
-    return 0
-
-  else
-    fatal "Could not create pipeline"
-    return 255
-  fi
-}
-
-function update_data_pipeline() {
-  local region="$1"; shift
-  local pipelineid="$1"; shift
-  local definitionfile="$1"; shift
-  local parameterobjectfile="$1"; shift
-  local parametervaluefile="$1"; shift
-  local cfnStackName="$1"; shift
-  local securityGroupId="$1"; shift
-
-  # Add resources created during stack creation
-  securityGroup="$(get_cloudformation_stack_output "${region}" "${cfnStackName}" "${securityGroupId}" "ref" || return $?)"
-
-  arnLookupValueFile="$(filePath ${parametervaluefile})/ArnLookup-$(fileBase ${parametervaluefile})"
-  jq --arg pipelineRole "${pipelineRole}" --arg resourceRole "${resourceRole}" --arg securityGroup "${securityGroup}" '.values.my_SECURITY_GROUP_ID = $securityGroup ' < "${parametervaluefile}" > "${arnLookupValueFile}"
-
-  pipeline_details="$(aws --region "${region}" datapipeline put-pipeline-definition --pipeline-id "${pipelineid}" --pipeline-definition "file://${definitionfile}" --parameter-objects "file://${parameterobjectfile}" --parameter-values-uri "file://${arnLookupValueFile}" )"
-  pipeline_errored="$(echo "${pipeline_details}" | jq -r '.errored ')"
-
-  if [[ "${pipeline_errored}" == "false" ]]; then
-    info "Pipeline definition update successful"
-    info "${pipeline_details}"
-    return 0
-  else
-    fatal "Pipeline definition did not work as expected"
-    fatal "${pipeline_details}"
-    return 255
-  fi
-}
-
 #-- DynamoDB --
 function upsert_dynamodb_item() {
   local region="$1"; shift

@@ -117,7 +117,7 @@ for IMAGE_FORMAT in "${IMAGE_FORMATS_ARRAY[@]}"; do
             [[ "${RESULT}" -eq 0 ]] && PRESENT=1
             ;;
 
-        lambda|pipeline|scripts|openapi|swagger|spa|contentnode)
+        lambda|scripts|openapi|swagger|spa|contentnode)
             ${AUTOMATION_DIR}/manageS3Registry.sh -v \
                 -u "${DEPLOYMENT_UNIT}" -g "${CODE_COMMIT}" -c "${REGISTRY_SCOPE}" \
                 -y "${IMAGE_FORMAT,,}" -f "${IMAGE_FORMAT,,}.zip"
