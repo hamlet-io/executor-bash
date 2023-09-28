@@ -1,6 +1,15 @@
 # Changelog
 
-## latest (2023-06-09)
+## latest (2023-09-28)
+
+#### Refactorings
+
+* remove legacy bash scripts ([#370](https://github.com/hamlet-io/executor-bash/issues/370))
+* remove datapipeline script support ([#324](https://github.com/hamlet-io/executor-bash/issues/324))
+
+Full set of changes: [`8.9.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.9.0...latest)
+
+## 8.9.0 (2023-06-16)
 
 #### New Features
 
@@ -18,9 +27,10 @@
 * (waf): remove older waf logging setup ([#365](https://github.com/hamlet-io/executor-bash/issues/365))
 #### Others
 
+* update changelog ([#364](https://github.com/hamlet-io/executor-bash/issues/364))
 * update changelog ([#359](https://github.com/hamlet-io/executor-bash/issues/359))
 
-Full set of changes: [`8.8.2...latest`](https://github.com/hamlet-io/executor-bash/compare/8.8.2...latest)
+Full set of changes: [`8.8.2...8.9.0`](https://github.com/hamlet-io/executor-bash/compare/8.8.2...8.9.0)
 
 ## 8.8.2 (2022-10-27)
 
