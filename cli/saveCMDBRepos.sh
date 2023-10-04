@@ -180,7 +180,7 @@ function commit_tag_push() {
 
             debug "Pushing the repo upstream"
             if git -C "${repo_dir}" symbolic-ref -q HEAD; then
-                if git push --tags ${repo_remote} ${repo_branch}; then
+                if git -C "${repo_dir}" push --tags ${repo_remote} ${repo_branch}; then
                     REPO_PUSHED=true
                     break
                 else
