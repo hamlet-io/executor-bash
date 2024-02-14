@@ -431,6 +431,7 @@ function process_template_pass() {
 
   # CMDB Root
   [[ -n "${ROOT_DIR}" ]]                  && args+=("-r" "rootDir=${ROOT_DIR}")
+  [[ -n "${cf_dir}" ]]                    && args+=("-r" "cfDir=${cf_dir}" )
 
   # Starting layers
   [[ -n "${DISTRICT_TYPE}" ]]             && args+=("-r" "districtType=${DISTRICT_TYPE}")
