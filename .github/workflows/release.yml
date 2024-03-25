@@ -10,6 +10,7 @@ on:
   pull_request:
 
 jobs:
-  image_release:
-    uses: 'hamlet-io/.github/.github/workflows/engine_image_release.yml@1.1.2'
+  package:
+    if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags') }}
+    uses: hamlet-io/.github/.github/workflows/engine_image_release.yml@1.1.4
     secrets: inherit
