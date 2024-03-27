@@ -1,11 +1,21 @@
 # Changelog
 
-## latest (2023-09-28)
+## latest (2024-03-25)
 
+#### New Features
+
+* (db): add support for checking cluster username ([#373](https://github.com/hamlet-io/executor-bash/issues/373))
+#### Fixes
+
+* set dir for git push ([#372](https://github.com/hamlet-io/executor-bash/issues/372))
 #### Refactorings
 
 * remove legacy bash scripts ([#370](https://github.com/hamlet-io/executor-bash/issues/370))
 * remove datapipeline script support ([#324](https://github.com/hamlet-io/executor-bash/issues/324))
+#### Others
+
+* update github actions pipelines ([#375](https://github.com/hamlet-io/executor-bash/issues/375))
+* update changelog ([#369](https://github.com/hamlet-io/executor-bash/issues/369))
 
 Full set of changes: [`8.9.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.9.0...latest)
 
