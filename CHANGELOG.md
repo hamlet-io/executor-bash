@@ -1,6 +1,6 @@
 # Changelog
 
-## latest (2024-03-25)
+## latest (2024-03-27)
 
 #### New Features
 
@@ -14,6 +14,7 @@
 * remove datapipeline script support ([#324](https://github.com/hamlet-io/executor-bash/issues/324))
 #### Others
 
+* update changelog ([#371](https://github.com/hamlet-io/executor-bash/issues/371))
 * update github actions pipelines ([#375](https://github.com/hamlet-io/executor-bash/issues/375))
 * update changelog ([#369](https://github.com/hamlet-io/executor-bash/issues/369))
 
