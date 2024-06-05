@@ -1,12 +1,14 @@
 # Changelog
 
-## latest (2024-03-25)
+## latest (2024-06-05)
 
 #### New Features
 
+* add cf_dir to engine ([#374](https://github.com/hamlet-io/executor-bash/issues/374))
 * (db): add support for checking cluster username ([#373](https://github.com/hamlet-io/executor-bash/issues/373))
 #### Fixes
 
+* utility scripts - add db snapshot identifier when calling describe-db-cluster-snapshots
 * set dir for git push ([#372](https://github.com/hamlet-io/executor-bash/issues/372))
 #### Refactorings
 
@@ -14,6 +16,7 @@
 * remove datapipeline script support ([#324](https://github.com/hamlet-io/executor-bash/issues/324))
 #### Others
 
+* update changelog ([#371](https://github.com/hamlet-io/executor-bash/issues/371))
 * update github actions pipelines ([#375](https://github.com/hamlet-io/executor-bash/issues/375))
 * update changelog ([#369](https://github.com/hamlet-io/executor-bash/issues/369))
 
