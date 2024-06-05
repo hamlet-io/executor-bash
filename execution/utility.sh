@@ -2483,7 +2483,7 @@ function check_rds_snapshot_username() {
   info "Checking snapshot username matches expected username"
 
   if [[ "${db_type}" == "cluster" ]]; then
-    snapshot_username="$( aws --region ${region} rds describe-db-cluster-snapshots --include-shared --include-public --db-cluster-snapshot-identifier --output text --query 'DBClusterSnapshots[0].MasterUsername || ``' || return $? )"
+    snapshot_username="$( aws --region ${region} rds describe-db-cluster-snapshots --include-shared --include-public --db-cluster-snapshot-identifier ${db_snapshot_identifier} --output text --query 'DBClusterSnapshots[0].MasterUsername || ``' || return $? )"
   else
     snapshot_username="$(aws --region ${region} rds describe-db-snapshots --include-shared --include-public --db-snapshot-identifier ${db_snapshot_identifier} --output text --query 'DBSnapshots[0].MasterUsername || ``' || return $? )"
   fi
