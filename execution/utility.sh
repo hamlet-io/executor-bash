@@ -2395,7 +2395,19 @@ function encrypt_snapshot() {
 
           info "Waiting for temp encrypted snapshot to become available..."
           sleep 2
-          aws --region "${region}" rds wait db-snapshot-available --db-snapshot-identifier "encrypted-${db_snapshot_identifier}" || return $?
+          available=false
+          for ((i=1;i<=3;i++)); do
+            if aws --region "${region}" rds wait db-snapshot-available --db-snapshot-identifier "encrypted-${db_snapshot_identifier}"; then
+              info "Snapshot is available"
+              available=true
+              break
+            fi
+          done
+
+          if [[ "$available" != true ]]; then
+            error "Snapshot still not available after 3 attempts"
+            return 128
+          fi
 
           info "Removing plaintext snapshot..."
           # delete the original snapshot
