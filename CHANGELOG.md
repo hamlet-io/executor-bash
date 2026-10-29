@@ -1,12 +1,22 @@
 # Changelog
 
-## latest (2024-03-25)
+## latest (2026-10-29)
+
+#### Fixes
+
+* make 3 attempts waiting for encyrpted snapshot to become available
+
+Full set of changes: [`9.1.0...latest`](https://github.com/hamlet-io/executor-bash/compare/9.1.0...latest)
+
+## 9.1.0 (2024-06-05)
 
 #### New Features
 
+* add cf_dir to engine ([#374](https://github.com/hamlet-io/executor-bash/issues/374))
 * (db): add support for checking cluster username ([#373](https://github.com/hamlet-io/executor-bash/issues/373))
 #### Fixes
 
+* utility scripts - add db snapshot identifier when calling describe-db-cluster-snapshots
 * set dir for git push ([#372](https://github.com/hamlet-io/executor-bash/issues/372))
 #### Refactorings
 
@@ -14,10 +24,11 @@
 * remove datapipeline script support ([#324](https://github.com/hamlet-io/executor-bash/issues/324))
 #### Others
 
+* update changelog ([#371](https://github.com/hamlet-io/executor-bash/issues/371))
 * update github actions pipelines ([#375](https://github.com/hamlet-io/executor-bash/issues/375))
 * update changelog ([#369](https://github.com/hamlet-io/executor-bash/issues/369))
 
-Full set of changes: [`8.9.0...latest`](https://github.com/hamlet-io/executor-bash/compare/8.9.0...latest)
+Full set of changes: [`8.9.0...9.1.0`](https://github.com/hamlet-io/executor-bash/compare/8.9.0...9.1.0)
 
 ## 8.9.0 (2023-06-16)
 
